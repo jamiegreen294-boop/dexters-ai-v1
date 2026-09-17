@@ -3,18 +3,57 @@
 <head>
 <title>Dexter AI Command Centre</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body{font-family:Arial,sans-serif;background:#111;color:white;padding:20px}
+.card{background:#222;border-radius:12px;padding:15px;margin:12px 0}
+button{padding:10px;margin:5px;border-radius:8px;cursor:pointer}
+.slider{width:100%}
+.chat{background:#000;padding:10px;border-radius:8px;min-height:100px}
+</style>
 </head>
 <body>
-<h1>Dexter AI Command Centre</h1>
-<p>Test environment only.</p>
-<div>
-<h2>Modules</h2>
+<h1>🤖 Dexter AI Command Centre</h1>
+<p>TEST ENVIRONMENT ONLY - NO LIVE CONNECTIONS</p>
+
+<div class="card">
+<h2>Dexter Status</h2>
+<p>🟢 Test Mode Online</p>
+<p>Live Systems: Locked</p>
+</div>
+
+<div class="card">
+<h2>Personality Studio</h2>
+<button>Normal Dexter</button>
+<button>Cheeky Glasgow Dexter</button>
+<button>Late Night Dexter</button>
+<button>Customer Safe</button>
+</div>
+
+<div class="card">
+<h2>Personality Controls</h2>
+<label>Banter Level</label>
+<input class="slider" type="range" min="0" max="100">
+<label>Sarcasm Level</label>
+<input class="slider" type="range" min="0" max="100">
+</div>
+
+<div class="card">
+<h2>Test Chat Simulator</h2>
+<div class="chat">Dexter test conversation area</div>
+<input placeholder="Type test customer message" style="width:80%;padding:10px">
+<button>Send</button>
+</div>
+
+<div class="card">
+<h2>AI Modules</h2>
 <ul>
-<li>Personality Studio</li>
-<li>Test Chat</li>
-<li>Rules Manager</li>
-<li>Knowledge Base</li>
+<li>✅ Personality Studio</li>
+<li>✅ Test Chat</li>
+<li>✅ Rules Manager</li>
+<li>✅ Knowledge Base</li>
+<li>🔒 Live Connections Disabled</li>
 </ul>
 </div>
+
 </body>
 </html>
