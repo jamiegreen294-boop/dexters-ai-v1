@@ -1,6 +1,6 @@
 {
   "name": "dexter-home-host",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,6 +8,6 @@
     "install-browser": "npx playwright install chromium"
   },
   "dependencies": {
-    "playwright": "^1.55.0"
+    "playwright": "1.55.0"
   }
 }
