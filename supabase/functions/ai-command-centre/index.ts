@@ -317,7 +317,8 @@ Deno.serve(async(req)=>{
       if(!connectorKey||!toolName)return json({error:"Connector and tool are required."},400);
       const {data:connector}=await db.from("ai_connectors").select("*").eq("connector_key",connectorKey).maybeSingle();
       if(!connector)return json({error:"Unknown connector."},404);
-      const sensitive=/write|create|update|delete|deploy|publish|send|payment|refund|charge|submit|login|upload|merge|push|place_order|cancel_order|amend_order|account_change/i.test(toolName);
+      const sensitiveText=(toolName+" "+JSON.stringify(request||{})).toLowerCase();
+      const sensitive=/write|create|update|delete|deploy|publish|send|payment|refund|charge|submit|login|sign in|upload|merge|push|place order|cancel order|amend order|account change|change password|purchase|checkout/.test(sensitiveText);
       const requiresApproval=sensitive;
       const {data:tr,error}=await db.from("ai_tool_requests").insert({
         connector_key:connectorKey,tool_name:toolName,requested_by:keyName,request,
@@ -546,6 +547,21 @@ await db.from("ai_task_events").insert({task_id:task.id,event_type:"completed",m
     if(!message)return json({error:"Message is required"},400);
     const context=await loadContext(db,message,role);
     const agentKey=chooseAgent(message,cleanText(body.agent,60),context.agents);
+    let chatToolContext:any=null;
+    const chatHomeUrl=(Deno.env.get("DEXTER_HOME_HOST_URL")||"").replace(/\/$/,"");
+    const chatHomeToken=Deno.env.get("DEXTER_HOME_HOST_TOKEN")||"";
+    const wantsWeb=/\b(latest|current|today|research|look up|internet|web search|online|documentation|docs|news|website)\b/i.test(message);
+    const chatUrl=message.match(/https?:\/\/[^\s)\]}>"']+/i);
+    if(chatHomeUrl&&chatHomeToken&&(wantsWeb||chatUrl)){
+      try{
+        const tool=wantsWeb?"web.research":"browser.navigate_and_act";
+        const endpoint=wantsWeb?chatHomeUrl+"/workspace/tool":chatHomeUrl+"/browser/tool";
+        const request=wantsWeb?{query:message,session:"chat-"+sessionId}:{url:chatUrl?.[0],session:"chat-"+sessionId,instruction:"Read this page for the user's question: "+message+". Read only; do not log in, submit, send, publish, purchase or change anything."};
+        const rr=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+chatHomeToken},body:JSON.stringify({tool,request})});
+        const rd=await rr.json().catch(()=>({}));
+        if(rr.ok)chatToolContext=rd?.result??rd;
+      }catch{}
+    }
     const {data:historyRows}=await db.from("dexter_messages").select("role,content,created_at").eq("session_id",sessionId).order("created_at",{ascending:true}).limit(30);
     const history=(historyRows||[]).slice(-18).map((m:any)=>({role:m.role==="assistant"?"assistant":"user",content:cleanText(m.content,12000)}));
     const system=basePrompt(role,context,agentKey)+"\n\nCHAT MODE\n- Answer directly.\n- Use test knowledge and approved memory when relevant.\n- For volatile facts such as current prices, stock, orders, deployments or system status, say when the test knowledge cannot confirm live state.\n- For coding questions, give useful technical guidance and code while respecting the no-live-write boundary.";
