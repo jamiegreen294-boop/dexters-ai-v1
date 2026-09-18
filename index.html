@@ -1,29 +1,220 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#11100f"><meta name="robots" content="noindex,nofollow,noarchive"><title>Dexter AI — Test</title>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#11100f">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<title>Dexter AI — Test Workspace</title>
 <style>
-:root{font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#0b0b0c;color:#f8f4ed;--accent:#ef8b22}
-*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(circle at 10% 0,#4a230f 0,#171211 30%,#090909 72%)}main{width:min(980px,100%);min-height:100vh;margin:auto;display:grid;grid-template-rows:auto 1fr auto;padding:18px}.top{display:flex;align-items:center;gap:12px;padding:8px 2px 16px}.logo{width:48px;height:48px;border-radius:15px;display:grid;place-items:center;background:var(--accent);color:#17100a;font-weight:950;font-size:26px}.top h1{margin:0;font-size:22px}.top p{margin:2px 0;color:#aaa29a;font-size:13px}.status{margin-left:auto;padding:7px 10px;border-radius:20px;background:#201d1a;border:1px solid #3a342e;color:#cfc7bf;font-size:12px}.status.ok{color:#9be7bd}.chat{overflow:auto;padding:8px 0 118px}.bubble{max-width:84%;padding:13px 15px;margin:10px 0;border-radius:18px;line-height:1.5;white-space:pre-wrap;word-break:break-word}.assistant{background:#211f1d;border:1px solid #3a342e;border-bottom-left-radius:5px}.user{background:var(--accent);color:#17100a;margin-left:auto;border-bottom-right-radius:5px}.composer{position:sticky;bottom:0;background:#151312;border:1px solid #3a342e;border-radius:20px;padding:10px;display:flex;gap:8px;box-shadow:0 16px 45px #000}.composer textarea{flex:1;min-height:46px;max-height:140px;resize:none;border:0;outline:0;background:transparent;color:#fff;font:inherit;padding:10px}.composer button,.secondary{border:0;border-radius:14px;background:var(--accent);color:#17100a;font-weight:900;padding:0 18px;cursor:pointer}.composer button:disabled{opacity:.45}.toolbar{display:flex;gap:8px;margin-bottom:8px}.secondary{padding:8px 11px;background:#211f1d;color:#e8e1d9;border:1px solid #3a342e;font-size:12px}.gate{position:fixed;inset:0;background:#080808ee;display:grid;place-items:center;padding:20px;z-index:10}.gate form{width:min(430px,100%);background:#191716;border:1px solid #3d352f;border-radius:24px;padding:26px;box-shadow:0 20px 80px #000}.gate input{width:100%;margin:10px 0;padding:13px;border:1px solid #463d36;border-radius:12px;background:#0f0e0d;color:#fff}.gate button{width:100%;height:46px;border:0;border-radius:13px;background:var(--accent);font-weight:900}.small{font-size:12px;color:#9f9891}.error{color:#ffb0a3}.hidden{display:none}.info{font-size:12px;color:#99928b;margin:8px 0 0}
-@media(max-width:600px){main{padding:12px}.bubble{max-width:92%}.top h1{font-size:20px}}
-</style></head>
+:root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#090909;color:#f7f1ea;--panel:#171514;--panel2:#201d1b;--line:#37312c;--muted:#a8a09a;--accent:#ef8b22;--good:#8fe0b6;--warn:#ffd27a}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(circle at 12% 0,#47200d 0,#181311 25%,#090909 62%);overflow:hidden}
+button,input,textarea,select{font:inherit}button{cursor:pointer}.hidden{display:none!important}
+.shell{display:grid;grid-template-columns:250px 1fr;height:100vh}
+.sidebar{border-right:1px solid var(--line);background:#0f0e0ddd;backdrop-filter:blur(18px);padding:18px 14px;display:flex;flex-direction:column;gap:18px}
+.brand{display:flex;gap:11px;align-items:center;padding:2px 4px}.logo{width:42px;height:42px;border-radius:13px;background:var(--accent);display:grid;place-items:center;color:#1b0f05;font-weight:950;font-size:24px}.brand h1{font-size:18px;margin:0}.brand p{margin:2px 0 0;color:var(--muted);font-size:11px;letter-spacing:.08em}
+.nav{display:grid;gap:7px}.nav button{border:1px solid transparent;background:transparent;color:#d9d1ca;text-align:left;padding:11px 12px;border-radius:12px;font-weight:750}.nav button.active,.nav button:hover{background:#211d1a;border-color:#3c342e;color:#fff}.nav small{float:right;color:#8f8881}
+.sidecard{margin-top:auto;border:1px solid var(--line);background:#171412;border-radius:14px;padding:12px}.sidecard b{display:block;font-size:12px}.sidecard span{display:block;color:var(--muted);font-size:11px;margin-top:4px}.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:5px 8px;background:#211d1a;border:1px solid #3b342f;font-size:11px}.dot{width:7px;height:7px;border-radius:50%;background:#888}.dot.ok{background:var(--good)}
+.main{min-width:0;height:100vh;display:grid;grid-template-rows:auto 1fr}.topbar{display:flex;gap:12px;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line);background:#11100fe8;backdrop-filter:blur(18px)}.topbar h2{margin:0;font-size:18px}.topbar p{margin:2px 0 0;color:var(--muted);font-size:12px}.top-actions{margin-left:auto;display:flex;gap:8px;align-items:center}.select{background:#201d1b;color:#fff;border:1px solid #3d3731;border-radius:10px;padding:8px 10px;max-width:210px}.iconbtn{background:#211e1b;color:#eee;border:1px solid #3d3731;border-radius:10px;padding:8px 10px}
+.content{min-height:0;overflow:auto;padding:18px}.page{display:none;min-height:100%}.page.active{display:block}
+.chat-layout{height:100%;display:grid;grid-template-rows:1fr auto;gap:12px}.chatlog{overflow:auto;padding:4px 4px 24px;max-width:960px;width:100%;margin:0 auto}.bubble{max-width:82%;padding:13px 15px;margin:10px 0;border-radius:18px;line-height:1.55;white-space:pre-wrap;word-break:break-word}.assistant{background:#201d1b;border:1px solid #3c342e;border-bottom-left-radius:5px}.user{background:var(--accent);color:#1b0f05;margin-left:auto;border-bottom-right-radius:5px}.meta{font-size:10px;opacity:.62;margin-top:6px}.composerwrap{max-width:960px;width:100%;margin:0 auto}.composer{background:#151312;border:1px solid #3a342e;border-radius:18px;padding:9px;display:flex;gap:8px;box-shadow:0 16px 44px #0008}.composer textarea{flex:1;min-height:48px;max-height:150px;resize:none;border:0;outline:0;background:transparent;color:#fff;padding:10px}.send{border:0;border-radius:13px;background:var(--accent);color:#1b0f05;font-weight:900;padding:0 18px}.send:disabled{opacity:.45}.hint{font-size:11px;color:var(--muted);padding:7px 4px 0}
+.hero{max-width:920px;margin:8px auto 18px}.hero h3{font-size:28px;margin:0 0 7px}.hero p{margin:0;color:var(--muted);line-height:1.5}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;max-width:920px;margin:auto}.card{background:#171513;border:1px solid var(--line);border-radius:16px;padding:15px}.card h4{margin:0 0 6px}.card p{color:var(--muted);font-size:13px;line-height:1.45;margin:0}.workbox{max-width:920px;margin:auto;background:#171513;border:1px solid var(--line);border-radius:18px;padding:16px}.workbox textarea{width:100%;min-height:160px;background:#0e0d0c;color:#fff;border:1px solid #3b3530;border-radius:13px;padding:13px;outline:none;resize:vertical}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.primary{border:0;background:var(--accent);color:#1b0f05;font-weight:900;border-radius:12px;padding:11px 15px}.secondary{border:1px solid #3c352f;background:#211e1b;color:#eee;font-weight:750;border-radius:12px;padding:10px 13px}.tasklist,.knowledge-list,.agent-list{display:grid;gap:10px;max-width:920px;margin:14px auto}.task,.knowledge,.agent{background:#171513;border:1px solid var(--line);border-radius:14px;padding:13px}.tasktop,.agenttop{display:flex;gap:8px;align-items:center}.tasktop b,.agenttop b{flex:1}.status{font-size:11px;border:1px solid #3a342f;border-radius:999px;padding:4px 8px;color:#d7d0c9}.result{margin-top:9px;color:#ddd5cf;white-space:pre-wrap;line-height:1.5;font-size:13px}.kcat{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);font-weight:850}.knowledge b{display:block;margin:4px 0 6px}.knowledge p{white-space:pre-wrap}.system-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;max-width:920px;margin:0 auto}.metric{background:#171513;border:1px solid var(--line);border-radius:14px;padding:14px}.metric strong{display:block;font-size:24px}.metric span{color:var(--muted);font-size:11px}
+.notice{max-width:920px;margin:12px auto;border:1px solid #554224;background:#2b2113;border-radius:14px;padding:12px;color:#f5d7a0;font-size:12px}
+.gate{position:fixed;inset:0;z-index:30;background:#080808f4;display:grid;place-items:center;padding:20px}.gate form{width:min(430px,100%);background:#191716;border:1px solid #3d352f;border-radius:24px;padding:26px;box-shadow:0 20px 80px #000}.gate h2{margin-bottom:6px}.gate p{color:var(--muted);line-height:1.45}.gate input{width:100%;margin:10px 0;padding:13px;border:1px solid #463d36;border-radius:12px;background:#0f0e0d;color:#fff}.gate button{width:100%;height:46px;border:0;border-radius:13px;background:var(--accent);font-weight:900}.error{color:#ffad9d;font-size:12px}
+@media(max-width:820px){body{overflow:auto}.shell{grid-template-columns:1fr;height:auto;min-height:100vh}.sidebar{display:none}.main{height:auto;min-height:100vh}.content{padding:12px}.topbar{position:sticky;top:0;z-index:10}.grid,.system-grid{grid-template-columns:1fr}.bubble{max-width:92%}.select{max-width:145px}.hero h3{font-size:23px}}
+</style>
+</head>
 <body>
-<div id="gate" class="gate"><form id="login"><div class="logo">D</div><h2>Dexter AI — Test</h2><p>Private Dexter assistant test environment. This does not change the live Loyalty App.</p><input id="token" type="password" autocomplete="current-password" placeholder="Dexter test access code" required><button>Open Dexter AI</button><p id="loginError" class="small error"></p></form></div>
-<main>
-<header class="top"><div class="logo">D</div><div><h1>Dexter AI</h1><p>Dexters business assistant · TEST</p></div><span id="status" class="status">Connecting…</span></header>
-<section id="chat" class="chat"><div class="bubble assistant">Awrite! I’m Dexter. Ask me about the live menu, Sunday Roast, the Loyalty App, Back Office, POS, KDS or how something works. I’ll keep the facts straight and the patter cheeky.</div></section>
-<div><div class="toolbar"><button class="secondary" id="newChat" type="button">New conversation</button><button class="secondary" id="changeCode" type="button">Change access code</button></div>
-<form id="composer" class="composer"><textarea id="message" placeholder="Ask Dexter…" rows="1" required></textarea><button id="send">Send</button></form></div>
+<div id="gate" class="gate">
+<form id="login">
+<div class="logo">D</div>
+<h2>Dexter AI — Test</h2>
+<p>Private Dexters assistant test workspace. This environment is isolated and does not make live changes.</p>
+<input id="token" type="password" autocomplete="current-password" placeholder="Dexter test access code" required>
+<button>Open Dexter AI</button>
+<p id="loginError" class="error"></p>
+</form>
+</div>
+
+<div class="shell">
+<aside class="sidebar">
+<div class="brand"><div class="logo">D</div><div><h1>Dexter AI</h1><p>TEST WORKSPACE</p></div></div>
+<div class="nav">
+<button class="active" data-page="chat">Chat <small>AI</small></button>
+<button data-page="work">Work <small>Tasks</small></button>
+<button data-page="agents">Agents <small>4</small></button>
+<button data-page="knowledge">Knowledge <small id="knowledgeNav">—</small></button>
+<button data-page="system">System <small>Status</small></button>
+</div>
+<div class="sidecard"><b>Safe test mode</b><span>No live writes, deployments, orders, payments or customer/staff changes.</span></div>
+</aside>
+
+<section class="main">
+<header class="topbar">
+<div><h2 id="pageTitle">Chat</h2><p id="subtitle">Ask Dexter about Dexters, systems, coding or operations.</p></div>
+<div class="top-actions">
+<select id="agentSelect" class="select"></select>
+<button id="newChat" class="iconbtn" type="button">New</button>
+<button id="logout" class="iconbtn" type="button">Lock</button>
+</div>
+</header>
+
+<main class="content">
+<section id="page-chat" class="page active">
+<div class="chat-layout">
+<div id="chat" class="chatlog"><div class="bubble assistant">Awrite! I’m Dexter. This is the isolated test workspace. Ask me something or switch to Work mode when you want a task worked through properly.</div></div>
+<div class="composerwrap">
+<form id="composer" class="composer"><textarea id="message" placeholder="Ask Dexter…" rows="1" required></textarea><button id="send" class="send">Send</button></form>
+<div class="hint">Chat uses conversation memory in Dexters-AI-Test. Live systems are not changed.</div>
+</div>
+</div>
+</section>
+
+<section id="page-work" class="page">
+<div class="hero"><h3>Dexter Work</h3><p>Give Dexter a substantial job. It will create a real test task, select the best agent, complete the reasoning/code work it can safely do, and save the result in the test database.</p></div>
+<div class="workbox">
+<textarea id="workRequest" placeholder="Example: Review the POS order flow, identify likely failure points and produce the exact code changes that should be made in a test branch."></textarea>
+<div class="row" style="margin-top:10px"><button id="runWork" class="primary">Run work task</button><button id="refreshTasks" class="secondary">Refresh tasks</button><span id="workState" class="status">Ready</span></div>
+</div>
+<div id="taskList" class="tasklist"></div>
+</section>
+
+<section id="page-agents" class="page">
+<div class="hero"><h3>Agents</h3><p>Dexter automatically chooses an agent from your request, or you can select one manually from the top bar.</p></div>
+<div id="agentList" class="agent-list"></div>
+</section>
+
+<section id="page-knowledge" class="page">
+<div class="hero"><h3>Test knowledge</h3><p>This is the business/system knowledge Dexter is allowed to use in the isolated build. Volatile live facts are deliberately not treated as current unless connected later with approval.</p></div>
+<div id="knowledgeList" class="knowledge-list"></div>
+</section>
+
+<section id="page-system" class="page">
+<div class="hero"><h3>System</h3><p>Backend readiness and isolation status for Dexter AI.</p></div>
+<div class="system-grid">
+<div class="metric"><strong id="mBackend">—</strong><span>Backend</span></div>
+<div class="metric"><strong id="mAI">—</strong><span>AI model</span></div>
+<div class="metric"><strong id="mKnowledge">—</strong><span>Knowledge items</span></div>
+<div class="metric"><strong id="mTasks">—</strong><span>Work tasks</span></div>
+</div>
+<div class="notice">Environment: TEST. Live writes are disabled by design. Dexter may reason and create records inside Dexters-AI-Test only.</div>
+</section>
 </main>
+</section>
+</div>
+
 <script>
-const ENDPOINT="https://eikruaxxzzxmfjvsmwwo.supabase.co/functions/v1/ai-command-centre";
-const $=id=>document.getElementById(id),chat=$("chat"),msg=$("message"),send=$("send");
-let token=sessionStorage.dexterToken||"",sessionId=localStorage.dexterSession||crypto.randomUUID();
-function bubble(text,who){const d=document.createElement("div");d.className="bubble "+who;d.textContent=text;chat.appendChild(d);chat.scrollTop=chat.scrollHeight;return d}
-async function health(){try{const r=await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json","x-dexter-token":token||"not-set"},body:JSON.stringify({action:"health",sessionId})});const d=await r.json();if(r.ok){$("status").textContent="Backend online";$("status").classList.add("ok")}else $("status").textContent=d.error||"Setup needed"}catch{$("status").textContent="Offline"}}
-async function loadHistory(){if(!token)return;try{const r=await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json","x-dexter-token":token},body:JSON.stringify({action:"history",sessionId})});const d=await r.json();if(!r.ok)return;(d.history||[]).forEach(x=>bubble(x.content,x.role==="assistant"?"assistant":"user"));}catch{}}
-$("login").onsubmit=async e=>{e.preventDefault();token=$("token").value.trim();sessionStorage.dexterToken=token;sessionId=crypto.randomUUID();localStorage.dexterSession=sessionId;$("gate").classList.add("hidden");chat.innerHTML="";bubble("Awrite! I’m Dexter. Fire away.","assistant");await health();msg.focus()};
-if(token){$("gate").classList.add("hidden");health();loadHistory()}
-$("changeCode").onclick=()=>{$("token").value="";sessionStorage.removeItem("dexterToken");$("gate").classList.remove("hidden");$("token").focus()};
-$("newChat").onclick=()=>{sessionId=crypto.randomUUID();localStorage.dexterSession=sessionId;chat.innerHTML="";bubble("Fresh conversation started. What are we sorting?","assistant");msg.focus()};
-$("composer").onsubmit=async e=>{e.preventDefault();const text=msg.value.trim();if(!text||!token)return;if(text.length>12000)return;msg.value="";bubble(text,"user");send.disabled=true;const wait=bubble("Thinking…","assistant");try{const r=await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json","x-dexter-token":token},body:JSON.stringify({message:text,sessionId})});const d=await r.json();if(r.status===401){sessionStorage.removeItem("dexterToken");token="";$("gate").classList.remove("hidden");throw new Error(d.error||"Access code rejected.")}if(!r.ok)throw new Error(d.error||"Dexter is unavailable.");wait.textContent=d.reply||"Aye, I didn't get a usable answer back."}catch(err){wait.textContent=err.message}finally{send.disabled=false;msg.focus()}};
-msg.onkeydown=e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();$("composer").requestSubmit()}};
-</script></body></html>
+var ENDPOINT="https://eikruaxxzzxmfjvsmwwo.supabase.co/functions/v1/ai-command-centre";
+var $=function(id){return document.getElementById(id)};
+var token=sessionStorage.dexterToken||"";
+var sessionId=localStorage.dexterSession||crypto.randomUUID();
+var dashboard={agents:[],tasks:[],knowledge:[],memory:[]};
+var currentPage="chat";
+
+function api(body){
+  body.sessionId=sessionId;
+  return fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json","x-dexter-token":token},body:JSON.stringify(body)}).then(async function(r){
+    var d=await r.json().catch(function(){return {}});
+    if(r.status===401){sessionStorage.removeItem("dexterToken");token="";$("gate").classList.remove("hidden");throw new Error(d.error||"Access code rejected.");}
+    if(!r.ok)throw new Error(d.error||"Dexter is unavailable.");
+    return d;
+  });
+}
+function bubble(text,who,meta){
+  var d=document.createElement("div");d.className="bubble "+who;d.textContent=text;
+  if(meta){var m=document.createElement("div");m.className="meta";m.textContent=meta;d.appendChild(m);}
+  $("chat").appendChild(d);$("chat").scrollTop=$("chat").scrollHeight;return d;
+}
+function escapeHtml(s){return String(s||"").replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]});}
+function setPage(name){
+  currentPage=name;
+  document.querySelectorAll(".page").forEach(function(x){x.classList.remove("active")});
+  document.querySelectorAll(".nav button").forEach(function(x){x.classList.toggle("active",x.dataset.page===name)});
+  $("page-"+name).classList.add("active");
+  var titles={chat:["Chat","Ask Dexter about Dexters, systems, coding or operations."],work:["Work","Run substantial tasks in the isolated test environment."],agents:["Agents","Choose the specialist Dexter should use."],knowledge:["Knowledge","Review the facts available to Dexter."],system:["System","Check backend, AI and isolation status."]};
+  $("pageTitle").textContent=titles[name][0];$("subtitle").textContent=titles[name][1];
+  if(name!=="chat")loadDashboard();
+  if(name==="system")health();
+}
+document.querySelectorAll(".nav button").forEach(function(b){b.onclick=function(){setPage(b.dataset.page)}});
+
+async function health(){
+  try{
+    var d=await api({action:"health"});
+    $("mBackend").textContent=d.status==="ready"?"Ready":"Check";
+    $("mAI").textContent=d.ai?"Ready":"Missing";
+    $("mKnowledge").textContent=d.knowledge||0;
+    $("mTasks").textContent=d.tasks||0;
+    $("knowledgeNav").textContent=d.knowledge||0;
+    return d;
+  }catch(e){
+    $("mBackend").textContent="Offline";$("mAI").textContent="—";throw e;
+  }
+}
+async function loadHistory(){
+  var d=await api({action:"history"});var rows=d.history||[];
+  if(rows.length){$("chat").innerHTML="";rows.forEach(function(x){bubble(x.content,x.role==="assistant"?"assistant":"user")});}
+}
+function renderAgents(){
+  var list=$("agentList"),sel=$("agentSelect");list.innerHTML="";var keep=sel.value;sel.innerHTML="";
+  (dashboard.agents||[]).forEach(function(a){
+    var opt=document.createElement("option");opt.value=a.agent_key;opt.textContent=a.name;sel.appendChild(opt);
+    var div=document.createElement("div");div.className="agent";div.innerHTML='<div class="agenttop"><b>'+escapeHtml(a.name)+'</b><span class="status">'+escapeHtml(a.agent_key)+'</span></div><p>'+escapeHtml(a.description||"")+'</p>';list.appendChild(div);
+  });
+  if(keep&&Array.from(sel.options).some(function(o){return o.value===keep}))sel.value=keep;
+}
+function renderKnowledge(){
+  var list=$("knowledgeList");list.innerHTML="";
+  (dashboard.knowledge||[]).forEach(function(k){
+    var div=document.createElement("div");div.className="knowledge";
+    div.innerHTML='<span class="kcat">'+escapeHtml(k.category)+'</span><b>'+escapeHtml(k.title)+'</b><p>'+escapeHtml(k.content)+'</p>';list.appendChild(div);
+  });
+  $("knowledgeNav").textContent=(dashboard.knowledge||[]).length;
+}
+function renderTasks(){
+  var list=$("taskList");list.innerHTML="";
+  if(!(dashboard.tasks||[]).length){list.innerHTML='<div class="task"><p>No work tasks yet.</p></div>';return;}
+  (dashboard.tasks||[]).forEach(function(t){
+    var div=document.createElement("div");div.className="task";
+    var body='<div class="tasktop"><b>'+escapeHtml(t.title)+'</b><span class="status">'+escapeHtml(t.status)+'</span></div><div class="meta">'+escapeHtml(t.agent_key||"")+" · "+escapeHtml(String(t.progress||0))+'%</div>';
+    if(t.result)body+='<div class="result">'+escapeHtml(t.result)+'</div>';
+    if(t.error)body+='<div class="result error">'+escapeHtml(t.error)+'</div>';
+    div.innerHTML=body;list.appendChild(div);
+  });
+}
+async function loadDashboard(){
+  try{
+    dashboard=await api({action:"dashboard"});renderAgents();renderKnowledge();renderTasks();
+  }catch(e){}
+}
+$("login").onsubmit=async function(e){
+  e.preventDefault();$("loginError").textContent="";token=$("token").value.trim();sessionStorage.dexterToken=token;
+  try{
+    await health();localStorage.dexterSession=sessionId;$("gate").classList.add("hidden");await loadDashboard();await loadHistory();$("message").focus();
+  }catch(err){$("loginError").textContent=err.message;sessionStorage.removeItem("dexterToken");token="";}
+};
+$("logout").onclick=function(){sessionStorage.removeItem("dexterToken");token="";$("token").value="";$("gate").classList.remove("hidden");$("token").focus();};
+$("newChat").onclick=function(){sessionId=crypto.randomUUID();localStorage.dexterSession=sessionId;$("chat").innerHTML="";bubble("Fresh conversation started. What are we sorting?","assistant");$("message").focus();};
+$("composer").onsubmit=async function(e){
+  e.preventDefault();var text=$("message").value.trim();if(!text||!token)return;$("message").value="";bubble(text,"user");$("send").disabled=true;var wait=bubble("Thinking…","assistant");
+  try{
+    var d=await api({action:"chat",message:text,agent:$("agentSelect").value});wait.firstChild?wait.firstChild.nodeValue=d.reply:wait.textContent=d.reply;wait.textContent=d.reply;
+    var meta=document.createElement("div");meta.className="meta";meta.textContent=(d.agent||"Dexter")+" · "+(d.model||"AI");wait.appendChild(meta);
+  }catch(err){wait.textContent=err.message;}finally{$("send").disabled=false;$("message").focus();}
+};
+$("message").onkeydown=function(e){if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();$("composer").requestSubmit();}};
+$("runWork").onclick=async function(){
+  var req=$("workRequest").value.trim();if(!req)return;$("runWork").disabled=true;$("workState").textContent="Working…";
+  try{
+    var d=await api({action:"work",message:req,agent:$("agentSelect").value});$("workState").textContent="Completed";$("workRequest").value="";await loadDashboard();
+    if(d.reply){setPage("work");}
+  }catch(err){$("workState").textContent=err.message;}finally{$("runWork").disabled=false;}
+};
+$("refreshTasks").onclick=function(){loadDashboard()};
+if(token){
+  $("gate").classList.add("hidden");
+  health().then(loadDashboard).then(loadHistory).catch(function(){sessionStorage.removeItem("dexterToken");token="";$("gate").classList.remove("hidden");});
+}
+</script>
+</body>
+</html>
