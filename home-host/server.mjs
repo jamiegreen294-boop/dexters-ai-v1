@@ -152,7 +152,7 @@ async function autonomousBrowser(page,request={}){
       "PAGE STATE:",JSON.stringify(state).slice(0,30000),
       "RECENT ACTIONS:",JSON.stringify(history.slice(-8))
     ].join("\n");
-    const decision=parseJson(await ollama([{role:"user",content:prompt}],"json",CODE_MODEL));
+    const decision=parseJson(await ollama([{role:"user",content:prompt}],"json",LOCAL_MODEL));
     if(isConsequence(decision)&&!allowConsequential)return {status:"blocked",reason:"Consequence requires separate owner approval and live mode.",state,history};
     if(decision.action==="done")return {status:"completed",result:String(decision.result||decision.reason||"Completed"),state,history};
     if(decision.action==="blocked")return {status:"blocked",reason:String(decision.reason||"Blocked"),state,history};
@@ -248,7 +248,7 @@ async function codingAgent(request={}){
       "GIT STATUS: "+JSON.stringify(status).slice(0,6000),
       "RECENT STEPS: "+JSON.stringify(history.slice(-10)).slice(0,14000)
     ].join("\n");
-    const decision=parseJson(await ollama([{role:"user",content:prompt}],"json"));
+    const decision=parseJson(await ollama([{role:"user",content:prompt}],"json",CODE_MODEL));
     let result;
     if(decision.action==="list")result={entries:await listTree(path.join(repoPath,String(decision.path||"")),2,300)};
     else if(decision.action==="read")result=await workspaceTool("workspace.read",{path:path.join(repoPath,String(decision.path||""))});
