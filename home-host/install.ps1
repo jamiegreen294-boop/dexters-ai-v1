@@ -42,9 +42,14 @@ if (-not (Get-Command ollama -ErrorAction SilentlyContinue)) {
 }
 
 if (Get-Command ollama -ErrorAction SilentlyContinue) {
-  Write-Host "Downloading Dexter's local model..."
-  ollama pull qwen3:4b
-  [Environment]::SetEnvironmentVariable("DEXTER_LOCAL_MODEL","qwen3:4b","User")
+  $ramGB = [math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB)
+  if ($ramGB -ge 32) { $model = "qwen3:14b" }
+  elseif ($ramGB -ge 16) { $model = "qwen3:8b" }
+  else { $model = "qwen3:4b" }
+  Write-Host "Detected $ramGB GB RAM. Installing Dexter local model: $model"
+  ollama pull $model
+  [Environment]::SetEnvironmentVariable("DEXTER_LOCAL_MODEL",$model,"User")
+  [Environment]::SetEnvironmentVariable("DEXTER_CODE_MODEL",$model,"User")
 }
 
 New-Item -ItemType Directory -Force -Path ".\workspace" | Out-Null
