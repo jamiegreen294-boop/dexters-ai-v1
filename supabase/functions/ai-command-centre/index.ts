@@ -317,8 +317,8 @@ Deno.serve(async(req)=>{
       if(!connectorKey||!toolName)return json({error:"Connector and tool are required."},400);
       const {data:connector}=await db.from("ai_connectors").select("*").eq("connector_key",connectorKey).maybeSingle();
       if(!connector)return json({error:"Unknown connector."},404);
-      const sensitive=/write|create|update|delete|deploy|publish|send|payment|refund|charge|submit|login|upload|merge/i.test(toolName);
-      const requiresApproval=sensitive||connectorKey==="browser";
+      const sensitive=/write|create|update|delete|deploy|publish|send|payment|refund|charge|submit|login|upload|merge|push|place_order|cancel_order|amend_order|account_change/i.test(toolName);
+      const requiresApproval=sensitive;
       const {data:tr,error}=await db.from("ai_tool_requests").insert({
         connector_key:connectorKey,tool_name:toolName,requested_by:keyName,request,
         status:requiresApproval?"waiting_approval":"pending",requires_approval:requiresApproval
@@ -372,7 +372,7 @@ Deno.serve(async(req)=>{
           const base=(Deno.env.get("DEXTER_HOME_HOST_URL")||Deno.env.get("DEXTER_BROWSER_WORKER_URL")||"").replace(/\/$/,"");
           const workerToken=Deno.env.get("DEXTER_HOME_HOST_TOKEN")||Deno.env.get("DEXTER_BROWSER_WORKER_TOKEN")||"";
           if(!base||!workerToken)throw new Error("Dexter Home PC is built but not connected to the command centre yet.");
-          const workspace=/^(workspace\.|git\.|code\.)/.test(tr.tool_name);
+          const workspace=/^(workspace\.|git\.|code\.|web\.research$)/.test(tr.tool_name);
           const endpoint=workspace?base+"/workspace/tool":base+"/browser/tool";
           const r=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+workerToken},body:JSON.stringify({tool:tr.tool_name,request:tr.request,environment:"test"})});
           const d=await r.json().catch(()=>({}));
@@ -464,9 +464,40 @@ if(action==="work"){
       await db.from("ai_agent_tasks").insert({task_id:task.id,agent_key:agentKey,status:"running",input:{request,environment:"test"}});
       let toolContext:any=null;
       const urlMatch=request.match(/https?:\/\/[^\s)\]}>"']+/i);
+      const githubMatch=request.match(/https?:\/\/github\.com\/[\w.-]+\/[\w.-]+(?:\.git)?/i);
       const homeUrl=(Deno.env.get("DEXTER_HOME_HOST_URL")||"").replace(/\/$/,"");
       const homeToken=Deno.env.get("DEXTER_HOME_HOST_TOKEN")||"";
-      if(urlMatch&&homeUrl&&homeToken){
+      const codingIntent=agentKey==="coding-agent"||/\b(build|create|code|fix|debug|website|web app|app|repo|github|javascript|typescript|html|css|sql|supabase|vercel)\b/i.test(request);
+      const researchIntent=/\b(latest|current|research|look up|internet|web search|documentation|docs|find online)\b/i.test(request);
+      if(homeUrl&&homeToken&&codingIntent){
+        try{
+          await db.from("ai_task_events").insert({task_id:task.id,event_type:"tool.started",message:"Dexter Home PC autonomous coding agent started."});
+          const cr=await fetch(homeUrl+"/workspace/tool",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+homeToken},body:JSON.stringify({tool:"code.agent",request:{goal:request,repo_url:githubMatch?.[0]||undefined,project_name:title}})});
+          const cd=await cr.json().catch(()=>({}));
+          if(cr.ok){
+            toolContext={coding:cd?.result??cd};
+            await db.from("ai_task_events").insert({task_id:task.id,event_type:"tool.completed",message:"Home PC coding agent completed its local workspace pass."});
+          }else{
+            await db.from("ai_task_events").insert({task_id:task.id,event_type:"tool.failed",message:String(cd?.error||"Coding agent failed").slice(0,500)});
+          }
+        }catch(err){
+          await db.from("ai_task_events").insert({task_id:task.id,event_type:"tool.failed",message:String((err as Error)?.message||err).slice(0,500)});
+        }
+      }else if(homeUrl&&homeToken&&researchIntent){
+        try{
+          await db.from("ai_task_events").insert({task_id:task.id,event_type:"tool.started",message:"Dexter Home PC internet research started."});
+          const rr=await fetch(homeUrl+"/workspace/tool",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+homeToken},body:JSON.stringify({tool:"web.research",request:{query:request,session:"research-"+task.id}})});
+          const rd=await rr.json().catch(()=>({}));
+          if(rr.ok){
+            toolContext={research:rd?.result??rd};
+            await db.from("ai_task_events").insert({task_id:task.id,event_type:"tool.completed",message:"Home PC internet research completed."});
+          }else{
+            await db.from("ai_task_events").insert({task_id:task.id,event_type:"tool.failed",message:String(rd?.error||"Research failed").slice(0,500)});
+          }
+        }catch(err){
+          await db.from("ai_task_events").insert({task_id:task.id,event_type:"tool.failed",message:String((err as Error)?.message||err).slice(0,500)});
+        }
+      }else if(urlMatch&&homeUrl&&homeToken){
         try{
           await db.from("ai_task_events").insert({task_id:task.id,event_type:"tool.started",message:"Dexter Home PC browser investigation started."});
           const br=await fetch(homeUrl+"/browser/tool",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+homeToken},body:JSON.stringify({tool:"browser.navigate_and_act",request:{url:urlMatch[0],session:"work-"+task.id,instruction:"READ-ONLY investigation for this Dexter work request: "+request+". Do not log in, submit forms, send messages, make purchases, publish, deploy, delete or change account/security settings."}})});
