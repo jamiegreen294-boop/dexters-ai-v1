@@ -17,6 +17,7 @@ const HEADLESS=String(process.env.DEXTER_BROWSER_HEADLESS||"false").toLowerCase(
 const OLLAMA_URL=(process.env.DEXTER_OLLAMA_URL||"http://127.0.0.1:11434").replace(/\/$/,"");
 const LOCAL_MODEL=process.env.DEXTER_LOCAL_MODEL||"qwen3:4b";
 const MAX_AGENT_STEPS=Math.max(1,Math.min(30,Number(process.env.DEXTER_MAX_AGENT_STEPS||15)));
+const LIVE_ACTIONS=String(process.env.DEXTER_LIVE_ACTIONS||"false").toLowerCase()==="true";
 
 if(!TOKEN||TOKEN.length<24){
   console.error("Set DEXTER_BROWSER_WORKER_TOKEN to a long random value before starting Dexter.");
@@ -51,6 +52,10 @@ function safeWorkspacePath(rel=""){
   const full=path.resolve(WORKSPACE,String(rel||""));
   if(full!==WORKSPACE&&!full.startsWith(WORKSPACE+path.sep))throw new Error("Workspace path escapes Dexter workspace.");
   return full;
+}
+function requireApprovedLive(request,action){
+  if(!LIVE_ACTIONS)throw new Error(action+" is disabled while Dexter is in TEST mode.");
+  if(request?.approval_granted!==true)throw new Error(action+" requires owner approval.");
 }
 async function getContext(){
   if(!context){
@@ -284,6 +289,33 @@ async function workspaceTool(tool,request={}){
   if(tool==="git.init")return await runProcess("git",["init"],safeWorkspacePath(request.path||""),30000);
   if(tool==="git.status")return await runProcess("git",["status","--short","--branch"],safeWorkspacePath(request.path||""),30000);
   if(tool==="git.diff")return await runProcess("git",["diff","--",request.file||"."],safeWorkspacePath(request.path||""),30000);
+  if(tool==="git.commit"){
+    requireApprovedLive(request,"Git commit");
+    const cwd=safeWorkspacePath(request.path||"");
+    const add=await runProcess("git",["add","-A"],cwd,30000);
+    if(add.code!==0)return add;
+    return await runProcess("git",["commit","-m",String(request.message||"Dexter approved change").slice(0,180)],cwd,60000);
+  }
+  if(tool==="git.push"){
+    requireApprovedLive(request,"Git push");
+    const cwd=safeWorkspacePath(request.path||"");
+    return await runProcess("git",["push",String(request.remote||"origin"),String(request.ref||"HEAD")],cwd,180000);
+  }
+  if(tool==="github.pr.create"){
+    requireApprovedLive(request,"GitHub PR creation");
+    const cwd=safeWorkspacePath(request.path||"");
+    const args=["pr","create","--title",String(request.title||"Dexter change").slice(0,180),"--body",String(request.body||"Created by Dexter AI after owner approval").slice(0,4000)];
+    if(request.base)args.push("--base",String(request.base));
+    if(request.head)args.push("--head",String(request.head));
+    return await runProcess("gh",args,cwd,120000);
+  }
+  if(tool==="vercel.deploy"){
+    requireApprovedLive(request,"Vercel deploy");
+    const cwd=safeWorkspacePath(request.path||"");
+    const args=["vercel","deploy","--yes"];
+    if(request.production===true)args.push("--prod");
+    return await runProcess("npx",args,cwd,240000);
+  }
   if(tool==="code.check"){
     const cwd=safeWorkspacePath(request.path||"");
     const kind=String(request.kind||"").toLowerCase();
@@ -314,7 +346,7 @@ async function createJob(body){
 async function health(){
   let ollamaReady=false,models=[];
   try{const r=await fetch(OLLAMA_URL+"/api/tags");const d=await r.json();ollamaReady=r.ok;models=(d.models||[]).map(x=>x.name).slice(0,20);}catch{}
-  return {status:"ready",host:"home-pc",browser:"chromium",internet:true,coding_agent:true,headless:HEADLESS,workspace:WORKSPACE,ollama:{ready:ollamaReady,url:OLLAMA_URL,model:LOCAL_MODEL,models},jobs:loadJobs().length};
+  return {status:"ready",host:"home-pc",browser:"chromium",internet:true,coding_agent:true,live_actions:LIVE_ACTIONS,headless:HEADLESS,workspace:WORKSPACE,ollama:{ready:ollamaReady,url:OLLAMA_URL,model:LOCAL_MODEL,models},jobs:loadJobs().length};
 }
 function serveFile(res,file,contentType){const data=fs.readFileSync(file);res.writeHead(200,{"Content-Type":contentType,"Cache-Control":"no-store"});res.end(data);}
 
