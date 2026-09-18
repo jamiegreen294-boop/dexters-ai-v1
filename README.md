@@ -1,15 +1,24 @@
-# Dexter AI
+# Dexter AI — Test Workspace
 
-Private, server-backed Dexters assistant. This branch replaces the placeholder with a working chat endpoint, live read-only business context, permission-aware responses, and Supabase conversation memory.
+Dexter AI is the isolated test assistant for Dexters.
 
-## Required Vercel environment variables
+## Current test architecture
 
-- OPENAI_API_KEY
-- OPENAI_MODEL (optional; defaults to gpt-5-mini)
-- DEXTER_ACCESS_TOKEN
-- DEXTER_AI_SUPABASE_URL
-- DEXTER_AI_SUPABASE_SERVICE_ROLE_KEY
-- DEXTERS_DATA_SUPABASE_URL
-- DEXTERS_DATA_SUPABASE_SERVICE_ROLE_KEY
+- Frontend: `index.html` on branch `build/real-dexter-ai`
+- Backend: Supabase Edge Function `ai-command-centre` in project `Dexters-AI-Test`
+- Memory: `dexter_sessions` + `dexter_messages`
+- Test knowledge: `dexter_ai_knowledge`
+- Work tasks: `ai_tasks`, `ai_agent_tasks`, `ai_task_events`
+- Agents: coding, platform doctor, business and customer assistant
+- Security: hashed Dexter access keys plus server-side Supabase service role
+- AI provider: OpenAI Responses API through the Supabase Edge Function
 
-No secret is stored in browser code or GitHub. Live writes and deployments remain approval-gated.
+## Safety boundary
+
+This build is intentionally test-only. It does not write to the live Loyalty App, live Supabase project, POS, KDS, Back Office, WhatsApp, payments, staff records or customer records.
+
+Work mode creates and completes tasks inside `Dexters-AI-Test` only. Any future external/live tool connection must remain approval-gated.
+
+## Branch
+
+Do not merge this branch to `main` or connect live write tools until the owner explicitly approves the completed test build.
