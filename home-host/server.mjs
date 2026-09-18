@@ -203,6 +203,13 @@ async function codingAgent(request={}){
   const goal=String(request.goal||request.instruction||"").trim();
   if(!goal)throw new Error("Coding goal is required.");
   let repoPath=String(request.path||"").trim();
+  if(!repoPath&&!request.repo_url){
+    const slug=String(request.project_name||goal).toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,48)||("dexter-project-"+Date.now());
+    repoPath=path.join("projects",slug);
+    const fresh=safeWorkspacePath(repoPath);
+    fs.mkdirSync(fresh,{recursive:true});
+    await runProcess("git",["init"],fresh,30000).catch(()=>null);
+  }
   if(request.repo_url){
     if(!repoPath)repoPath=path.basename(new URL(String(request.repo_url)).pathname).replace(/\.git$/,"");
     const dest=safeWorkspacePath(repoPath);
@@ -210,7 +217,6 @@ async function codingAgent(request={}){
       await workspaceTool("git.clone",{url:String(request.repo_url),path:repoPath});
     }
   }
-  if(!repoPath)throw new Error("A workspace path or repo_url is required.");
   const root=safeWorkspacePath(repoPath);
   if(!fs.existsSync(root))throw new Error("Workspace/repository path does not exist.");
   const history=[];
@@ -275,6 +281,7 @@ async function workspaceTool(tool,request={}){
     fs.mkdirSync(path.dirname(dest),{recursive:true});
     return await runProcess("git",["clone","--depth","1",url,dest],WORKSPACE,180000);
   }
+  if(tool==="git.init")return await runProcess("git",["init"],safeWorkspacePath(request.path||""),30000);
   if(tool==="git.status")return await runProcess("git",["status","--short","--branch"],safeWorkspacePath(request.path||""),30000);
   if(tool==="git.diff")return await runProcess("git",["diff","--",request.file||"."],safeWorkspacePath(request.path||""),30000);
   if(tool==="code.check"){
