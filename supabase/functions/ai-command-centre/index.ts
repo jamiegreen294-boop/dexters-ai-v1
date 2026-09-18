@@ -69,7 +69,7 @@ function extractJson(text:string){
   return null;
 }
 function approvalRequired(message:string){
-  return /\b(deploy|merge|publish|production|live|refund|charge|payment|delete|remove customer|remove staff|change staff|change customer|send email|send message|place order|cancel order|amend order|database write|update live|github push)\b/i.test(message);
+  return /\b(deploy|merge|publish|refund|charge|payment|delete|remove customer|remove staff|change staff|change customer|send email|send message|place order|cancel order|amend order|database write|update live|github push|change password|create account)\b/i.test(message);
 }
 async function planWork(context:any,role:string,request:string,requestedAgent:string){
   const fallbackAgent=chooseAgent(request,requestedAgent,context.agents);
@@ -392,7 +392,26 @@ if(action==="work"){
 
       await db.from("ai_task_events").insert({task_id:task.id,event_type:"started",message:"Dexter AI test work started."});
       await db.from("ai_agent_tasks").insert({task_id:task.id,agent_key:agentKey,status:"running",input:{request,environment:"test"}});
-      const system=basePrompt(role,context,agentKey)+"\n\nWORK MODE\n- Produce a completed, practical work result using only reasoning and supplied test knowledge.\n- When code is requested, provide concrete code or exact changes, but do not pretend they were applied.\n- When diagnosis is requested, separate confirmed facts from hypotheses.\n- If a request requires a live or external action, mark that part as Needs approved tool connection and continue with everything that can be completed safely.\n- Do not ask unnecessary follow-up questions; make a best effort.";
+      let toolContext:any=null;
+      const urlMatch=request.match(/https?:\/\/[^\s)\]}>"']+/i);
+      const homeUrl=(Deno.env.get("DEXTER_HOME_HOST_URL")||"").replace(/\/$/,"");
+      const homeToken=Deno.env.get("DEXTER_HOME_HOST_TOKEN")||"";
+      if(urlMatch&&homeUrl&&homeToken){
+        try{
+          await db.from("ai_task_events").insert({task_id:task.id,event_type:"tool.started",message:"Dexter Home PC browser investigation started."});
+          const br=await fetch(homeUrl+"/browser/tool",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+homeToken},body:JSON.stringify({tool:"browser.navigate_and_act",request:{url:urlMatch[0],session:"work-"+task.id,instruction:"READ-ONLY investigation for this Dexter work request: "+request+". Do not log in, submit forms, send messages, make purchases, publish, deploy, delete or change account/security settings."}})});
+          const bd=await br.json().catch(()=>({}));
+          if(br.ok){
+            toolContext=bd?.result??bd;
+            await db.from("ai_task_events").insert({task_id:task.id,event_type:"tool.completed",message:"Home PC browser investigation completed."});
+          }else{
+            await db.from("ai_task_events").insert({task_id:task.id,event_type:"tool.failed",message:String(bd?.error||"Browser investigation failed").slice(0,500)});
+          }
+        }catch(err){
+          await db.from("ai_task_events").insert({task_id:task.id,event_type:"tool.failed",message:String((err as Error)?.message||err).slice(0,500)});
+        }
+      }
+      const system=basePrompt(role,context,agentKey)+(toolContext?"\n\nHOME PC TOOL CONTEXT\n"+JSON.stringify(toolContext).slice(0,30000):"")+"\n\nWORK MODE\n- Produce a completed, practical work result using only reasoning and supplied test knowledge.\n- When code is requested, provide concrete code or exact changes, but do not pretend they were applied.\n- When diagnosis is requested, separate confirmed facts from hypotheses.\n- If a request requires a live or external action, mark that part as Needs approved tool connection and continue with everything that can be completed safely.\n- Do not ask unnecessary follow-up questions; make a best effort.";
       try{
         const {reply,model}=await callAI([{role:"system",content:system},{role:"user",content:request}],3000);
         await db.from("ai_tasks").update({status:"completed",progress:100,result:reply,updated_at:now()}).eq("id",task.id);
