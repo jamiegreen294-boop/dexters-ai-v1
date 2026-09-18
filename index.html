@@ -116,12 +116,28 @@ button,input,textarea,select{font:inherit}button{cursor:pointer}.hidden{display:
 <section id="page-connectors" class="page">
 <div class="hero"><h3>Connectors & Browser</h3><p>Dexter can use direct APIs where possible and a remote browser worker for sites that need real navigation. Sensitive actions are approval-gated.</p></div>
 <div id="connectorList" class="agent-list"></div>
+<div class="hero"><h3>Tool queue</h3><p>Requests created by Dexter appear here. Read-only/local test tools can run directly; consequential actions remain approval-gated.</p></div>
+<div id="toolRequestList" class="agent-list"></div>
 <div class="detailbox">
 <b>Browser tool request</b>
 <p class="muted">Use this to queue a browser action after the Browser Worker service is connected.</p>
 <input id="browserUrl" class="miniinput" placeholder="https://example.com">
 <input id="browserInstruction" class="miniinput" style="margin-top:8px" placeholder="What Dexter should do on the site">
 <div class="approval-actions"><button id="queueBrowser" class="primary">Queue browser request</button></div>
+</div>
+<div class="detailbox">
+<b>Code workspace request</b>
+<p class="muted">Queue a controlled home-PC workspace tool. Writes remain approval-gated.</p>
+<select id="workspaceTool" class="miniinput">
+<option value="workspace.list">List files</option>
+<option value="workspace.read">Read file</option>
+<option value="git.status">Git status</option>
+<option value="git.diff">Git diff</option>
+<option value="code.check">Code check</option>
+</select>
+<input id="workspacePath" class="miniinput" style="margin-top:8px" placeholder="Workspace/repo path">
+<input id="workspaceFile" class="miniinput" style="margin-top:8px" placeholder="Optional file or check kind">
+<div class="approval-actions"><button id="queueWorkspace" class="primary">Queue workspace request</button></div>
 </div>
 </section>
 
@@ -268,6 +284,20 @@ function renderConnectors(){
     try{var d=await api({action:"square_authorize"});if(d.authorize_url)window.open(d.authorize_url,"_blank");}
     catch(e){alert(e.message);}
   }});
+  var tools=$("toolRequestList");if(!tools)return;tools.innerHTML="";
+  var reqs=dashboard.toolRequests||[];
+  if(!reqs.length){tools.innerHTML='<div class="agent"><p>No connector tool requests yet.</p></div>';}
+  reqs.forEach(function(t){
+    var div=document.createElement("div");div.className="agent";
+    var canRun=t.status==="pending"||t.status==="approved"||t.status==="waiting_approval";
+    div.innerHTML='<div class="agenttop"><b>'+escapeHtml(t.connector_key+" / "+t.tool_name)+'</b><span class="status">'+escapeHtml(t.status)+'</span></div><div class="meta">'+escapeHtml(t.created_at||"")+'</div>'+(t.error?'<div class="result error">'+escapeHtml(t.error)+'</div>':'')+(t.result?'<div class="result">'+escapeHtml(JSON.stringify(t.result,null,2))+'</div>':'')+(canRun?'<div class="approval-actions"><button class="secondary tool-run" data-id="'+escapeHtml(t.id)+'">Execute tool</button></div>':'');
+    tools.appendChild(div);
+  });
+  document.querySelectorAll(".tool-run").forEach(function(b){b.onclick=async function(){
+    b.disabled=true;
+    try{await api({action:"tool_execute",toolRequestId:b.dataset.id});await loadDashboard();}
+    catch(e){alert(e.message);}finally{b.disabled=false;}
+  }});
 }
 function renderSystem(){
   var box=$("systemSettings");
@@ -310,6 +340,15 @@ $("runWork").onclick=async function(){
   }catch(err){$("workState").textContent=err.message;}finally{$("runWork").disabled=false;}
 };
 $("refreshTasks").onclick=function(){loadDashboard()};
+$("queueWorkspace").onclick=async function(){
+  var tool=$("workspaceTool").value,path=$("workspacePath").value.trim(),extra=$("workspaceFile").value.trim();
+  var req={path:path};
+  if(tool==="workspace.read")req.path=extra||path;
+  if(tool==="git.diff")req.file=extra||".";
+  if(tool==="code.check")req.kind=extra||"npm-build";
+  try{await api({action:"tool_request",connector:"home-host",tool:tool,request:req});await loadDashboard();alert("Workspace request queued.");}
+  catch(e){alert(e.message);}
+};
 $("queueBrowser").onclick=async function(){
   var url=$("browserUrl").value.trim(),instruction=$("browserInstruction").value.trim();
   if(!url||!instruction)return;
