@@ -16,6 +16,7 @@ const PROFILE=process.env.DEXTER_BROWSER_PROFILE||path.resolve(__dirname,"browse
 const HEADLESS=String(process.env.DEXTER_BROWSER_HEADLESS||"false").toLowerCase()==="true";
 const OLLAMA_URL=(process.env.DEXTER_OLLAMA_URL||"http://127.0.0.1:11434").replace(/\/$/,"");
 const LOCAL_MODEL=process.env.DEXTER_LOCAL_MODEL||"qwen3:4b";
+const CODE_MODEL=process.env.DEXTER_CODE_MODEL||LOCAL_MODEL;
 const MAX_AGENT_STEPS=Math.max(1,Math.min(30,Number(process.env.DEXTER_MAX_AGENT_STEPS||15)));
 const LIVE_ACTIONS=String(process.env.DEXTER_LIVE_ACTIONS||"false").toLowerCase()==="true";
 
@@ -97,9 +98,9 @@ async function byRef(page,ref){
   if(await loc.count()<1)throw new Error("Element ref not found; refresh snapshot.");
   return loc.first();
 }
-async function ollama(messages,format){
+async function ollama(messages,format,model=LOCAL_MODEL){
   const r=await fetch(OLLAMA_URL+"/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
-    model:LOCAL_MODEL,messages,stream:false,format:format||undefined,options:{temperature:0.1}
+    model,messages,stream:false,format:format||undefined,options:{temperature:0.1}
   })});
   const data=await r.json().catch(()=>({}));
   if(!r.ok)throw new Error(data?.error||"Local Ollama request failed");
@@ -148,7 +149,7 @@ async function autonomousBrowser(page,request={}){
       "PAGE STATE:",JSON.stringify(state).slice(0,30000),
       "RECENT ACTIONS:",JSON.stringify(history.slice(-8))
     ].join("\n");
-    const decision=parseJson(await ollama([{role:"user",content:prompt}],"json"));
+    const decision=parseJson(await ollama([{role:"user",content:prompt}],"json",CODE_MODEL));
     if(isConsequence(decision))return {status:"blocked",reason:"Consequence requires separate owner approval.",state,history};
     if(decision.action==="done")return {status:"completed",result:String(decision.result||decision.reason||"Completed"),state,history};
     if(decision.action==="blocked")return {status:"blocked",reason:String(decision.reason||"Blocked"),state,history};
@@ -346,7 +347,7 @@ async function createJob(body){
 async function health(){
   let ollamaReady=false,models=[];
   try{const r=await fetch(OLLAMA_URL+"/api/tags");const d=await r.json();ollamaReady=r.ok;models=(d.models||[]).map(x=>x.name).slice(0,20);}catch{}
-  return {status:"ready",host:"home-pc",browser:"chromium",internet:true,coding_agent:true,live_actions:LIVE_ACTIONS,headless:HEADLESS,workspace:WORKSPACE,ollama:{ready:ollamaReady,url:OLLAMA_URL,model:LOCAL_MODEL,models},jobs:loadJobs().length};
+  return {status:"ready",host:"home-pc",browser:"chromium",internet:true,coding_agent:true,live_actions:LIVE_ACTIONS,headless:HEADLESS,workspace:WORKSPACE,ollama:{ready:ollamaReady,url:OLLAMA_URL,model:LOCAL_MODEL,code_model:CODE_MODEL,models},jobs:loadJobs().length};
 }
 function serveFile(res,file,contentType){const data=fs.readFileSync(file);res.writeHead(200,{"Content-Type":contentType,"Cache-Control":"no-store"});res.end(data);}
 
