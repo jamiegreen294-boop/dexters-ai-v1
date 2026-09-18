@@ -194,11 +194,119 @@ Deno.serve(async(req)=>{
       const {data:audit}=await db.from("ai_audit_logs").select("id,action,actor,environment,details,created_at").order("created_at",{ascending:false}).limit(50);
       const {data:orchestration}=await db.from("ai_orchestration_tasks").select("id,task_id,requested_action,selected_agent,stage,progress,result,created_at,updated_at").order("created_at",{ascending:false}).limit(30);
       const {data:settings}=await db.from("dexter_command_centre_settings").select("setting_key,setting_value").order("setting_key");
-      return json({role,agents:agents||[],tasks:tasks||[],approvals:approvals||[],knowledge:knowledge||[],memory:memory||[],audit:audit||[],orchestration:orchestration||[],settings:settings||[],environment:"test",liveWrites:false});
+      const {data:connectors}=await db.from("ai_connectors").select("connector_key,name,connector_type,status,capabilities,config,last_checked_at,last_error").order("name");
+      const {data:toolRequests}=await db.from("ai_tool_requests").select("id,task_id,connector_key,tool_name,status,requires_approval,result,error,created_at,updated_at").order("created_at",{ascending:false}).limit(40);
+      return json({role,agents:agents||[],tasks:tasks||[],approvals:approvals||[],knowledge:knowledge||[],memory:memory||[],audit:audit||[],orchestration:orchestration||[],settings:settings||[],connectors:connectors||[],toolRequests:toolRequests||[],environment:"test",liveWrites:false});
     }
 
     
-    if(action==="task_detail"){
+    
+    if(action==="connectors"){
+      const {data:rows}=await db.from("ai_connectors").select("*").order("name");
+      const envReady=(key:string)=>{
+        if(key==="square")return Boolean(Deno.env.get("SQUARE_APPLICATION_ID")&&Deno.env.get("SQUARE_APPLICATION_SECRET"));
+        if(key==="github")return Boolean(Deno.env.get("DEXTER_GITHUB_TOKEN"));
+        if(key==="vercel")return Boolean(Deno.env.get("DEXTER_VERCEL_TOKEN"));
+        if(key==="browser")return Boolean(Deno.env.get("DEXTER_BROWSER_WORKER_URL")&&Deno.env.get("DEXTER_BROWSER_WORKER_TOKEN"));
+        if(key==="supabase")return true;
+        return false;
+      };
+      const out=(rows||[]).map((x:any)=>({...x,runtime_ready:envReady(x.connector_key)}));
+      return json({connectors:out});
+    }
+
+    if(action==="square_authorize"){
+      if(role!=="owner")return json({error:"Only owner test access can connect Square."},403);
+      const appId=Deno.env.get("SQUARE_APPLICATION_ID")||"";
+      const redirect=Deno.env.get("SQUARE_REDIRECT_URL")||"";
+      if(!appId||!redirect)return json({error:"Square OAuth is built but SQUARE_APPLICATION_ID and SQUARE_REDIRECT_URL are not configured yet."},409);
+      const state=crypto.randomUUID();
+      const scopes=[
+        "MERCHANT_PROFILE_READ","CUSTOMERS_READ","CUSTOMERS_WRITE",
+        "ORDERS_READ","ORDERS_WRITE","PAYMENTS_READ","PAYMENTS_WRITE"
+      ].join(" ");
+      const url="https://connect.squareup.com/oauth2/authorize?client_id="+encodeURIComponent(appId)+"&scope="+encodeURIComponent(scopes)+"&session=false&state="+encodeURIComponent(state);
+      await logAudit(db,"connector.square.authorization_started",keyName,{state});
+      return json({authorize_url:url,state,redirect_url:redirect});
+    }
+
+    if(action==="tool_request"){
+      if(!["owner","manager"].includes(role))return json({error:"Tool requests require owner/manager test access."},403);
+      const connectorKey=cleanText(body.connector,60),toolName=cleanText(body.tool,120),request=body.request||{};
+      if(!connectorKey||!toolName)return json({error:"Connector and tool are required."},400);
+      const {data:connector}=await db.from("ai_connectors").select("*").eq("connector_key",connectorKey).maybeSingle();
+      if(!connector)return json({error:"Unknown connector."},404);
+      const sensitive=/write|create|update|delete|deploy|publish|send|payment|refund|charge|submit|login|upload|merge/i.test(toolName);
+      const requiresApproval=sensitive||connectorKey==="browser";
+      const {data:tr,error}=await db.from("ai_tool_requests").insert({
+        connector_key:connectorKey,tool_name:toolName,requested_by:keyName,request,
+        status:requiresApproval?"waiting_approval":"pending",requires_approval:requiresApproval
+      }).select("*").single();
+      if(error)throw error;
+      let approval=null;
+      if(requiresApproval){
+        const {data:task}=await db.from("ai_tasks").insert({
+          title:"Tool request: "+connector.name+" / "+toolName,
+          description:JSON.stringify(request).slice(0,12000),
+          status:"waiting_approval",agent_key:"platform-doctor",progress:5,requires_approval:true
+        }).select("*").single();
+        if(task){
+          await db.from("ai_tool_requests").update({task_id:task.id}).eq("id",tr.id);
+          const {data:a}=await db.from("ai_approvals").insert({
+            task_id:task.id,status:"pending",
+            requested_action:"Connector "+connector.name+" wants to run "+toolName+". Approval permits TEST execution/preview only."
+          }).select("*").single();
+          approval=a;
+        }
+      }
+      await logAudit(db,"tool.requested",keyName,{tool_request_id:tr.id,connector:connectorKey,tool:toolName,requires_approval:requiresApproval});
+      return json({toolRequest:{...tr,task_id:tr.task_id||approval?.task_id||null},approval});
+    }
+
+    if(action==="tool_execute"){
+      if(role!=="owner")return json({error:"Only owner test access can execute connector tools."},403);
+      const id=cleanText(body.toolRequestId,80);
+      const {data:tr}=await db.from("ai_tool_requests").select("*").eq("id",id).maybeSingle();
+      if(!tr)return json({error:"Tool request not found."},404);
+      if(tr.requires_approval){
+        const {data:a}=await db.from("ai_approvals").select("status").eq("task_id",tr.task_id).order("created_at",{ascending:false}).limit(1).maybeSingle();
+        if(a?.status!=="approved")return json({error:"Tool request still requires approval."},409);
+      }
+      await db.from("ai_tool_requests").update({status:"running",updated_at:now()}).eq("id",id);
+      try{
+        let result:any={};
+        if(tr.connector_key==="square"){
+          const token=Deno.env.get("SQUARE_ACCESS_TOKEN")||"";
+          if(!token)throw new Error("Square access token is not configured.");
+          const headers={"Authorization":"Bearer "+token,"Square-Version":"2026-09-16","Content-Type":"application/json"};
+          if(tr.tool_name==="locations.read"){
+            const r=await fetch("https://connect.squareup.com/v2/locations",{headers});result=await r.json();if(!r.ok)throw new Error(result?.errors?.[0]?.detail||"Square locations request failed");
+          }else if(tr.tool_name==="customers.search"){
+            const r=await fetch("https://connect.squareup.com/v2/customers/search",{method:"POST",headers,body:JSON.stringify(tr.request||{})});result=await r.json();if(!r.ok)throw new Error(result?.errors?.[0]?.detail||"Square customer search failed");
+          }else if(tr.tool_name==="payments.list"){
+            const qs=new URLSearchParams(tr.request||{}).toString();
+            const r=await fetch("https://connect.squareup.com/v2/payments"+(qs?"?"+qs:""),{headers});result=await r.json();if(!r.ok)throw new Error(result?.errors?.[0]?.detail||"Square payments request failed");
+          }else throw new Error("Square tool is not enabled in Dexter test yet.");
+        }else if(tr.connector_key==="browser"){
+          const url=Deno.env.get("DEXTER_BROWSER_WORKER_URL")||"",workerToken=Deno.env.get("DEXTER_BROWSER_WORKER_TOKEN")||"";
+          if(!url||!workerToken)throw new Error("Browser Worker is built into Dexter but no browser worker service is connected yet.");
+          const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+workerToken},body:JSON.stringify({tool:tr.tool_name,request:tr.request,environment:"test"})});
+          result=await r.json().catch(()=>({}));if(!r.ok)throw new Error(result?.error||"Browser Worker request failed");
+        }else{
+          throw new Error("This connector executor is not enabled yet.");
+        }
+        await db.from("ai_tool_requests").update({status:"completed",result,updated_at:now()}).eq("id",id);
+        await logAudit(db,"tool.completed",keyName,{tool_request_id:id,connector:tr.connector_key,tool:tr.tool_name});
+        return json({result});
+      }catch(err){
+        const error=String((err as Error)?.message||err);
+        await db.from("ai_tool_requests").update({status:"failed",error,updated_at:now()}).eq("id",id);
+        await logAudit(db,"tool.failed",keyName,{tool_request_id:id,error});
+        return json({error},500);
+      }
+    }
+
+if(action==="task_detail"){
       const taskId=cleanText(body.taskId,80);
       const [{data:task},{data:events},{data:agentRuns},{data:orchestration},{data:approval}]=await Promise.all([
         db.from("ai_tasks").select("*").eq("id",taskId).maybeSingle(),
