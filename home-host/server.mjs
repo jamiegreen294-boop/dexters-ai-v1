@@ -169,11 +169,98 @@ function runProcess(command,args,cwd,timeout=120000){
     child.on("close",code=>{clearTimeout(timer);resolve({code,killed,stdout:stdout.slice(-100000),stderr:stderr.slice(-100000)});});
   });
 }
+async function listTree(rel="",depth=3,maxEntries=500){
+  const root=safeWorkspacePath(rel),out=[];
+  function walk(dir,level){
+    if(level>depth||out.length>=maxEntries)return;
+    for(const ent of fs.readdirSync(dir,{withFileTypes:true})){
+      if(["node_modules",".git",".next","dist","build"].includes(ent.name))continue;
+      const full=path.join(dir,ent.name),r=path.relative(WORKSPACE,full);
+      out.push({path:r,type:ent.isDirectory()?"directory":"file"});
+      if(ent.isDirectory())walk(full,level+1);
+      if(out.length>=maxEntries)break;
+    }
+  }
+  walk(root,0);return out;
+}
+async function internetResearch(request={}){
+  const query=String(request.query||request.goal||"").trim();
+  if(!query)throw new Error("Research query is required.");
+  const session=String(request.session||("research-"+crypto.randomUUID())).slice(0,80);
+  const page=await getPage(session);
+  const searchUrl="https://duckduckgo.com/?q="+encodeURIComponent(query);
+  await page.goto(searchUrl,{waitUntil:"domcontentloaded",timeout:45000});
+  await page.waitForTimeout(1200);
+  const state=await snapshot(page);
+  const result=await autonomousBrowser(page,{
+    session,
+    instruction:"Research this question using the public web and return when you have enough evidence: "+query+". Read pages only. Do not log in, submit forms, send messages, purchase anything, publish, deploy, delete, or change accounts.",
+    url:page.url()
+  });
+  return {query,search:state,result};
+}
+async function codingAgent(request={}){
+  const goal=String(request.goal||request.instruction||"").trim();
+  if(!goal)throw new Error("Coding goal is required.");
+  let repoPath=String(request.path||"").trim();
+  if(request.repo_url){
+    if(!repoPath)repoPath=path.basename(new URL(String(request.repo_url)).pathname).replace(/\.git$/,"");
+    const dest=safeWorkspacePath(repoPath);
+    if(!fs.existsSync(dest)||!fs.readdirSync(dest).length){
+      await workspaceTool("git.clone",{url:String(request.repo_url),path:repoPath});
+    }
+  }
+  if(!repoPath)throw new Error("A workspace path or repo_url is required.");
+  const root=safeWorkspacePath(repoPath);
+  if(!fs.existsSync(root))throw new Error("Workspace/repository path does not exist.");
+  const history=[];
+  for(let step=1;step<=Math.max(5,MAX_AGENT_STEPS);step++){
+    const tree=await listTree(repoPath,3,350);
+    const status=await runProcess("git",["status","--short","--branch"],root,30000).catch(()=>({code:1,stdout:"",stderr:"not a git repo"}));
+    const prompt=[
+      "You are Dexter Coding Agent running locally for Dexters.",
+      "Goal: "+goal,
+      "You may inspect and edit files ONLY inside the Dexter workspace/repository.",
+      "Never push, deploy, publish, merge, delete remote resources, access credentials, or change live systems.",
+      "Choose one action only from: list, read, write, mkdir, git_status, git_diff, check, research, done, blocked.",
+      "For write, provide the COMPLETE replacement content for one file. Never use placeholders or ellipses.",
+      "For check, kind must be one of npm-build, npm-test, node-check.",
+      "Use research only when current public documentation is genuinely needed.",
+      "When the requested work is complete, run relevant checks and inspect git_diff before returning done.",
+      "Return JSON only with fields: action,path,content,file,kind,query,reason,result.",
+      "REPO PATH: "+repoPath,
+      "TREE: "+JSON.stringify(tree).slice(0,22000),
+      "GIT STATUS: "+JSON.stringify(status).slice(0,6000),
+      "RECENT STEPS: "+JSON.stringify(history.slice(-10)).slice(0,14000)
+    ].join("\n");
+    const decision=parseJson(await ollama([{role:"user",content:prompt}],"json"));
+    let result;
+    if(decision.action==="list")result={entries:await listTree(path.join(repoPath,String(decision.path||"")),2,300)};
+    else if(decision.action==="read")result=await workspaceTool("workspace.read",{path:path.join(repoPath,String(decision.path||""))});
+    else if(decision.action==="write")result=await workspaceTool("workspace.write",{path:path.join(repoPath,String(decision.path||"")),content:String(decision.content??"")});
+    else if(decision.action==="mkdir")result=await workspaceTool("workspace.mkdir",{path:path.join(repoPath,String(decision.path||""))});
+    else if(decision.action==="git_status")result=await workspaceTool("git.status",{path:repoPath});
+    else if(decision.action==="git_diff")result=await workspaceTool("git.diff",{path:repoPath,file:String(decision.file||".")});
+    else if(decision.action==="check")result=await workspaceTool("code.check",{path:repoPath,kind:String(decision.kind||""),file:String(decision.file||"")});
+    else if(decision.action==="research")result=await internetResearch({query:String(decision.query||goal),session:"code-research-"+crypto.randomUUID()});
+    else if(decision.action==="done"){
+      const diff=await workspaceTool("git.diff",{path:repoPath,file:"."}).catch(()=>null);
+      const finalStatus=await workspaceTool("git.status",{path:repoPath}).catch(()=>null);
+      return {status:"completed",result:String(decision.result||decision.reason||"Completed"),repo_path:repoPath,history,git_status:finalStatus,git_diff:diff};
+    }else if(decision.action==="blocked")return {status:"blocked",reason:String(decision.reason||"Blocked"),repo_path:repoPath,history};
+    else throw new Error("Unsupported coding-agent action: "+decision.action);
+    history.push({step,decision:{...decision,content:decision.content?"[file content written]":undefined},result:JSON.stringify(result).slice(0,12000)});
+  }
+  return {status:"step_limit",repo_path:repoPath,history,git_status:await workspaceTool("git.status",{path:repoPath}).catch(()=>null),git_diff:await workspaceTool("git.diff",{path:repoPath,file:"."}).catch(()=>null)};
+}
 async function workspaceTool(tool,request={}){
   if(tool==="workspace.list"){
     const dir=safeWorkspacePath(request.path||"");
     return {path:path.relative(WORKSPACE,dir),entries:fs.readdirSync(dir,{withFileTypes:true}).map(x=>({name:x.name,type:x.isDirectory()?"directory":"file"})).slice(0,500)};
   }
+  if(tool==="workspace.tree")return {path:String(request.path||""),entries:await listTree(String(request.path||""),Number(request.depth||3),Number(request.max_entries||500))};
+  if(tool==="web.research")return await internetResearch(request);
+  if(tool==="code.agent")return await codingAgent(request);
   if(tool==="workspace.read"){
     const file=safeWorkspacePath(request.path);return {path:request.path,content:fs.readFileSync(file,"utf8").slice(0,200000)};
   }
@@ -210,6 +297,8 @@ async function createJob(body){
   queueMicrotask(async()=>{try{job.status="running";job.updated_at=new Date().toISOString();saveJob(job);
     if(job.type==="browser")job.result=await browserTool("browser.navigate_and_act",job.request);
     else if(job.type==="workspace")job.result=await workspaceTool(String(job.request.tool||""),job.request.input||{});
+    else if(job.type==="research")job.result=await internetResearch(job.request);
+    else if(job.type==="coding")job.result=await codingAgent(job.request);
     else throw new Error("Unsupported job type.");
     job.status="completed";
   }catch(e){job.status="failed";job.error=String(e?.message||e);}finally{job.updated_at=new Date().toISOString();saveJob(job);}});
@@ -218,7 +307,7 @@ async function createJob(body){
 async function health(){
   let ollamaReady=false,models=[];
   try{const r=await fetch(OLLAMA_URL+"/api/tags");const d=await r.json();ollamaReady=r.ok;models=(d.models||[]).map(x=>x.name).slice(0,20);}catch{}
-  return {status:"ready",host:"home-pc",browser:"chromium",headless:HEADLESS,workspace:WORKSPACE,ollama:{ready:ollamaReady,url:OLLAMA_URL,model:LOCAL_MODEL,models},jobs:loadJobs().length};
+  return {status:"ready",host:"home-pc",browser:"chromium",internet:true,coding_agent:true,headless:HEADLESS,workspace:WORKSPACE,ollama:{ready:ollamaReady,url:OLLAMA_URL,model:LOCAL_MODEL,models},jobs:loadJobs().length};
 }
 function serveFile(res,file,contentType){const data=fs.readFileSync(file);res.writeHead(200,{"Content-Type":contentType,"Cache-Control":"no-store"});res.end(data);}
 
