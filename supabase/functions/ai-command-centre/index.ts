@@ -113,15 +113,25 @@ async function planWork(context:any,role:string,request:string,requestedAgent:st
 }
 
 async function callAI(input:any[],maxOutputTokens=1800){
+  const homeUrl=(Deno.env.get("DEXTER_HOME_HOST_URL")||"").replace(/\/$/,"");
+  const homeToken=Deno.env.get("DEXTER_HOME_HOST_TOKEN")||"";
+  if(homeUrl&&homeToken){
+    try{
+      const messages=(input||[]).map((m:any)=>({role:m.role==="system"?"system":m.role==="assistant"?"assistant":"user",content:cleanText(m.content,50000)}));
+      const r=await fetch(homeUrl+"/ai/chat",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+homeToken},body:JSON.stringify({messages,max_output_tokens:maxOutputTokens})});
+      const d=await r.json().catch(()=>({}));
+      if(r.ok&&d?.reply)return {reply:String(d.reply),model:String(d.model||"local"),provider:"ollama-local"};
+    }catch{}
+  }
   const apiKey=Deno.env.get("OPENAI_API_KEY")||"";
-  if(!apiKey)throw new Error("OPENAI_API_KEY is not configured on the Dexter AI test backend.");
+  if(!apiKey)throw new Error("No AI provider is configured. Connect the Dexter Home PC/Ollama or configure OPENAI_API_KEY.");
   const model=Deno.env.get("DEXTER_AI_MODEL")||"gpt-5.6-luna";
   const response=await fetch("https://api.openai.com/v1/responses",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+apiKey},body:JSON.stringify({model,input,max_output_tokens:maxOutputTokens})});
   const data=await response.json().catch(()=>({}));
   if(!response.ok)throw new Error(data?.error?.message||"AI provider request failed");
   const reply=outputText(data);
   if(!reply)throw new Error("AI provider returned no usable text");
-  return {reply,model};
+  return {reply,model,provider:"openai"};
 }
 function basePrompt(role:string,context:any,agentKey:string){
   const agent=(context.agents||[]).find((a:any)=>a.agent_key===agentKey);
@@ -207,7 +217,8 @@ Deno.serve(async(req)=>{
         if(key==="square")return Boolean(Deno.env.get("SQUARE_APPLICATION_ID")&&Deno.env.get("SQUARE_APPLICATION_SECRET"));
         if(key==="github")return Boolean(Deno.env.get("DEXTER_GITHUB_TOKEN"));
         if(key==="vercel")return Boolean(Deno.env.get("DEXTER_VERCEL_TOKEN"));
-        if(key==="browser")return Boolean(Deno.env.get("DEXTER_BROWSER_WORKER_URL")&&Deno.env.get("DEXTER_BROWSER_WORKER_TOKEN"));
+        if(key==="browser")return Boolean((Deno.env.get("DEXTER_HOME_HOST_URL")&&Deno.env.get("DEXTER_HOME_HOST_TOKEN"))||(Deno.env.get("DEXTER_BROWSER_WORKER_URL")&&Deno.env.get("DEXTER_BROWSER_WORKER_TOKEN")));
+        if(key==="home-host"||key==="local-ai")return Boolean(Deno.env.get("DEXTER_HOME_HOST_URL")&&Deno.env.get("DEXTER_HOME_HOST_TOKEN"));
         if(key==="supabase")return true;
         return false;
       };
@@ -287,11 +298,21 @@ Deno.serve(async(req)=>{
             const qs=new URLSearchParams(tr.request||{}).toString();
             const r=await fetch("https://connect.squareup.com/v2/payments"+(qs?"?"+qs:""),{headers});result=await r.json();if(!r.ok)throw new Error(result?.errors?.[0]?.detail||"Square payments request failed");
           }else throw new Error("Square tool is not enabled in Dexter test yet.");
-        }else if(tr.connector_key==="browser"){
-          const url=Deno.env.get("DEXTER_BROWSER_WORKER_URL")||"",workerToken=Deno.env.get("DEXTER_BROWSER_WORKER_TOKEN")||"";
-          if(!url||!workerToken)throw new Error("Browser Worker is built into Dexter but no browser worker service is connected yet.");
-          const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+workerToken},body:JSON.stringify({tool:tr.tool_name,request:tr.request,environment:"test"})});
-          result=await r.json().catch(()=>({}));if(!r.ok)throw new Error(result?.error||"Browser Worker request failed");
+        }else if(tr.connector_key==="browser"||tr.connector_key==="home-host"){
+          const base=(Deno.env.get("DEXTER_HOME_HOST_URL")||Deno.env.get("DEXTER_BROWSER_WORKER_URL")||"").replace(/\/$/,"");
+          const workerToken=Deno.env.get("DEXTER_HOME_HOST_TOKEN")||Deno.env.get("DEXTER_BROWSER_WORKER_TOKEN")||"";
+          if(!base||!workerToken)throw new Error("Dexter Home PC is built but not connected to the command centre yet.");
+          const workspace=/^(workspace\.|git\.|code\.)/.test(tr.tool_name);
+          const endpoint=workspace?base+"/workspace/tool":base+"/browser/tool";
+          const r=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+workerToken},body:JSON.stringify({tool:tr.tool_name,request:tr.request,environment:"test"})});
+          const d=await r.json().catch(()=>({}));
+          result=d?.result??d;
+          if(!r.ok)throw new Error(d?.error||"Dexter Home PC request failed");
+        }else if(tr.connector_key==="local-ai"){
+          const base=(Deno.env.get("DEXTER_HOME_HOST_URL")||"").replace(/\/$/,""),workerToken=Deno.env.get("DEXTER_HOME_HOST_TOKEN")||"";
+          if(!base||!workerToken)throw new Error("Dexter Home PC is not connected.");
+          const r=await fetch(base+"/ai/chat",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+workerToken},body:JSON.stringify(tr.request||{})});
+          const d=await r.json().catch(()=>({}));result=d;if(!r.ok)throw new Error(d?.error||"Local AI request failed");
         }else{
           throw new Error("This connector executor is not enabled yet.");
         }
