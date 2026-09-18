@@ -146,11 +146,14 @@ button,input,textarea,select{font:inherit}button{cursor:pointer}.hidden{display:
 <div class="system-grid">
 <div class="metric"><strong id="mBackend">—</strong><span>Backend</span></div>
 <div class="metric"><strong id="mAI">—</strong><span>AI model</span></div>
-<div class="metric"><strong id="mKnowledge">—</strong><span>Knowledge items</span></div>
+<div class="metric"><strong id="mKnowledge">—</strong><span>Base knowledge</span></div>
+<div class="metric"><strong id="mBusinessKnowledge">—</strong><span>Business knowledge</span></div>
+<div class="metric"><strong id="mLiveMenu">—</strong><span>Live menu</span></div>
 <div class="metric"><strong id="mTasks">—</strong><span>Work tasks</span></div>
 </div>
 <div id="systemSettings" class="detailbox"><b>Brain settings</b><pre>Loading…</pre></div>
-<div class="notice">Environment: TEST. Live writes are disabled by design. Dexter may reason and create records inside Dexters-AI-Test only.</div>
+<div class="detailbox"><b>Full Dexter readiness test</b><p class="muted">Checks AI, live read-only menu, business knowledge, memory, agents and connector registry. It does not make live changes.</p><div class="approval-actions"><button id="runSelfTest" class="primary">Run Full Dexter Test</button></div><pre id="selfTestResult">Not run yet.</pre></div>
+<div class="notice">Environment: TEST. Live writes are disabled. Git pushes, deployments and consequential browser actions remain locked until live mode is explicitly enabled after testing.</div>
 </section>
 </main>
 </section>
@@ -197,6 +200,8 @@ async function health(){
     $("mBackend").textContent=d.status==="ready"?"Ready":"Check";
     $("mAI").textContent=d.ai?"Ready":"Missing";
     $("mKnowledge").textContent=d.knowledge||0;
+    $("mBusinessKnowledge").textContent=d.businessKnowledge||0;
+    $("mLiveMenu").textContent=d.liveMenu?"Ready":"Check";
     $("mTasks").textContent=d.tasks||0;
     $("knowledgeNav").textContent=d.knowledge||0;
     return d;
@@ -340,6 +345,14 @@ $("runWork").onclick=async function(){
   }catch(err){$("workState").textContent=err.message;}finally{$("runWork").disabled=false;}
 };
 $("refreshTasks").onclick=function(){loadDashboard()};
+$("runSelfTest").onclick=async function(){
+  var b=$("runSelfTest"),out=$("selfTestResult");b.disabled=true;out.textContent="Running full Dexter test…";
+  try{
+    var d=await api({action:"self_test"});
+    out.textContent=JSON.stringify(d,null,2);
+  }catch(e){out.textContent="FAILED: "+e.message;}
+  finally{b.disabled=false;}
+};
 $("queueWorkspace").onclick=async function(){
   var tool=$("workspaceTool").value,path=$("workspacePath").value.trim(),extra=$("workspaceFile").value.trim();
   var req={path:path};
