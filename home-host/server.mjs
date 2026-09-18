@@ -73,24 +73,24 @@ async function snapshot(page){
     const selectors=["a[href]","button","input","textarea","select","[role=button]","[contenteditable=true]"];
     return Array.from(document.querySelectorAll(selectors.join(","))).filter(el=>{
       const r=el.getBoundingClientRect();return r.width>0&&r.height>0;
-    }).slice(0,250).map((el,i)=>({
-      ref:"e"+(i+1),tag:el.tagName.toLowerCase(),
+    }).slice(0,250).map((el,i)=>{
+      const ref="e"+(i+1);el.setAttribute("data-dexter-ref",ref);return ({
+      ref,tag:el.tagName.toLowerCase(),
       text:(el.innerText||el.getAttribute("aria-label")||el.getAttribute("placeholder")||"").trim().slice(0,240),
       type:el.getAttribute("type"),name:el.getAttribute("name"),
       value:(el.tagName==="SELECT"?"":(el.value||"")).slice(0,120),
       href:el instanceof HTMLAnchorElement?el.href:null
-    }));
+    })});
   });
   const text=(await page.locator("body").innerText().catch(()=>"" )).slice(0,16000);
   return {url:page.url(),title:await page.title(),text,elements};
 }
 async function byRef(page,ref){
-  const index=Number(String(ref||"").replace(/^e/,""))-1;
-  if(!Number.isInteger(index)||index<0)throw new Error("Invalid element ref.");
-  const sel=["a[href]","button","input","textarea","select","[role=button]","[contenteditable=true]"].join(",");
-  const loc=page.locator(sel).filter({visible:true}).nth(index);
+  const value=String(ref||"");
+  if(!/^e\d+$/.test(value))throw new Error("Invalid element ref.");
+  const loc=page.locator('[data-dexter-ref="'+value+'"]');
   if(await loc.count()<1)throw new Error("Element ref not found; refresh snapshot.");
-  return loc;
+  return loc.first();
 }
 async function ollama(messages,format){
   const r=await fetch(OLLAMA_URL+"/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
