@@ -169,7 +169,8 @@ async function autonomousBrowser(page,request={}){
 }
 function runProcess(command,args,cwd,timeout=120000){
   return new Promise((resolve,reject)=>{
-    const child=spawn(command,args,{cwd,windowsHide:true,shell:false,env:{...process.env,CI:"1"}});
+    const executable=process.platform==="win32"&&["npm","npx"].includes(command)?command+".cmd":command;
+    const child=spawn(executable,args,{cwd,windowsHide:true,shell:false,env:{...process.env,CI:"1"}});
     let stdout="",stderr="",killed=false;
     const timer=setTimeout(()=>{killed=true;child.kill();},timeout);
     child.stdout.on("data",d=>stdout+=d.toString());
@@ -228,6 +229,11 @@ async function codingAgent(request={}){
   }
   const root=safeWorkspacePath(repoPath);
   if(!fs.existsSync(root))throw new Error("Workspace/repository path does not exist.");
+  function repoRelative(rel=""){
+    const full=path.resolve(root,String(rel||""));
+    if(full!==root&&!full.startsWith(root+path.sep))throw new Error("Coding-agent path escapes its project workspace.");
+    return path.relative(WORKSPACE,full);
+  }
   const history=[];
   for(let step=1;step<=Math.max(5,MAX_AGENT_STEPS);step++){
     const tree=await listTree(repoPath,3,350);
@@ -250,10 +256,10 @@ async function codingAgent(request={}){
     ].join("\n");
     const decision=parseJson(await ollama([{role:"user",content:prompt}],"json",CODE_MODEL));
     let result;
-    if(decision.action==="list")result={entries:await listTree(path.join(repoPath,String(decision.path||"")),2,300)};
-    else if(decision.action==="read")result=await workspaceTool("workspace.read",{path:path.join(repoPath,String(decision.path||""))});
-    else if(decision.action==="write")result=await workspaceTool("workspace.write",{path:path.join(repoPath,String(decision.path||"")),content:String(decision.content??"")});
-    else if(decision.action==="mkdir")result=await workspaceTool("workspace.mkdir",{path:path.join(repoPath,String(decision.path||""))});
+    if(decision.action==="list")result={entries:await listTree(repoRelative(decision.path||""),2,300)};
+    else if(decision.action==="read")result=await workspaceTool("workspace.read",{path:repoRelative(decision.path||"")});
+    else if(decision.action==="write")result=await workspaceTool("workspace.write",{path:repoRelative(decision.path||""),content:String(decision.content??"")});
+    else if(decision.action==="mkdir")result=await workspaceTool("workspace.mkdir",{path:repoRelative(decision.path||"")});
     else if(decision.action==="git_status")result=await workspaceTool("git.status",{path:repoPath});
     else if(decision.action==="git_diff")result=await workspaceTool("git.diff",{path:repoPath,file:String(decision.file||".")});
     else if(decision.action==="check")result=await workspaceTool("code.check",{path:repoPath,kind:String(decision.kind||""),file:String(decision.file||"")});
