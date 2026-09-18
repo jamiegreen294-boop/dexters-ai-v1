@@ -372,9 +372,10 @@ Deno.serve(async(req)=>{
           const base=(Deno.env.get("DEXTER_HOME_HOST_URL")||Deno.env.get("DEXTER_BROWSER_WORKER_URL")||"").replace(/\/$/,"");
           const workerToken=Deno.env.get("DEXTER_HOME_HOST_TOKEN")||Deno.env.get("DEXTER_BROWSER_WORKER_TOKEN")||"";
           if(!base||!workerToken)throw new Error("Dexter Home PC is built but not connected to the command centre yet.");
-          const workspace=/^(workspace\.|git\.|code\.|web\.research$)/.test(tr.tool_name);
+          const workspace=/^(workspace\.|git\.|github\.|vercel\.|code\.|web\.research$)/.test(tr.tool_name);
           const endpoint=workspace?base+"/workspace/tool":base+"/browser/tool";
-          const r=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+workerToken},body:JSON.stringify({tool:tr.tool_name,request:tr.request,environment:"test"})});
+          const approvedRequest={...(tr.request||{}),approval_granted:tr.requires_approval===true};
+          const r=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+workerToken},body:JSON.stringify({tool:tr.tool_name,request:approvedRequest,environment:"test"})});
           const d=await r.json().catch(()=>({}));
           result=d?.result??d;
           if(!r.ok)throw new Error(d?.error||"Dexter Home PC request failed");
