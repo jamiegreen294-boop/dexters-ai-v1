@@ -135,6 +135,7 @@ async function browserTool(tool,request={}){
 async function autonomousBrowser(page,request={}){
   const goal=String(request.instruction||request.goal||"").trim();
   if(!goal)throw new Error("Browser instruction is required.");
+  const allowConsequential=LIVE_ACTIONS&&request.approval_granted===true;
   if(request.url)await page.goto(safeUrl(request.url),{waitUntil:"domcontentloaded",timeout:45000});
   const history=[];
   for(let step=1;step<=MAX_AGENT_STEPS;step++){
@@ -144,13 +145,15 @@ async function autonomousBrowser(page,request={}){
       "Goal: "+goal,
       "Choose exactly one next action from: click, fill, select, press, navigate, done, blocked.",
       "Never invent element refs. Use only refs shown in PAGE STATE.",
-      "Do not perform purchases, payments, refunds, deletion, publishing, deployment, sending messages, submitting irreversible forms, or account/security changes. If one is necessary return blocked.",
+      allowConsequential
+        ?"Owner approval is verified for this request. You may perform only the consequential actions necessary for this exact goal. Do not expand scope."
+        :"Do not perform purchases, payments, refunds, deletion, publishing, deployment, sending messages, login, submitting irreversible forms, or account/security changes. If one is necessary return blocked.",
       "Return JSON only: {action,ref,value,url,key,reason,result}.",
       "PAGE STATE:",JSON.stringify(state).slice(0,30000),
       "RECENT ACTIONS:",JSON.stringify(history.slice(-8))
     ].join("\n");
     const decision=parseJson(await ollama([{role:"user",content:prompt}],"json",CODE_MODEL));
-    if(isConsequence(decision))return {status:"blocked",reason:"Consequence requires separate owner approval.",state,history};
+    if(isConsequence(decision)&&!allowConsequential)return {status:"blocked",reason:"Consequence requires separate owner approval and live mode.",state,history};
     if(decision.action==="done")return {status:"completed",result:String(decision.result||decision.reason||"Completed"),state,history};
     if(decision.action==="blocked")return {status:"blocked",reason:String(decision.reason||"Blocked"),state,history};
     let result;
