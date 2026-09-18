@@ -107,7 +107,7 @@ function parseJson(s){
 }
 function isConsequence(action){
   const text=JSON.stringify(action).toLowerCase();
-  return /purchase|pay|refund|delete|publish|deploy|merge|send|submit|create account|change password|confirm order|place order/.test(text);
+  return /purchase|pay|refund|delete|publish|deploy|merge|send|submit|login|sign in|create account|change password|confirm order|place order/.test(text);
 }
 async function browserTool(tool,request={}){
   const session=String(request.session||"default").slice(0,80),page=await getPage(session);
