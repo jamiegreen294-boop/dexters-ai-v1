@@ -60,6 +60,58 @@ function chooseAgent(message:string,requested:string,agents:any[]){
   if(/customer|reply|message|menu|roast|order|whatsapp/.test(m)&&keys.has("customer-assistant"))return "customer-assistant";
   return keys.has("business-agent")?"business-agent":(agents?.[0]?.agent_key||"business-agent");
 }
+
+function extractJson(text:string){
+  const cleaned=text.replace(/^```json\s*/i,"").replace(/```$/,"").trim();
+  try{return JSON.parse(cleaned)}catch{}
+  const m=cleaned.match(/\{[\s\S]*\}/);
+  if(m){try{return JSON.parse(m[0])}catch{}}
+  return null;
+}
+function approvalRequired(message:string){
+  return /\b(deploy|merge|publish|production|live|refund|charge|payment|delete|remove customer|remove staff|change staff|change customer|send email|send message|place order|cancel order|amend order|database write|update live|github push)\b/i.test(message);
+}
+async function planWork(context:any,role:string,request:string,requestedAgent:string){
+  const fallbackAgent=chooseAgent(request,requestedAgent,context.agents);
+  const prompt=[
+    "You are Dexter AI's internal planner for an isolated TEST command centre.",
+    "Return JSON only with keys: summary, primary_agent, reviewer_agent, needs_approval, approval_reason, steps.",
+    "primary_agent and reviewer_agent must be one of: "+(context.agents||[]).map((a:any)=>a.agent_key).join(", "),
+    "Use null for reviewer_agent when no second specialist is useful.",
+    "needs_approval must be true for any requested live/production write, deploy, merge, payment/refund, order change, staff/customer change, outbound message/email, or destructive action.",
+    "This test system NEVER performs a live action even after approval; approval only allows planning/preview.",
+    "Keep steps practical and no more than 8.",
+    "Role: "+role,
+    "Request: "+request
+  ].join("\n");
+  try{
+    const {reply,model}=await callAI([{role:"system",content:prompt},{role:"user",content:request}],900);
+    const parsed=extractJson(reply)||{};
+    const allowed=new Set((context.agents||[]).map((a:any)=>a.agent_key));
+    const primary=allowed.has(parsed.primary_agent)?parsed.primary_agent:fallbackAgent;
+    const reviewer=allowed.has(parsed.reviewer_agent)&&parsed.reviewer_agent!==primary?parsed.reviewer_agent:null;
+    return {
+      summary:cleanText(parsed.summary||request,500),
+      primary_agent:primary,
+      reviewer_agent:reviewer,
+      needs_approval:Boolean(parsed.needs_approval)||approvalRequired(request),
+      approval_reason:cleanText(parsed.approval_reason||"",500),
+      steps:Array.isArray(parsed.steps)?parsed.steps.map((x:any)=>cleanText(x,400)).filter(Boolean).slice(0,8):[],
+      planner_model:model
+    };
+  }catch{
+    return {
+      summary:request.slice(0,500),
+      primary_agent:fallbackAgent,
+      reviewer_agent:null,
+      needs_approval:approvalRequired(request),
+      approval_reason:approvalRequired(request)?"Request includes an action that must remain approval-gated.":"",
+      steps:["Analyse request","Produce test-safe result","Record result and audit trail"],
+      planner_model:"fallback-router"
+    };
+  }
+}
+
 async function callAI(input:any[],maxOutputTokens=1800){
   const apiKey=Deno.env.get("OPENAI_API_KEY")||"";
   if(!apiKey)throw new Error("OPENAI_API_KEY is not configured on the Dexter AI test backend.");
@@ -139,18 +191,76 @@ Deno.serve(async(req)=>{
         db.from("dexter_ai_knowledge").select("category,title,content").eq("enabled",true).order("category").limit(100),
         db.from("dexter_approved_memory").select("id,category,content,approved_at").eq("active",true).order("approved_at",{ascending:false}).limit(50)
       ]);
-      return json({role,agents:agents||[],tasks:tasks||[],approvals:approvals||[],knowledge:knowledge||[],memory:memory||[],environment:"test",liveWrites:false});
+      const {data:audit}=await db.from("ai_audit_logs").select("id,action,actor,environment,details,created_at").order("created_at",{ascending:false}).limit(50);
+      const {data:orchestration}=await db.from("ai_orchestration_tasks").select("id,task_id,requested_action,selected_agent,stage,progress,result,created_at,updated_at").order("created_at",{ascending:false}).limit(30);
+      const {data:settings}=await db.from("dexter_command_centre_settings").select("setting_key,setting_value").order("setting_key");
+      return json({role,agents:agents||[],tasks:tasks||[],approvals:approvals||[],knowledge:knowledge||[],memory:memory||[],audit:audit||[],orchestration:orchestration||[],settings:settings||[],environment:"test",liveWrites:false});
     }
 
-    if(action==="work"){
+    
+    if(action==="task_detail"){
+      const taskId=cleanText(body.taskId,80);
+      const [{data:task},{data:events},{data:agentRuns},{data:orchestration},{data:approval}]=await Promise.all([
+        db.from("ai_tasks").select("*").eq("id",taskId).maybeSingle(),
+        db.from("ai_task_events").select("*").eq("task_id",taskId).order("created_at",{ascending:true}),
+        db.from("ai_agent_tasks").select("*").eq("task_id",taskId).order("created_at",{ascending:true}),
+        db.from("ai_orchestration_tasks").select("*").eq("task_id",taskId).order("created_at",{ascending:true}),
+        db.from("ai_approvals").select("*").eq("task_id",taskId).order("created_at",{ascending:false}).limit(1).maybeSingle()
+      ]);
+      return json({task,events:events||[],agentRuns:agentRuns||[],orchestration:orchestration||[],approval:approval||null});
+    }
+
+    if(action==="approval"){
+      if(role!=="owner")return json({error:"Only owner test access can change approvals."},403);
+      const approvalId=cleanText(body.approvalId,80),decision=cleanText(body.decision,20).toLowerCase();
+      if(!["approved","rejected"].includes(decision))return json({error:"Decision must be approved or rejected."},400);
+      const {data:approval,error}=await db.from("ai_approvals").update({status:decision,approved_by:keyName,updated_at:now()}).eq("id",approvalId).select("*").single();
+      if(error||!approval)return json({error:error?.message||"Approval not found"},404);
+      await db.from("ai_tasks").update({status:decision==="approved"?"approved_preview_only":"rejected",updated_at:now()}).eq("id",approval.task_id);
+      await db.from("ai_orchestration_tasks").update({stage:decision==="approved"?"approved_preview_only":"rejected",updated_at:now()}).eq("task_id",approval.task_id);
+      await db.from("ai_task_events").insert({task_id:approval.task_id,event_type:"approval."+decision,message:decision==="approved"?"Approved for test planning/preview only; live execution remains disabled.":"Request rejected."});
+      await logAudit(db,"approval."+decision,keyName,{approval_id:approvalId,task_id:approval.task_id});
+      return json({approval,liveExecution:false});
+    }
+
+    if(action==="memory_add"){
+      if(!["owner","manager"].includes(role))return json({error:"Memory changes require owner/manager test access."},403);
+      const category=cleanText(body.category||"general",80),content=cleanText(body.content,8000);
+      if(!content)return json({error:"Memory content is required."},400);
+      const active=role==="owner";
+      const {data,error}=await db.from("dexter_approved_memory").insert({category,content,approved_by:active?keyName:null,approved_at:active?now():null,active}).select("*").single();
+      if(error)throw error;
+      await logAudit(db,"memory.add",keyName,{memory_id:data.id,active});
+      return json({memory:data});
+    }
+
+    if(action==="memory_toggle"){
+      if(role!=="owner")return json({error:"Only owner test access can approve/disable memory."},403);
+      const id=cleanText(body.memoryId,80),active=Boolean(body.active);
+      const {data,error}=await db.from("dexter_approved_memory").update({active,approved_by:active?keyName:null,approved_at:active?now():null}).eq("id",id).select("*").single();
+      if(error)throw error;
+      await logAudit(db,active?"memory.approved":"memory.disabled",keyName,{memory_id:id});
+      return json({memory:data});
+    }
+
+if(action==="work"){
       if(!["owner","manager"].includes(role))return json({error:"Work mode is restricted to owner/manager test access."},403);
       const request=cleanText(body.message,12000);
       if(!request)return json({error:"Work request is required"},400);
       const context=await loadContext(db);
-      const agentKey=chooseAgent(request,cleanText(body.agent,60),context.agents);
-      const title=(cleanText(body.title||request.split(/\n/)[0],120)||"Dexter work task").slice(0,120);
-      const {data:task,error:taskError}=await db.from("ai_tasks").insert({title,description:request,status:"running",agent_key:agentKey,progress:10,requires_approval:false}).select("id,title,status,agent_key,progress").single();
+      const plan=await planWork(context,role,request,cleanText(body.agent,60));
+      const agentKey=plan.primary_agent;
+      const title=(cleanText(body.title||plan.summary||request.split(/\n/)[0],120)||"Dexter work task").slice(0,120);
+      const {data:task,error:taskError}=await db.from("ai_tasks").insert({title,description:request,status:plan.needs_approval?"waiting_approval":"running",agent_key:agentKey,progress:plan.needs_approval?5:10,requires_approval:plan.needs_approval}).select("id,title,status,agent_key,progress").single();
       if(taskError||!task)throw new Error(taskError?.message||"Could not create test task");
+      await db.from("ai_orchestration_tasks").insert({task_id:task.id,requested_action:request,selected_agent:agentKey,stage:plan.needs_approval?"waiting_approval":"planned",progress:plan.needs_approval?5:10,result:JSON.stringify({plan})});
+      await db.from("ai_task_events").insert({task_id:task.id,event_type:"planned",message:"Planner selected "+agentKey+(plan.reviewer_agent?" with reviewer "+plan.reviewer_agent:"")+". " + (plan.steps||[]).join(" → ")});
+      if(plan.needs_approval){
+        const {data:approval}=await db.from("ai_approvals").insert({task_id:task.id,status:"pending",requested_action:plan.approval_reason||request}).select("*").single();
+        await logAudit(db,"approval.requested",keyName,{task_id:task.id,approval_id:approval?.id,reason:plan.approval_reason});
+        return json({task:{...task,status:"waiting_approval",progress:5},plan,approval,reply:"This request includes a live/consequential action, so Dexter has queued it for owner approval. In TEST mode, approval allows planning/preview only — no live action will execute.",liveWrites:false});
+      }
+
       await db.from("ai_task_events").insert({task_id:task.id,event_type:"started",message:"Dexter AI test work started."});
       await db.from("ai_agent_tasks").insert({task_id:task.id,agent_key:agentKey,status:"running",input:{request,environment:"test"}});
       const system=basePrompt(role,context,agentKey)+"\n\nWORK MODE\n- Produce a completed, practical work result using only reasoning and supplied test knowledge.\n- When code is requested, provide concrete code or exact changes, but do not pretend they were applied.\n- When diagnosis is requested, separate confirmed facts from hypotheses.\n- If a request requires a live or external action, mark that part as Needs approved tool connection and continue with everything that can be completed safely.\n- Do not ask unnecessary follow-up questions; make a best effort.";
@@ -158,9 +268,20 @@ Deno.serve(async(req)=>{
         const {reply,model}=await callAI([{role:"system",content:system},{role:"user",content:request}],3000);
         await db.from("ai_tasks").update({status:"completed",progress:100,result:reply,updated_at:now()}).eq("id",task.id);
         await db.from("ai_agent_tasks").update({status:"completed",output:{result:reply,model},updated_at:now()}).eq("task_id",task.id).eq("agent_key",agentKey);
-        await db.from("ai_task_events").insert({task_id:task.id,event_type:"completed",message:"Dexter AI test work completed."});
+        
+        if(plan.reviewer_agent){
+          const reviewerSystem=basePrompt(role,context,plan.reviewer_agent)+"\n\nREVIEW MODE\nReview the primary agent result for correctness, missing risks and practical improvements. Return a concise review; do not claim any live changes.";
+          const review=await callAI([{role:"system",content:reviewerSystem},{role:"user",content:"Original request:\n"+request+"\n\nPrimary result:\n"+reply}],1200);
+          const combined=reply+"\n\n--- Dexter review ("+plan.reviewer_agent+") ---\n"+review.reply;
+          await db.from("ai_tasks").update({result:combined,updated_at:now()}).eq("id",task.id);
+          await db.from("ai_agent_tasks").insert({task_id:task.id,agent_key:plan.reviewer_agent,status:"completed",input:{request,review_of:agentKey},output:{result:review.reply,model:review.model}});
+          await db.from("ai_task_events").insert({task_id:task.id,event_type:"reviewed",message:"Result reviewed by "+plan.reviewer_agent+"."});
+        }
+        await db.from("ai_orchestration_tasks").update({stage:"completed",progress:100,updated_at:now()}).eq("task_id",task.id);
+await db.from("ai_task_events").insert({task_id:task.id,event_type:"completed",message:"Dexter AI test work completed."});
         await logAudit(db,"work.completed",keyName,{task_id:task.id,agent_key:agentKey});
-        return json({task:{...task,status:"completed",progress:100,result:reply},reply,agent:agentKey,model,liveWrites:false});
+        const {data:finalTask}=await db.from("ai_tasks").select("*").eq("id",task.id).single();
+        return json({task:finalTask||{...task,status:"completed",progress:100,result:reply},reply:finalTask?.result||reply,agent:agentKey,reviewer:plan.reviewer_agent,plan,model,liveWrites:false});
       }catch(err){
         const error=String((err as Error)?.message||err).slice(0,1000);
         await db.from("ai_tasks").update({status:"failed",progress:100,error,updated_at:now()}).eq("id",task.id);
