@@ -215,11 +215,47 @@ Deno.serve(async(req)=>{
     if(!sessionId)return json({error:"Invalid session"},400);
 
     if(action==="health"){
-      const [{count:knowledgeCount},{count:taskCount}]=await Promise.all([
+      const [{count:knowledgeCount},{count:businessKnowledgeCount},{count:taskCount},liveMenu]=await Promise.all([
         db.from("dexter_ai_knowledge").select("*",{count:"exact",head:true}).eq("enabled",true),
-        db.from("ai_tasks").select("*",{count:"exact",head:true})
+        db.from("dexter_business_knowledge").select("*",{count:"exact",head:true}),
+        db.from("ai_tasks").select("*",{count:"exact",head:true}),
+        liveMenuForQuery("menu price stock")
       ]);
-      return json({status:"ready",environment:"test",role,keyName,ai:Boolean(Deno.env.get("OPENAI_API_KEY")),memory:true,knowledge:knowledgeCount||0,tasks:taskCount||0,liveWrites:false});
+      const localAI=Boolean(Deno.env.get("DEXTER_HOME_HOST_URL")&&Deno.env.get("DEXTER_HOME_HOST_TOKEN"));
+      return json({status:"ready",environment:"test",role,keyName,ai:Boolean(Deno.env.get("OPENAI_API_KEY"))||localAI,localAI,memory:true,knowledge:knowledgeCount||0,businessKnowledge:businessKnowledgeCount||0,liveMenu:Boolean(liveMenu),tasks:taskCount||0,liveWrites:false});
+    }
+
+    if(action==="self_test"){
+      if(role!=="owner")return json({error:"Owner test access required."},403);
+      const checks:any[]=[];
+      const add=(name:string,ok:boolean,detail:any={})=>checks.push({name,ok,detail});
+      try{
+        const {data:b,error}=await db.rpc("dexter_search_business_knowledge",{p_query:"full Scottish breakfast",p_limit:5});
+        add("business_knowledge",!error&&Array.isArray(b)&&b.length>0,{matches:b?.length||0});
+      }catch(e){add("business_knowledge",false,{error:String((e as Error)?.message||e)});}
+      try{
+        const menu=await liveMenuForQuery("full Scottish breakfast price");
+        const flat=Array.isArray(menu)?menu.flatMap((c:any)=>c?.items||[]):[];
+        const item=flat.find((x:any)=>/full scottish breakfast/i.test(String(x?.name||"")));
+        add("live_menu",Boolean(item),item?{name:item.name,price:item.price,in_stock:item.in_stock}:{});
+      }catch(e){add("live_menu",false,{error:String((e as Error)?.message||e)});}
+      try{
+        const {count,error}=await db.from("dexter_approved_memory").select("*",{count:"exact",head:true});
+        add("memory_store",!error,{records:count||0});
+      }catch(e){add("memory_store",false,{error:String((e as Error)?.message||e)});}
+      try{
+        const {data:a,error}=await db.from("ai_agents").select("agent_key").limit(10);
+        add("agents",!error&&(a||[]).length>=4,{agents:(a||[]).map((x:any)=>x.agent_key)});
+      }catch(e){add("agents",false,{error:String((e as Error)?.message||e)});}
+      try{
+        const ai=await callAI([{role:"system",content:"You are Dexter AI. Reply with exactly DEXTER_SELF_TEST_OK"},{role:"user",content:"Self test"}],80);
+        add("ai_provider",/DEXTER_SELF_TEST_OK/i.test(ai.reply),{model:ai.model,provider:ai.provider||"unknown"});
+      }catch(e){add("ai_provider",false,{error:String((e as Error)?.message||e)});}
+      const {data:conns}=await db.from("ai_connectors").select("connector_key,status");
+      add("connectors_registry",Array.isArray(conns)&&conns.length>=5,{connectors:conns||[]});
+      const passed=checks.filter(x=>x.ok).length;
+      await logAudit(db,"self_test.completed",keyName,{passed,total:checks.length,checks});
+      return json({status:passed===checks.length?"pass":"partial",passed,total:checks.length,checks,liveWrites:false});
     }
 
     if(action==="history"){
