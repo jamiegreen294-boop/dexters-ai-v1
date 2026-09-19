@@ -767,8 +767,17 @@ async function comfyGenerate(request={}){
   return {status:"completed",provider:"comfyui-local",free:true,prompt,checkpoint,width,height,steps,seed,filename,path:path.relative(WORKSPACE,file),bytes:buf.length};
 }
 
+async function installChatModel(request={}){
+  const model=String(request.model||"qwen3:1.7b").trim();
+  if(!/^qwen3:(?:0\.6b|1\.7b|4b)$/i.test(model))throw new Error("Unsupported local chat model.");
+  const r=await runProcess("ollama",["pull",model],WORKSPACE,600000);
+  if(r.code!==0)throw new Error("Ollama model install failed: "+String(r.stderr||r.stdout).slice(-2500));
+  return {installed:true,model,free:true,provider:"ollama-local"};
+}
+
 async function workspaceTool(tool,request={}){
   if(tool==="system.info")return await systemInfo();
+  if(tool==="local_ai.install_chat_model")return await installChatModel(request);
   if(tool==="image.install")return await installSdCpp();
   if(tool==="image.status"){
     const comfy=await comfyStatus();
