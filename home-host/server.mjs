@@ -226,32 +226,32 @@ async function internetResearch(request={}){
   if(!query)throw new Error("Research query is required.");
   const session=String(request.session||("research-"+crypto.randomUUID())).slice(0,80);
   const page=await getPage(session);
-  const searchUrl="https://duckduckgo.com/?q="+encodeURIComponent(query);
+  const searchUrl="https://html.duckduckgo.com/html/?q="+encodeURIComponent(query);
   await page.goto(searchUrl,{waitUntil:"domcontentloaded",timeout:45000});
-  await page.waitForTimeout(1200);
+  await page.waitForTimeout(800);
   const results=await page.evaluate(()=>{
     const out=[];
     const seen=new Set();
-    const selectors=["article[data-testid=result]","div.result","li[data-layout=organic]"];
-    const nodes=Array.from(document.querySelectorAll(selectors.join(",")));
+    function cleanHref(raw){
+      try{
+        const u=new URL(raw,location.href);
+        const uddg=u.searchParams.get("uddg");
+        if(uddg)return decodeURIComponent(uddg);
+        if(u.hostname.endsWith("duckduckgo.com"))return "";
+        return u.href;
+      }catch{return "";}
+    }
+    const nodes=Array.from(document.querySelectorAll(".result"));
     for(const node of nodes){
-      const a=node.querySelector("a[href]");
+      const a=node.querySelector("a.result__a[href],a[href]");
       if(!a)continue;
-      const href=a.href||"";
-      const title=(a.textContent||node.querySelector("h2,h3")?.textContent||"").trim();
-      const snippet=(node.querySelector("[data-result=snippet],.result__snippet,.snippet")?.textContent||node.textContent||"").trim();
+      const href=cleanHref(a.getAttribute("href")||a.href||"");
+      const title=(a.textContent||"").trim();
+      const snippet=(node.querySelector(".result__snippet")?.textContent||"").trim();
       if(!href||!title||seen.has(href))continue;
       seen.add(href);
       out.push({title:title.slice(0,300),url:href,snippet:snippet.slice(0,700)});
       if(out.length>=10)break;
-    }
-    if(!out.length){
-      for(const a of Array.from(document.querySelectorAll("a[href]"))){
-        const href=a.href||"", title=(a.textContent||"").trim();
-        if(!href||!title||seen.has(href)||href.includes("duckduckgo.com"))continue;
-        seen.add(href);out.push({title:title.slice(0,300),url:href,snippet:""});
-        if(out.length>=10)break;
-      }
     }
     return out;
   });
