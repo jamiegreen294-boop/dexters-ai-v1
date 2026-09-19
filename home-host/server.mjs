@@ -481,37 +481,9 @@ async function createJob(body){
   }catch(e){job.status="failed";job.error=String(e?.message||e);}finally{job.updated_at=new Date().toISOString();saveJob(job);}});
   return job;
 }
-function scheduleSelfRestart(delayMs=3500){
-  if(process.platform!=="win32")throw new Error("Self-restart is currently implemented for the Windows Home PC.");
-  const helper=path.join(__dirname,"restart-helper.ps1");
-  const nodeExe=process.execPath;
-  const serverFile=path.join(__dirname,"server.mjs");
-  const logFile=path.join(__dirname,"restart.log");
-  const ps=[
-    "$ErrorActionPreference = 'Stop'",
-    "Start-Sleep -Seconds 6",
-    "$envPath='HKCU:\\Environment'",
-    "foreach($n in @('DEXTER_BROWSER_WORKER_TOKEN','DEXTER_AGENT_ENDPOINT','DEXTER_AGENT_TOKEN','DEXTER_LOCAL_MODEL','DEXTER_CODE_MODEL')) {",
-    "  try { $v=(Get-ItemProperty -Path $envPath -Name $n -ErrorAction Stop).$n; if($v){ Set-Item -Path ('Env:'+ $n) -Value $v } } catch {}",
-    "}",
-    "if(-not $env:DEXTER_LOCAL_MODEL){$env:DEXTER_LOCAL_MODEL='qwen3:4b'}",
-    "if(-not $env:DEXTER_CODE_MODEL){$env:DEXTER_CODE_MODEL='qwen3:4b'}",
-    "$env:DEXTER_LIVE_ACTIONS='false'",
-    "$out="+JSON.stringify(logFile),
-    "$err="+JSON.stringify(logFile+".err"),
-    "Start-Process -FilePath "+JSON.stringify(nodeExe)+" -ArgumentList "+JSON.stringify(serverFile)+" -WorkingDirectory "+JSON.stringify(__dirname)+" -WindowStyle Hidden -RedirectStandardOutput $out -RedirectStandardError $err"
-  ];
-  fs.writeFileSync(helper,ps.join("\r\n"),"utf8");
-  const child=spawn("powershell.exe",["-NoProfile","-ExecutionPolicy","Bypass","-WindowStyle","Hidden","-File",helper],{
-    cwd:__dirname,
-    detached:true,
-    stdio:"ignore",
-    windowsHide:true,
-    env:{...process.env}
-  });
-  child.unref();
-  setTimeout(()=>process.exit(0),1200);
-  return {restart_scheduled:true,restart_in_ms:6000,method:"powershell-start-process",log_file:"restart.log"};
+function scheduleSelfRestart(delayMs=1500){
+  setTimeout(()=>process.exit(0),Math.max(500,Number(delayMs)||1500));
+  return {restart_scheduled:true,restart_in_ms:Math.max(500,Number(delayMs)||1500),method:"launcher-watchdog"};
 }
 
 async function selfUpdateWorker(){
