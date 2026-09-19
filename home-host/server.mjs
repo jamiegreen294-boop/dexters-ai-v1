@@ -279,10 +279,11 @@ async function internetResearch(request={}){
     .trim();
   if(cleaned && cleaned!==query && combined.length<8) await ddgSearch(cleaned,"broader");
 
-  const phoneLike=/(?:\+?44|0)[\s()\-]*\d(?:[\s()\-]*\d){8,}/.test(query);
+  const phoneToken=(query.match(/\+?44[\s()\-]*(?:\d[\s()\-]*){9,10}/)||query.match(/0(?:[\s()\-]*\d){9,10}/)||[])[0]||"";
+  const phoneLike=Boolean(phoneToken);
   let businessMatch=null;
   if(phoneLike){
-    const digits=query.replace(/\D/g,"");
+    const digits=phoneToken.replace(/\D/g,"");
     const local=digits.startsWith("44")?"0"+digits.slice(2):digits;
     const intl=local.startsWith("0")?"+44"+local.slice(1):"+"+digits;
     if(combined.length<8) await ddgSearch(local,"phone-local");
