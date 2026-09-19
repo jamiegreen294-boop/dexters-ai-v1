@@ -15,6 +15,8 @@ const TOKEN=process.env.DEXTER_BROWSER_WORKER_TOKEN||"";
 const PROFILE=process.env.DEXTER_BROWSER_PROFILE||path.resolve(__dirname,"browser-profile");
 const HEADLESS=String(process.env.DEXTER_BROWSER_HEADLESS||"false").toLowerCase()==="true";
 const OLLAMA_URL=(process.env.DEXTER_OLLAMA_URL||"http://127.0.0.1:11434").replace(/\/$/,"");
+const COMFY_URL=(process.env.DEXTER_COMFY_URL||"http://127.0.0.1:8188").replace(/\/$/,"");
+const IMAGE_DIR=path.join(WORKSPACE,"generated-images");
 const LOCAL_MODEL=process.env.DEXTER_LOCAL_MODEL||"qwen3:4b";
 const CODE_MODEL=process.env.DEXTER_CODE_MODEL||LOCAL_MODEL;
 const MAX_AGENT_STEPS=Math.max(1,Math.min(30,Number(process.env.DEXTER_MAX_AGENT_STEPS||15)));
@@ -27,7 +29,7 @@ if(!TOKEN||TOKEN.length<24){
   console.error("Set DEXTER_BROWSER_WORKER_TOKEN to a long random value before starting Dexter.");
   process.exit(1);
 }
-for(const dir of [PROFILE,WORKSPACE,JOB_DIR])fs.mkdirSync(dir,{recursive:true});
+for(const dir of [PROFILE,WORKSPACE,JOB_DIR,IMAGE_DIR])fs.mkdirSync(dir,{recursive:true});
 
 let context;
 const pageSessions=new Map();
@@ -581,7 +583,98 @@ async function codingAgent(request={}){
   }
   return {status:"step_limit",repo_path:repoPath,history,git_status:await workspaceTool("git.status",{path:repoPath}).catch(()=>null),git_diff:await workspaceTool("git.diff",{path:repoPath,file:"."}).catch(()=>null)};
 }
+async function systemInfo(){
+  const out={platform:process.platform,arch:process.arch,node:process.version,cpu:process.env.PROCESSOR_IDENTIFIER||"",ram:null,gpu:[],python:null};
+  if(process.platform==="win32"){
+    const ps=[
+      "$os=Get-CimInstance Win32_OperatingSystem;",
+      "$g=Get-CimInstance Win32_VideoController | Select-Object Name,AdapterRAM,DriverVersion;",
+      "$p=(Get-Command python -ErrorAction SilentlyContinue).Source;",
+      "[pscustomobject]@{ram=[math]::Round($os.TotalVisibleMemorySize/1MB,1);gpu=$g;python=$p}|ConvertTo-Json -Depth 4 -Compress"
+    ].join("");
+    const r=await runProcess("powershell",["-NoProfile","-Command",ps],WORKSPACE,30000);
+    if(r.code===0){
+      try{
+        const d=JSON.parse(r.stdout.trim());
+        out.ram=d.ram??null;
+        out.gpu=Array.isArray(d.gpu)?d.gpu:(d.gpu?[d.gpu]:[]);
+        out.python=d.python||null;
+      }catch{}
+    }
+  }
+  return out;
+}
+async function comfyStatus(){
+  try{
+    const [statsRes,objRes]=await Promise.all([
+      fetch(COMFY_URL+"/system_stats",{signal:AbortSignal.timeout(5000)}),
+      fetch(COMFY_URL+"/object_info/CheckpointLoaderSimple",{signal:AbortSignal.timeout(5000)})
+    ]);
+    if(!statsRes.ok||!objRes.ok)throw new Error("ComfyUI not ready");
+    const stats=await statsRes.json();
+    const obj=await objRes.json();
+    const choices=obj?.CheckpointLoaderSimple?.input?.required?.ckpt_name?.[0]||[];
+    return {ready:true,url:COMFY_URL,checkpoints:Array.isArray(choices)?choices.slice(0,50):[],system:stats};
+  }catch(e){
+    return {ready:false,url:COMFY_URL,error:String(e?.message||e)};
+  }
+}
+async function comfyGenerate(request={}){
+  const prompt=String(request.prompt||"").trim();
+  if(!prompt)throw new Error("Image prompt is required.");
+  const status=await comfyStatus();
+  if(!status.ready)throw new Error("Local image engine is not running. Install/start ComfyUI on the Dexter Home PC first.");
+  const checkpoint=String(request.checkpoint||status.checkpoints?.[0]||"");
+  if(!checkpoint)throw new Error("No local image checkpoint is installed.");
+  const width=Math.max(256,Math.min(1536,Number(request.width||1024)));
+  const height=Math.max(256,Math.min(1536,Number(request.height||1024)));
+  const steps=Math.max(8,Math.min(40,Number(request.steps||24)));
+  const cfg=Math.max(1,Math.min(12,Number(request.cfg||7)));
+  const seed=Number.isFinite(Number(request.seed))?Number(request.seed):Math.floor(Math.random()*2147483647);
+  const negative=String(request.negative_prompt||"blurry, low quality, distorted text, watermark").slice(0,2000);
+  const clientId="dexter-"+crypto.randomUUID();
+  const workflow={
+    "1":{class_type:"CheckpointLoaderSimple",inputs:{ckpt_name:checkpoint}},
+    "2":{class_type:"CLIPTextEncode",inputs:{text:prompt.slice(0,4000),clip:["1",1]}},
+    "3":{class_type:"CLIPTextEncode",inputs:{text:negative,clip:["1",1]}},
+    "4":{class_type:"EmptyLatentImage",inputs:{width,height,batch_size:1}},
+    "5":{class_type:"KSampler",inputs:{seed,steps,cfg,sampler_name:"euler",scheduler:"normal",denoise:1,model:["1",0],positive:["2",0],negative:["3",0],latent_image:["4",0]}},
+    "6":{class_type:"VAEDecode",inputs:{samples:["5",0],vae:["1",2]}},
+    "7":{class_type:"SaveImage",inputs:{filename_prefix:"DexterAI",images:["6",0]}}
+  };
+  const qr=await fetch(COMFY_URL+"/prompt",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt:workflow,client_id:clientId}),signal:AbortSignal.timeout(15000)});
+  const q=await qr.json().catch(()=>({}));
+  if(!qr.ok||!q.prompt_id)throw new Error(q?.error?.message||q?.error||"ComfyUI rejected the image job.");
+  const deadline=Date.now()+Math.max(60000,Math.min(600000,Number(request.timeout_ms||300000)));
+  let imageMeta=null;
+  while(Date.now()<deadline){
+    await new Promise(r=>setTimeout(r,1500));
+    const hr=await fetch(COMFY_URL+"/history/"+encodeURIComponent(q.prompt_id),{signal:AbortSignal.timeout(10000)});
+    if(!hr.ok)continue;
+    const h=await hr.json();
+    const outputs=h?.[q.prompt_id]?.outputs||{};
+    for(const value of Object.values(outputs)){
+      const imgs=value?.images;
+      if(Array.isArray(imgs)&&imgs.length){imageMeta=imgs[0];break;}
+    }
+    if(imageMeta)break;
+  }
+  if(!imageMeta)throw new Error("Local image generation timed out.");
+  const params=new URLSearchParams({filename:imageMeta.filename,subfolder:imageMeta.subfolder||"",type:imageMeta.type||"output"});
+  const ir=await fetch(COMFY_URL+"/view?"+params.toString(),{signal:AbortSignal.timeout(30000)});
+  if(!ir.ok)throw new Error("Generated image could not be downloaded from ComfyUI.");
+  const buf=Buffer.from(await ir.arrayBuffer());
+  const ext=path.extname(String(imageMeta.filename||""))||".png";
+  const filename="dexter-"+new Date().toISOString().replace(/[:.]/g,"-")+"-"+crypto.randomUUID().slice(0,8)+ext;
+  const file=path.join(IMAGE_DIR,filename);
+  fs.writeFileSync(file,buf);
+  return {status:"completed",provider:"comfyui-local",free:true,prompt,checkpoint,width,height,steps,seed,filename,path:path.relative(WORKSPACE,file),bytes:buf.length};
+}
+
 async function workspaceTool(tool,request={}){
+  if(tool==="system.info")return await systemInfo();
+  if(tool==="image.status")return await comfyStatus();
+  if(tool==="image.generate")return await comfyGenerate(request);
   if(tool==="workspace.list"){
     const dir=safeWorkspacePath(request.path||"");
     return {path:path.relative(WORKSPACE,dir),entries:fs.readdirSync(dir,{withFileTypes:true}).map(x=>({name:x.name,type:x.isDirectory()?"directory":"file"})).slice(0,500)};
@@ -693,6 +786,8 @@ async function executeCloudJob(job){
     if(String(job.tool_name||"")==="code.direct"||Array.isArray(request.files))return await directCodingPlan(request);
     return await codingAgent(request);
   }
+  if(job.job_type==="system")return await workspaceTool(String(job.tool_name||"system.info"),request);
+  if(job.job_type==="image")return await workspaceTool(String(job.tool_name||"image.generate"),request);
   if(job.job_type==="self_update")return await selfUpdateWorker();
   if(job.job_type==="self_restart")return scheduleSelfRestart(3000);
   if(job.job_type==="local_ai"){
@@ -736,7 +831,8 @@ async function pollHomeJobs(){
 async function health(){
   let ollamaReady=false,models=[];
   try{const r=await fetch(OLLAMA_URL+"/api/tags");const d=await r.json();ollamaReady=r.ok;models=(d.models||[]).map(x=>x.name).slice(0,20);}catch{}
-  return {status:"ready",host:"home-pc",browser:"chromium",internet:true,coding_agent:true,live_actions:LIVE_ACTIONS,cloud_agent_paired:Boolean(AGENT_TOKEN),agent_endpoint:AGENT_ENDPOINT,headless:HEADLESS,workspace:WORKSPACE,ollama:{ready:ollamaReady,url:OLLAMA_URL,model:LOCAL_MODEL,code_model:CODE_MODEL,models},jobs:loadJobs().length};
+  const image=await comfyStatus();
+  return {status:"ready",host:"home-pc",browser:"chromium",internet:true,coding_agent:true,image_generation:image.ready,live_actions:LIVE_ACTIONS,cloud_agent_paired:Boolean(AGENT_TOKEN),agent_endpoint:AGENT_ENDPOINT,headless:HEADLESS,workspace:WORKSPACE,ollama:{ready:ollamaReady,url:OLLAMA_URL,model:LOCAL_MODEL,code_model:CODE_MODEL,models},comfyui:image,jobs:loadJobs().length};
 }
 function serveFile(res,file,contentType){const data=fs.readFileSync(file);res.writeHead(200,{"Content-Type":contentType,"Cache-Control":"no-store"});res.end(data);}
 
