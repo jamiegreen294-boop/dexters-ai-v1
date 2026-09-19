@@ -123,7 +123,7 @@ async function ollamaFast(messages,format,model=CODE_MODEL){
   let r;
   try{
     r=await fetch(OLLAMA_URL+"/api/chat",{method:"POST",signal:controller.signal,headers:{"Content-Type":"application/json"},body:JSON.stringify({
-      model,messages:fastMessages,stream:false,format:format||undefined,options:{temperature:0,num_ctx:2048,num_predict:768}
+      model,messages:fastMessages,stream:false,think:false,format:format||undefined,options:{temperature:0,num_ctx:2048,num_predict:768}
     })});
   }finally{clearTimeout(timer);}
   const data=await r.json().catch(()=>({}));
