@@ -50,7 +50,7 @@ function businessCategoriesForRole(role:string){
   return ["menu","modifier","allergen","offer","sunday_roast","catering"];
 }
 async function liveMenuForQuery(query:string){
-  if(!/menu|price|cost|how much|stock|available|breakfast|roll|toast|panini|wrap|burger|fries|pizza|chippy|coffee|drink|soup|sub|chicken|beef|roast/i.test(query))return null;
+  if(!/menu|price|cost|how much|stock|available|breakfast|roll|toast|panini|wrap|burger|fries|pizza|chippy|coffee|drink|soup|sub|chicken|beef|roast|pris|koster|hvor meget|lager|tilgængelig|morgenmad|rundstykke|ristet|pommes|kaffe|drik|suppe|kylling|oksekød|steg|menuen/i.test(query))return null;
   try{
     const r=await fetch(LIVE_SUPABASE_URL+"/rest/v1/rpc/loyalty_menu_public",{
       method:"POST",
@@ -60,11 +60,26 @@ async function liveMenuForQuery(query:string){
     return await r.json();
   }catch{return null;}
 }
+async function knowledgeSearchQuery(query:string){
+  const q=cleanText(query,500);
+  if(!q)return "";
+  if(/[æøåÆØÅ]|\b(hvad|hvordan|hvor|koster|pris|morgenmad|bestilling|printer|catering|tilbud|menuen|kylling|arbejde|medarbejder)\b/i.test(q)){
+    try{
+      const x=await callAI([
+        {role:"system",content:"Translate this Danish business-search query into concise English search keywords only. Preserve Dexter product names. No explanation."},
+        {role:"user",content:q}
+      ],100);
+      if(x?.reply)return cleanText(x.reply,500);
+    }catch{}
+  }
+  return q;
+}
 async function loadContext(db:any,query="",role="owner"){
   const safeQuery=cleanText(query,500);
+  const searchQuery=await knowledgeSearchQuery(safeQuery);
   const allowed=businessCategoriesForRole(role);
-  const businessPromise=safeQuery
-    ? db.rpc("dexter_search_business_knowledge",{p_query:safeQuery,p_limit:30})
+  const businessPromise=searchQuery
+    ? db.rpc("dexter_search_business_knowledge",{p_query:searchQuery,p_limit:30})
     : Promise.resolve({data:[]});
   const [{data:knowledge},{data:memory},{data:agents},{data:permissions},business,liveMenu]=await Promise.all([
     db.from("dexter_ai_knowledge").select("category,title,content").eq("enabled",true).order("category").limit(80),
