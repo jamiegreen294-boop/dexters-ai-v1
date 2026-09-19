@@ -268,6 +268,38 @@ function bubble(text,who,meta){
   if(meta){var m=document.createElement("div");m.className="meta";m.textContent=meta;d.appendChild(m);}
   $("chat").appendChild(d);$("chat").scrollTop=$("chat").scrollHeight;return d;
 }
+async function pollDexterImage(jobId,container){
+  var tries=0,maxTries=200;
+  while(tries++<maxTries){
+    await new Promise(function(r){setTimeout(r,3000)});
+    var d=await api({action:"image_status",job_id:jobId});
+    var job=d.job||{};
+    if(job.status==="failed"){container.textContent="Image generation failed: "+(job.error||"unknown error");return;}
+    if(job.status==="completed"){
+      var result=job.result||{};
+      container.textContent="";
+      var note=document.createElement("div");
+      note.textContent="Done — generated locally on Dexter Home PC · £0 image API cost.";
+      container.appendChild(note);
+      if(result.image_url){
+        var img=document.createElement("img");
+        img.src=result.image_url;img.alt="Dexter generated image";
+        img.style.maxWidth="100%";img.style.borderRadius="14px";img.style.marginTop="10px";img.style.display="block";
+        container.appendChild(img);
+        var a=document.createElement("a");
+        a.href=result.image_url;a.target="_blank";a.rel="noopener";a.textContent="Open / download image";
+        a.style.display="inline-block";a.style.marginTop="10px";
+        container.appendChild(a);
+      }else{
+        var p=document.createElement("div");p.textContent="Image completed on the Home PC.";container.appendChild(p);
+      }
+      $("chat").scrollTop=$("chat").scrollHeight;
+      return;
+    }
+    container.textContent="Generating image locally… "+Math.max(0,tries*3)+"s";
+  }
+  container.textContent="The Home PC is still generating the image. Check again shortly.";
+}
 function escapeHtml(s){return String(s||"").replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]});}
 function setPage(name){
   currentPage=name;
@@ -436,6 +468,7 @@ $("composer").onsubmit=async function(e){
   try{
     var d=await api({action:"chat",message:text,agent:$("agentSelect").value});wait.firstChild?wait.firstChild.nodeValue=d.reply:wait.textContent=d.reply;wait.textContent=d.reply;
     var meta=document.createElement("div");meta.className="meta";meta.textContent=(d.agent||"Dexter")+" · "+(d.model||"AI");wait.appendChild(meta);
+    if(d.imageJob&&d.imageJob.id){pollDexterImage(d.imageJob.id,wait).catch(function(err){wait.textContent=err.message;});}
   }catch(err){wait.textContent=err.message;}finally{$("send").disabled=false;$("message").focus();}
 };
 $("message").onkeydown=function(e){if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();$("composer").requestSubmit();}};
