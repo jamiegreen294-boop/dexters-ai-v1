@@ -17,6 +17,13 @@ const HEADLESS=String(process.env.DEXTER_BROWSER_HEADLESS||"false").toLowerCase(
 const OLLAMA_URL=(process.env.DEXTER_OLLAMA_URL||"http://127.0.0.1:11434").replace(/\/$/,"");
 const COMFY_URL=(process.env.DEXTER_COMFY_URL||"http://127.0.0.1:8188").replace(/\/$/,"");
 const IMAGE_DIR=path.join(WORKSPACE,"generated-images");
+const SDCPP_DIR=path.join(WORKSPACE,"image-engine","stable-diffusion-cpp");
+const SDCPP_MODEL_DIR=path.join(WORKSPACE,"image-engine","models");
+const SDCPP_MODEL=path.join(SDCPP_MODEL_DIR,"dreamshaper-7-lcm-q4_0.gguf");
+const SDCPP_RELEASE_URL="https://github.com/leejet/stable-diffusion.cpp/releases/download/master-874-656a135/sd-master-656a135-bin-win-cpu-x64.zip";
+const SDCPP_RELEASE_SHA256="396d3395be15e6c83d8e5f9021a44e42c874c37070320d36feb115b1f13f7312";
+const SDCPP_MODEL_URL="https://huggingface.co/darkmaniac7/TokForge-DreamShaper-LCM-GGUF-q4/resolve/main/dreamshaper-7-lcm-q4_0.gguf?download=true";
+const SDCPP_MODEL_SHA256="8b080d29432a3185936585971cca09236eea3a018161dd0af11b6f59b5dc4dfb";
 const LOCAL_MODEL=process.env.DEXTER_LOCAL_MODEL||"qwen3:4b";
 const CODE_MODEL=process.env.DEXTER_CODE_MODEL||LOCAL_MODEL;
 const MAX_AGENT_STEPS=Math.max(1,Math.min(30,Number(process.env.DEXTER_MAX_AGENT_STEPS||15)));
@@ -29,7 +36,7 @@ if(!TOKEN||TOKEN.length<24){
   console.error("Set DEXTER_BROWSER_WORKER_TOKEN to a long random value before starting Dexter.");
   process.exit(1);
 }
-for(const dir of [PROFILE,WORKSPACE,JOB_DIR,IMAGE_DIR])fs.mkdirSync(dir,{recursive:true});
+for(const dir of [PROFILE,WORKSPACE,JOB_DIR,IMAGE_DIR,SDCPP_DIR,SDCPP_MODEL_DIR])fs.mkdirSync(dir,{recursive:true});
 
 let context;
 const pageSessions=new Map();
@@ -604,6 +611,93 @@ async function systemInfo(){
   }
   return out;
 }
+async function sha256File(file){
+  return await new Promise((resolve,reject)=>{
+    const h=crypto.createHash("sha256");
+    const s=fs.createReadStream(file);
+    s.on("data",d=>h.update(d));s.on("error",reject);s.on("end",()=>resolve(h.digest("hex")));
+  });
+}
+async function downloadFile(url,dest){
+  const temp=dest+".part";
+  if(fs.existsSync(temp))fs.rmSync(temp,{force:true});
+  const r=await fetch(url,{redirect:"follow"});
+  if(!r.ok||!r.body)throw new Error("Download failed: "+r.status+" "+url);
+  const out=fs.createWriteStream(temp);
+  let bytes=0;
+  for await(const chunk of r.body){bytes+=chunk.length;if(!out.write(chunk))await new Promise(ok=>out.once("drain",ok));}
+  await new Promise((ok,fail)=>out.end(err=>err?fail(err):ok()));
+  fs.renameSync(temp,dest);
+  return bytes;
+}
+function findSdCli(){
+  if(!fs.existsSync(SDCPP_DIR))return null;
+  const stack=[SDCPP_DIR];
+  while(stack.length){
+    const dir=stack.pop();
+    for(const ent of fs.readdirSync(dir,{withFileTypes:true})){
+      const full=path.join(dir,ent.name);
+      if(ent.isDirectory())stack.push(full);
+      else if(/^sd(?:-cli)?\.exe$/i.test(ent.name))return full;
+    }
+  }
+  return null;
+}
+async function sdCppStatus(){
+  const exe=findSdCli();
+  const modelExists=fs.existsSync(SDCPP_MODEL);
+  return {
+    ready:Boolean(exe&&modelExists),
+    provider:"stable-diffusion.cpp-cpu",
+    free:true,
+    exe:exe?path.relative(WORKSPACE,exe):null,
+    model:modelExists?path.relative(WORKSPACE,SDCPP_MODEL):null,
+    model_bytes:modelExists?fs.statSync(SDCPP_MODEL).size:0
+  };
+}
+async function installSdCpp(){
+  if(process.platform!=="win32")throw new Error("The automatic image installer currently supports the Dexter Windows Home PC.");
+  const zip=path.join(SDCPP_DIR,"stable-diffusion-cpp.zip");
+  const exe=findSdCli();
+  if(!exe){
+    await downloadFile(SDCPP_RELEASE_URL,zip);
+    const hash=await sha256File(zip);
+    if(hash!==SDCPP_RELEASE_SHA256){fs.rmSync(zip,{force:true});throw new Error("stable-diffusion.cpp checksum verification failed.");}
+    const ps="Expand-Archive -LiteralPath '"+zip.replace(/'/g,"''")+"' -DestinationPath '"+SDCPP_DIR.replace(/'/g,"''")+"' -Force";
+    const un=await runProcess("powershell",["-NoProfile","-Command",ps],WORKSPACE,120000);
+    if(un.code!==0)throw new Error("Could not unpack image engine: "+un.stderr);
+    fs.rmSync(zip,{force:true});
+  }
+  if(!fs.existsSync(SDCPP_MODEL)){
+    await downloadFile(SDCPP_MODEL_URL,SDCPP_MODEL);
+    const hash=await sha256File(SDCPP_MODEL);
+    if(hash!==SDCPP_MODEL_SHA256){fs.rmSync(SDCPP_MODEL,{force:true});throw new Error("Image model checksum verification failed.");}
+  }
+  const status=await sdCppStatus();
+  if(!status.ready)throw new Error("Image engine files installed but sd-cli.exe was not found.");
+  return {...status,installed:true};
+}
+async function sdCppGenerate(request={}){
+  const status=await sdCppStatus();
+  if(!status.ready)throw new Error("Free CPU image engine is not installed.");
+  const prompt=String(request.prompt||"").trim();
+  if(!prompt)throw new Error("Image prompt is required.");
+  const negative=String(request.negative_prompt||"blurry, low quality, distorted, watermark, unreadable text").slice(0,1500);
+  const width=Math.max(256,Math.min(768,Number(request.width||512)));
+  const height=Math.max(256,Math.min(768,Number(request.height||512)));
+  const steps=Math.max(4,Math.min(8,Number(request.steps||6)));
+  const seed=Number.isFinite(Number(request.seed))?Math.trunc(Number(request.seed)):Math.floor(Math.random()*2147483647);
+  const filename="dexter-"+new Date().toISOString().replace(/[:.]/g,"-")+"-"+crypto.randomUUID().slice(0,8)+".png";
+  const out=path.join(IMAGE_DIR,filename);
+  const exe=path.resolve(WORKSPACE,status.exe);
+  const args=["-M","img_gen","-m",SDCPP_MODEL,"-p",prompt.slice(0,3000),"-n",negative,
+    "--sampling-method","lcm","--scheduler","lcm","--steps",String(steps),"--cfg-scale","1.5",
+    "-W",String(width),"-H",String(height),"-s",String(seed),"-o",out];
+  const r=await runProcess(exe,args,SDCPP_DIR,600000);
+  if(r.code!==0||!fs.existsSync(out))throw new Error("Local image generation failed: "+String(r.stderr||r.stdout).slice(-3000));
+  return {status:"completed",provider:"stable-diffusion.cpp-cpu",free:true,prompt,width,height,steps,seed,filename,path:path.relative(WORKSPACE,out),bytes:fs.statSync(out).size};
+}
+
 async function comfyStatus(){
   try{
     const [statsRes,objRes]=await Promise.all([
@@ -673,8 +767,17 @@ async function comfyGenerate(request={}){
 
 async function workspaceTool(tool,request={}){
   if(tool==="system.info")return await systemInfo();
-  if(tool==="image.status")return await comfyStatus();
-  if(tool==="image.generate")return await comfyGenerate(request);
+  if(tool==="image.install")return await installSdCpp();
+  if(tool==="image.status"){
+    const comfy=await comfyStatus();
+    const cpu=await sdCppStatus();
+    return {ready:comfy.ready||cpu.ready,preferred:comfy.ready?"comfyui":cpu.ready?"stable-diffusion.cpp-cpu":null,comfyui:comfy,cpu};
+  }
+  if(tool==="image.generate"){
+    const comfy=await comfyStatus();
+    if(comfy.ready)return await comfyGenerate(request);
+    return await sdCppGenerate(request);
+  }
   if(tool==="workspace.list"){
     const dir=safeWorkspacePath(request.path||"");
     return {path:path.relative(WORKSPACE,dir),entries:fs.readdirSync(dir,{withFileTypes:true}).map(x=>({name:x.name,type:x.isDirectory()?"directory":"file"})).slice(0,500)};
@@ -831,8 +934,9 @@ async function pollHomeJobs(){
 async function health(){
   let ollamaReady=false,models=[];
   try{const r=await fetch(OLLAMA_URL+"/api/tags");const d=await r.json();ollamaReady=r.ok;models=(d.models||[]).map(x=>x.name).slice(0,20);}catch{}
-  const image=await comfyStatus();
-  return {status:"ready",host:"home-pc",browser:"chromium",internet:true,coding_agent:true,image_generation:image.ready,live_actions:LIVE_ACTIONS,cloud_agent_paired:Boolean(AGENT_TOKEN),agent_endpoint:AGENT_ENDPOINT,headless:HEADLESS,workspace:WORKSPACE,ollama:{ready:ollamaReady,url:OLLAMA_URL,model:LOCAL_MODEL,code_model:CODE_MODEL,models},comfyui:image,jobs:loadJobs().length};
+  const comfy=await comfyStatus();
+  const cpuImage=await sdCppStatus();
+  return {status:"ready",host:"home-pc",browser:"chromium",internet:true,coding_agent:true,image_generation:comfy.ready||cpuImage.ready,live_actions:LIVE_ACTIONS,cloud_agent_paired:Boolean(AGENT_TOKEN),agent_endpoint:AGENT_ENDPOINT,headless:HEADLESS,workspace:WORKSPACE,ollama:{ready:ollamaReady,url:OLLAMA_URL,model:LOCAL_MODEL,code_model:CODE_MODEL,models},image:{preferred:comfy.ready?"comfyui":cpuImage.ready?"stable-diffusion.cpp-cpu":null,comfyui:comfy,cpu:cpuImage},jobs:loadJobs().length};
 }
 function serveFile(res,file,contentType){const data=fs.readFileSync(file);res.writeHead(200,{"Content-Type":contentType,"Cache-Control":"no-store"});res.end(data);}
 
