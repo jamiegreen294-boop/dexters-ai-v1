@@ -149,9 +149,16 @@ button,input,textarea,select{font:inherit}button{cursor:pointer}.hidden{display:
 <div class="metric"><strong id="mKnowledge">—</strong><span>Base knowledge</span></div>
 <div class="metric"><strong id="mBusinessKnowledge">—</strong><span>Business knowledge</span></div>
 <div class="metric"><strong id="mLiveMenu">—</strong><span>Live menu</span></div>
+<div class="metric"><strong id="mHomePC">—</strong><span>Home PC</span></div>
 <div class="metric"><strong id="mTasks">—</strong><span>Work tasks</span></div>
 </div>
 <div id="systemSettings" class="detailbox"><b>Brain settings</b><pre>Loading…</pre></div>
+<div class="detailbox">
+<b>Dexter Home PC</b>
+<p class="muted">Pair the free Windows host so cloud/phone Work tasks can run the local browser, internet research and coding agent.</p>
+<div class="approval-actions"><button id="createPairCode" class="primary">Create pairing code</button></div>
+<pre id="pairCodeResult">Not paired from this device yet.</pre>
+</div>
 <div class="detailbox"><b>Full Dexter readiness test</b><p class="muted">Checks AI, live read-only menu, business knowledge, memory, agents and connector registry. It does not make live changes.</p><div class="approval-actions"><button id="runSelfTest" class="primary">Run Full Dexter Test</button></div><pre id="selfTestResult">Not run yet.</pre></div>
 <div class="notice">Environment: TEST. Live writes are disabled. Git pushes, deployments and consequential browser actions remain locked until live mode is explicitly enabled after testing.</div>
 </section>
@@ -164,7 +171,7 @@ var ENDPOINT="https://eikruaxxzzxmfjvsmwwo.supabase.co/functions/v1/ai-command-c
 var $=function(id){return document.getElementById(id)};
 var token=sessionStorage.dexterToken||"";
 var sessionId=localStorage.dexterSession||crypto.randomUUID();
-var dashboard={agents:[],tasks:[],knowledge:[],memory:[],approvals:[],audit:[],orchestration:[],settings:[],connectors:[],toolRequests:[]};
+var dashboard={agents:[],tasks:[],knowledge:[],memory:[],approvals:[],audit:[],orchestration:[],settings:[],connectors:[],toolRequests:[],homeAgents:[],homeJobs:[]};
 var currentPage="chat";
 
 function api(body){
@@ -202,6 +209,7 @@ async function health(){
     $("mKnowledge").textContent=d.knowledge||0;
     $("mBusinessKnowledge").textContent=d.businessKnowledge||0;
     $("mLiveMenu").textContent=d.liveMenu?"Ready":"Check";
+    $("mHomePC").textContent=d.homeAgentOnline?"Online":"Offline";
     $("mTasks").textContent=d.tasks||0;
     $("knowledgeNav").textContent=d.knowledge||0;
     return d;
@@ -307,7 +315,8 @@ function renderConnectors(){
 function renderSystem(){
   var box=$("systemSettings");
   if(!box)return;
-  box.innerHTML='<b>Brain settings</b><pre>'+escapeHtml(JSON.stringify(dashboard.settings||[],null,2))+'</pre>';
+  var agents=(dashboard.homeAgents||[]).map(function(a){return {name:a.name,last_seen_at:a.last_seen_at,active:a.active,capabilities:a.capabilities}});
+  box.innerHTML='<b>Brain settings</b><pre>'+escapeHtml(JSON.stringify(dashboard.settings||[],null,2))+'</pre><b>Paired home agents</b><pre>'+escapeHtml(JSON.stringify(agents,null,2))+'</pre>';
 }
 async function openTask(id){
   var d=await api({action:"task_detail",taskId:id});
@@ -345,6 +354,14 @@ $("runWork").onclick=async function(){
   }catch(err){$("workState").textContent=err.message;}finally{$("runWork").disabled=false;}
 };
 $("refreshTasks").onclick=function(){loadDashboard()};
+$("createPairCode").onclick=async function(){
+  var b=$("createPairCode"),out=$("pairCodeResult");b.disabled=true;out.textContent="Creating secure pairing code…";
+  try{
+    var d=await api({action:"home_pair_code"});
+    out.textContent="PAIRING CODE: "+d.code+"\nExpires: "+d.expires_at+"\n\nOn the home PC run home-host\\PAIR-HOME-PC.ps1 and enter this code.";
+  }catch(e){out.textContent="FAILED: "+e.message;}
+  finally{b.disabled=false;}
+};
 $("runSelfTest").onclick=async function(){
   var b=$("runSelfTest"),out=$("selfTestResult");b.disabled=true;out.textContent="Running full Dexter test…";
   try{
