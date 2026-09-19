@@ -986,6 +986,13 @@ const server=http.createServer(async(req,res)=>{
   try{
     if(req.method==="GET"&&(req.url==="/"||req.url==="/index.html"))return serveFile(res,path.join(ROOT,"index.html"),"text/html; charset=utf-8");
     if(req.method==="GET"&&req.url==="/health")return json(res,200,await health());
+    if(req.method==="GET"&&req.url?.startsWith("/generated-images/")){
+      const name=decodeURIComponent(req.url.slice("/generated-images/".length));
+      if(!/^[A-Za-z0-9._-]+$/.test(name))return json(res,400,{error:"Invalid image name"});
+      const file=path.join(IMAGE_DIR,name);
+      if(!fs.existsSync(file))return json(res,404,{error:"Image not found"});
+      return serveFile(res,file,"image/png");
+    }
     if(req.method==="GET"&&req.url==="/jobs"){if(!authOk(req))return json(res,401,{error:"Unauthorized"});return json(res,200,{jobs:loadJobs()});}
     if(req.method==="POST"&&req.url==="/browser/tool"){if(!authOk(req))return json(res,401,{error:"Unauthorized"});const body=await readBody(req);return json(res,200,{result:await browserTool(String(body.tool||""),body.request||{})});}
     if(req.method==="POST"&&req.url==="/workspace/tool"){if(!authOk(req))return json(res,401,{error:"Unauthorized"});const body=await readBody(req);return json(res,200,{result:await workspaceTool(String(body.tool||""),body.request||{})});}
