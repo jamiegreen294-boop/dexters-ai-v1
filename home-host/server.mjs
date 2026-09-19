@@ -229,16 +229,45 @@ async function internetResearch(request={}){
   const searchUrl="https://duckduckgo.com/?q="+encodeURIComponent(query);
   await page.goto(searchUrl,{waitUntil:"domcontentloaded",timeout:45000});
   await page.waitForTimeout(1200);
-  const state=await snapshot(page);
-  const result=await autonomousBrowser(page,{
-    session,
-    instruction:"Research this question using the public web and return when you have enough evidence: "+query+". Read pages only. Do not log in, submit forms, send messages, purchase anything, publish, deploy, delete, or change accounts.",
-    url:page.url(),
-    max_steps:5,
-    timeout_ms:90000
+  const results=await page.evaluate(()=>{
+    const out=[];
+    const seen=new Set();
+    const selectors=["article[data-testid=result]","div.result","li[data-layout=organic]"];
+    const nodes=Array.from(document.querySelectorAll(selectors.join(",")));
+    for(const node of nodes){
+      const a=node.querySelector("a[href]");
+      if(!a)continue;
+      const href=a.href||"";
+      const title=(a.textContent||node.querySelector("h2,h3")?.textContent||"").trim();
+      const snippet=(node.querySelector("[data-result=snippet],.result__snippet,.snippet")?.textContent||node.textContent||"").trim();
+      if(!href||!title||seen.has(href))continue;
+      seen.add(href);
+      out.push({title:title.slice(0,300),url:href,snippet:snippet.slice(0,700)});
+      if(out.length>=10)break;
+    }
+    if(!out.length){
+      for(const a of Array.from(document.querySelectorAll("a[href]"))){
+        const href=a.href||"", title=(a.textContent||"").trim();
+        if(!href||!title||seen.has(href)||href.includes("duckduckgo.com"))continue;
+        seen.add(href);out.push({title:title.slice(0,300),url:href,snippet:""});
+        if(out.length>=10)break;
+      }
+    }
+    return out;
   });
-  return {query,search:state,result};
+  if(request.deep===true){
+    const result=await autonomousBrowser(page,{
+      session,
+      instruction:"Research this question using the public web and return when you have enough evidence: "+query+". Read pages only. Do not log in, submit forms, send messages, purchase anything, publish, deploy, delete, or change accounts.",
+      url:page.url(),
+      max_steps:Math.max(1,Math.min(3,Number(request.max_steps||3))),
+      timeout_ms:Math.max(15000,Math.min(60000,Number(request.timeout_ms||45000)))
+    });
+    return {status:"completed",mode:"deep",query,search_url:searchUrl,results,result};
+  }
+  return {status:"completed",mode:"fast-search",query,search_url:searchUrl,results};
 }
+
 async function directCodingPlan(request={}){
   const repoPath=String(request.path||request.project_path||"").trim();
   if(!repoPath)throw new Error("Direct coding requires a project path.");
