@@ -483,26 +483,26 @@ async function createJob(body){
 }
 function scheduleSelfRestart(delayMs=3500){
   if(process.platform!=="win32")throw new Error("Self-restart is currently implemented for the Windows Home PC.");
-  const helper=path.join(__dirname,"restart-helper.cmd");
+  const helper=path.join(__dirname,"restart-helper.ps1");
   const nodeExe=process.execPath;
   const serverFile=path.join(__dirname,"server.mjs");
   const logFile=path.join(__dirname,"restart.log");
-  const lines=[
-    "@echo off",
-    "timeout /t 6 /nobreak >nul",
-    'for /f "tokens=2,*" %%A in (\'reg query "HKCU\\Environment" /v DEXTER_BROWSER_WORKER_TOKEN 2^>nul ^| find "DEXTER_BROWSER_WORKER_TOKEN"\') do set "DEXTER_BROWSER_WORKER_TOKEN=%%B"',
-    'for /f "tokens=2,*" %%A in (\'reg query "HKCU\\Environment" /v DEXTER_AGENT_ENDPOINT 2^>nul ^| find "DEXTER_AGENT_ENDPOINT"\') do set "DEXTER_AGENT_ENDPOINT=%%B"',
-    'for /f "tokens=2,*" %%A in (\'reg query "HKCU\\Environment" /v DEXTER_AGENT_TOKEN 2^>nul ^| find "DEXTER_AGENT_TOKEN"\') do set "DEXTER_AGENT_TOKEN=%%B"',
-    'for /f "tokens=2,*" %%A in (\'reg query "HKCU\\Environment" /v DEXTER_LOCAL_MODEL 2^>nul ^| find "DEXTER_LOCAL_MODEL"\') do set "DEXTER_LOCAL_MODEL=%%B"',
-    'for /f "tokens=2,*" %%A in (\'reg query "HKCU\\Environment" /v DEXTER_CODE_MODEL 2^>nul ^| find "DEXTER_CODE_MODEL"\') do set "DEXTER_CODE_MODEL=%%B"',
-    'if "%DEXTER_LOCAL_MODEL%"=="" set "DEXTER_LOCAL_MODEL=qwen3:4b"',
-    'if "%DEXTER_CODE_MODEL%"=="" set "DEXTER_CODE_MODEL=qwen3:4b"',
-    'set "DEXTER_LIVE_ACTIONS=false"',
-    'cd /d '+JSON.stringify(__dirname),
-    JSON.stringify(nodeExe)+' '+JSON.stringify(serverFile)+' >> '+JSON.stringify(logFile)+' 2>&1'
+  const ps=[
+    "$ErrorActionPreference = 'Stop'",
+    "Start-Sleep -Seconds 6",
+    "$envPath='HKCU:\\Environment'",
+    "foreach($n in @('DEXTER_BROWSER_WORKER_TOKEN','DEXTER_AGENT_ENDPOINT','DEXTER_AGENT_TOKEN','DEXTER_LOCAL_MODEL','DEXTER_CODE_MODEL')) {",
+    "  try { $v=(Get-ItemProperty -Path $envPath -Name $n -ErrorAction Stop).$n; if($v){ Set-Item -Path ('Env:'+ $n) -Value $v } } catch {}",
+    "}",
+    "if(-not $env:DEXTER_LOCAL_MODEL){$env:DEXTER_LOCAL_MODEL='qwen3:4b'}",
+    "if(-not $env:DEXTER_CODE_MODEL){$env:DEXTER_CODE_MODEL='qwen3:4b'}",
+    "$env:DEXTER_LIVE_ACTIONS='false'",
+    "$out="+JSON.stringify(logFile),
+    "$err="+JSON.stringify(logFile+".err"),
+    "Start-Process -FilePath "+JSON.stringify(nodeExe)+" -ArgumentList "+JSON.stringify(serverFile)+" -WorkingDirectory "+JSON.stringify(__dirname)+" -WindowStyle Hidden -RedirectStandardOutput $out -RedirectStandardError $err"
   ];
-  fs.writeFileSync(helper,lines.join("\r\n"),"utf8");
-  const child=spawn("cmd.exe",["/d","/c",helper],{
+  fs.writeFileSync(helper,ps.join("\r\n"),"utf8");
+  const child=spawn("powershell.exe",["-NoProfile","-ExecutionPolicy","Bypass","-WindowStyle","Hidden","-File",helper],{
     cwd:__dirname,
     detached:true,
     stdio:"ignore",
@@ -511,7 +511,7 @@ function scheduleSelfRestart(delayMs=3500){
   });
   child.unref();
   setTimeout(()=>process.exit(0),1200);
-  return {restart_scheduled:true,restart_in_ms:6000,method:"windows-cmd-handoff",log_file:"restart.log"};
+  return {restart_scheduled:true,restart_in_ms:6000,method:"powershell-start-process",log_file:"restart.log"};
 }
 
 async function selfUpdateWorker(){
