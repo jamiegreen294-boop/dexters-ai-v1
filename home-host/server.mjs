@@ -19,6 +19,9 @@ const LOCAL_MODEL=process.env.DEXTER_LOCAL_MODEL||"qwen3:4b";
 const CODE_MODEL=process.env.DEXTER_CODE_MODEL||LOCAL_MODEL;
 const MAX_AGENT_STEPS=Math.max(1,Math.min(30,Number(process.env.DEXTER_MAX_AGENT_STEPS||15)));
 const LIVE_ACTIONS=String(process.env.DEXTER_LIVE_ACTIONS||"false").toLowerCase()==="true";
+const AGENT_ENDPOINT=(process.env.DEXTER_AGENT_ENDPOINT||"https://eikruaxxzzxmfjvsmwwo.supabase.co/functions/v1/dexter-home-agent").replace(/\/$/,"");
+const AGENT_TOKEN=process.env.DEXTER_AGENT_TOKEN||"";
+let agentBusy=false;
 
 if(!TOKEN||TOKEN.length<24){
   console.error("Set DEXTER_BROWSER_WORKER_TOKEN to a long random value before starting Dexter.");
@@ -353,10 +356,50 @@ async function createJob(body){
   }catch(e){job.status="failed";job.error=String(e?.message||e);}finally{job.updated_at=new Date().toISOString();saveJob(job);}});
   return job;
 }
+async function executeCloudJob(job){
+  const request=job?.request||{};
+  if(job.job_type==="browser")return await browserTool(String(job.tool_name||"browser.navigate_and_act"),request);
+  if(job.job_type==="workspace")return await workspaceTool(String(job.tool_name||""),request);
+  if(job.job_type==="research")return await internetResearch(request);
+  if(job.job_type==="coding")return await codingAgent(request);
+  if(job.job_type==="local_ai"){
+    const messages=Array.isArray(request.messages)?request.messages:[{role:"user",content:String(request.prompt||"")}];
+    const reply=await ollama(messages,request.format,request.model||LOCAL_MODEL);
+    return {reply,model:request.model||LOCAL_MODEL,provider:"ollama-local"};
+  }
+  throw new Error("Unsupported cloud job type: "+job.job_type);
+}
+async function agentRequest(body){
+  if(!AGENT_TOKEN)return null;
+  const r=await fetch(AGENT_ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json","x-dexter-agent-token":AGENT_TOKEN},body:JSON.stringify(body)});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(d?.error||("Home-agent API failed "+r.status));
+  return d;
+}
+async function pollHomeJobs(){
+  if(!AGENT_TOKEN||agentBusy)return;
+  agentBusy=true;
+  try{
+    const d=await agentRequest({action:"poll"});
+    const job=d?.job;
+    if(!job)return;
+    try{
+      const result=await executeCloudJob(job);
+      await agentRequest({action:"result",job_id:job.id,status:"completed",result});
+    }catch(e){
+      await agentRequest({action:"result",job_id:job.id,status:"failed",error:String(e?.message||e).slice(0,5000)});
+    }
+  }catch(e){
+    console.error("Dexter home-agent poll:",String(e?.message||e));
+  }finally{
+    agentBusy=false;
+  }
+}
+
 async function health(){
   let ollamaReady=false,models=[];
   try{const r=await fetch(OLLAMA_URL+"/api/tags");const d=await r.json();ollamaReady=r.ok;models=(d.models||[]).map(x=>x.name).slice(0,20);}catch{}
-  return {status:"ready",host:"home-pc",browser:"chromium",internet:true,coding_agent:true,live_actions:LIVE_ACTIONS,headless:HEADLESS,workspace:WORKSPACE,ollama:{ready:ollamaReady,url:OLLAMA_URL,model:LOCAL_MODEL,code_model:CODE_MODEL,models},jobs:loadJobs().length};
+  return {status:"ready",host:"home-pc",browser:"chromium",internet:true,coding_agent:true,live_actions:LIVE_ACTIONS,cloud_agent_paired:Boolean(AGENT_TOKEN),agent_endpoint:AGENT_ENDPOINT,headless:HEADLESS,workspace:WORKSPACE,ollama:{ready:ollamaReady,url:OLLAMA_URL,model:LOCAL_MODEL,code_model:CODE_MODEL,models},jobs:loadJobs().length};
 }
 function serveFile(res,file,contentType){const data=fs.readFileSync(file);res.writeHead(200,{"Content-Type":contentType,"Cache-Control":"no-store"});res.end(data);}
 
@@ -374,6 +417,11 @@ const server=http.createServer(async(req,res)=>{
 });
 
 server.listen(PORT,"127.0.0.1",()=>{
-  console.log("Dexter AI Home Host v2 running at http://127.0.0.1:"+PORT);
+  console.log("Dexter AI Home Host running at http://127.0.0.1:"+PORT);
   console.log("Browser: /browser/tool | Workspace: /workspace/tool | Local AI: /ai/chat | Jobs: /jobs");
+  console.log(AGENT_TOKEN?"Dexter cloud agent: paired":"Dexter cloud agent: not paired");
+  if(AGENT_TOKEN){
+    setTimeout(pollHomeJobs,1000);
+    setInterval(pollHomeJobs,5000);
+  }
 });
