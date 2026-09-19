@@ -695,7 +695,9 @@ async function sdCppGenerate(request={}){
     "-W",String(width),"-H",String(height),"-s",String(seed),"-o",out];
   const r=await runProcess(exe,args,SDCPP_DIR,600000);
   if(r.code!==0||!fs.existsSync(out))throw new Error("Local image generation failed: "+String(r.stderr||r.stdout).slice(-3000));
-  return {status:"completed",provider:"stable-diffusion.cpp-cpu",free:true,prompt,width,height,steps,seed,filename,path:path.relative(WORKSPACE,out),bytes:fs.statSync(out).size};
+  const result={status:"completed",provider:"stable-diffusion.cpp-cpu",free:true,prompt,width,height,steps,seed,filename,path:path.relative(WORKSPACE,out),bytes:fs.statSync(out).size,mime_type:"image/png"};
+  if(request.return_base64===true)result.image_base64=fs.readFileSync(out).toString("base64");
+  return result;
 }
 
 async function comfyStatus(){
@@ -875,6 +877,16 @@ async function selfUpdateWorker(){
     const backup=path.join(__dirname,"server.mjs.backup");
     fs.copyFileSync(current,backup);
     fs.writeFileSync(current,next,"utf8");
+    try{
+      const launcherUrl="https://raw.githubusercontent.com/jamiegreen294-boop/dexters-ai-v1/build/real-dexter-ai/home-host/START-DEXTER.bat?dexter_update="+Date.now();
+      const lr=await fetch(launcherUrl,{cache:"no-store",headers:{"Cache-Control":"no-cache, no-store, must-revalidate","Pragma":"no-cache"}});
+      if(lr.ok){
+        const launcher=await lr.text();
+        if(launcher.includes("Dexter Home Host updates")&&launcher.includes("npm start")){
+          fs.writeFileSync(path.join(__dirname,"START-DEXTER.bat"),launcher,"utf8");
+        }
+      }
+    }catch{}
     const restart=scheduleSelfRestart(4500);
     return {updated:true,bytes:Buffer.byteLength(next),restart_required:false,...restart};
   }finally{clearTimeout(timer);}
