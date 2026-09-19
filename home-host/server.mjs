@@ -481,6 +481,24 @@ async function createJob(body){
   }catch(e){job.status="failed";job.error=String(e?.message||e);}finally{job.updated_at=new Date().toISOString();saveJob(job);}});
   return job;
 }
+function scheduleSelfRestart(delayMs=3500){
+  const helper=path.join(__dirname,"restart-helper.cjs");
+  const serverFile=path.join(__dirname,"server.mjs");
+  const helperCode=[
+    'const {spawn}=require("child_process");',
+    'setTimeout(()=>{',
+    '  const child=spawn(process.execPath,['+JSON.stringify(serverFile)+'],{cwd:'+JSON.stringify(__dirname)+',env:process.env,detached:true,stdio:"ignore"});',
+    '  child.unref();',
+    '  process.exit(0);',
+    '},1500);'
+  ].join("\n");
+  fs.writeFileSync(helper,helperCode,"utf8");
+  const child=spawn(process.execPath,[helper],{cwd:__dirname,env:process.env,detached:true,stdio:"ignore"});
+  child.unref();
+  setTimeout(()=>process.exit(0),Math.max(500,delayMs));
+  return {restart_scheduled:true,restart_in_ms:Math.max(500,delayMs)};
+}
+
 async function selfUpdateWorker(){
   const rawUrl="https://raw.githubusercontent.com/jamiegreen294-boop/dexters-ai-v1/build/real-dexter-ai/home-host/server.mjs";
   const controller=new AbortController();
@@ -494,7 +512,8 @@ async function selfUpdateWorker(){
     const backup=path.join(__dirname,"server.mjs.backup");
     fs.copyFileSync(current,backup);
     fs.writeFileSync(current,next,"utf8");
-    return {updated:true,bytes:Buffer.byteLength(next),restart_required:true};
+    const restart=scheduleSelfRestart(4500);
+    return {updated:true,bytes:Buffer.byteLength(next),restart_required:false,...restart};
   }finally{clearTimeout(timer);}
 }
 
@@ -508,6 +527,7 @@ async function executeCloudJob(job){
     return await codingAgent(request);
   }
   if(job.job_type==="self_update")return await selfUpdateWorker();
+  if(job.job_type==="self_restart")return scheduleSelfRestart(3000);
   if(job.job_type==="local_ai"){
     const messages=Array.isArray(request.messages)?request.messages:[{role:"user",content:String(request.prompt||"")}];
     const reply=await ollama(messages,request.format,request.model||LOCAL_MODEL);
