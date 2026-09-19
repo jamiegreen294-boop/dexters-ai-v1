@@ -24,8 +24,8 @@ const SDCPP_RELEASE_URL="https://github.com/leejet/stable-diffusion.cpp/releases
 const SDCPP_RELEASE_SHA256="396d3395be15e6c83d8e5f9021a44e42c874c37070320d36feb115b1f13f7312";
 const SDCPP_MODEL_URL="https://huggingface.co/darkmaniac7/TokForge-DreamShaper-LCM-GGUF-q4/resolve/main/dreamshaper-7-lcm-q4_0.gguf?download=true";
 const SDCPP_MODEL_SHA256="8b080d29432a3185936585971cca09236eea3a018161dd0af11b6f59b5dc4dfb";
-const LOCAL_MODEL=process.env.DEXTER_LOCAL_MODEL||"qwen3:4b";
-const CODE_MODEL=process.env.DEXTER_CODE_MODEL||LOCAL_MODEL;
+const LOCAL_MODEL=process.env.DEXTER_CHAT_MODEL||"qwen3:1.7b";
+const CODE_MODEL=process.env.DEXTER_CODE_MODEL||process.env.DEXTER_LOCAL_MODEL||"qwen3:4b";
 const MAX_AGENT_STEPS=Math.max(1,Math.min(30,Number(process.env.DEXTER_MAX_AGENT_STEPS||15)));
 const LIVE_ACTIONS=String(process.env.DEXTER_LIVE_ACTIONS||"false").toLowerCase()==="true";
 const AGENT_ENDPOINT=(process.env.DEXTER_AGENT_ENDPOINT||"https://eikruaxxzzxmfjvsmwwo.supabase.co/functions/v1/dexter-home-agent").replace(/\/$/,"");
