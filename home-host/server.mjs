@@ -244,7 +244,12 @@ async function autonomousBrowser(page,request={}){
 }
 function runProcess(command,args,cwd,timeout=120000){
   return new Promise((resolve,reject)=>{
-    let executable=process.platform==="win32"&&["npm","npx"].includes(command)?command+".cmd":command;
+    let executable=command;
+    let runArgs=args;
+    if(process.platform==="win32"&&["npm","npx"].includes(command)){
+      executable=process.env.ComSpec||"cmd.exe";
+      runArgs=["/d","/s","/c",command,...args];
+    }
     if(process.platform==="win32"&&command==="ollama"){
       const candidates=[
         path.join(process.env.LOCALAPPDATA||"","Programs","Ollama","ollama.exe"),
@@ -253,7 +258,7 @@ function runProcess(command,args,cwd,timeout=120000){
       const found=candidates.find(p=>p&&fs.existsSync(p));
       if(found)executable=found;
     }
-    const child=spawn(executable,args,{cwd,windowsHide:true,shell:false,env:{...process.env,CI:"1"}});
+    const child=spawn(executable,runArgs,{cwd,windowsHide:true,shell:false,env:{...process.env,CI:"1"}});
     let stdout="",stderr="",killed=false;
     const timer=setTimeout(()=>{killed=true;child.kill();},timeout);
     child.stdout.on("data",d=>stdout+=d.toString());
@@ -793,8 +798,66 @@ async function installChatModel(request={}){
   }finally{clearTimeout(timer);}
 }
 
+
+async function runHardwarePowerShell(script,timeout=45000){
+  if(process.platform!=="win32")throw new Error("Windows hardware tools require the Dexter Windows PC.");
+  const encoded=Buffer.from(String(script),"utf16le").toString("base64");
+  const r=await runProcess("powershell.exe",["-NoProfile","-NonInteractive","-ExecutionPolicy","Bypass","-EncodedCommand",encoded],__dirname,timeout);
+  if(r.code!==0)throw new Error((r.stderr||r.stdout||("PowerShell exited "+r.code)).trim());
+  return String(r.stdout||"").trim();
+}
+function parseHardwareJson(v){
+  const s=String(v||"").trim();
+  if(!s)return null;
+  try{return JSON.parse(s)}catch{}
+  const a=s.indexOf("{"),b=s.lastIndexOf("}");
+  if(a>=0&&b>a)return JSON.parse(s.slice(a,b+1));
+  const x=s.indexOf("["),y=s.lastIndexOf("]");
+  if(x>=0&&y>x)return JSON.parse(s.slice(x,y+1));
+  throw new Error("Hardware diagnostic returned invalid JSON.");
+}
+async function hardwareInspect(){
+  const ps=[
+    "$ErrorActionPreference='SilentlyContinue'",
+    "$printers=@(Get-CimInstance Win32_Printer|Select-Object Name,DriverName,PortName,Default,Network,WorkOffline,PrinterStatus,DetectedErrorState)",
+    "$ports=@(Get-PrinterPort|Select-Object Name,Description,PrinterHostAddress,PortNumber)",
+    "$spooler=Get-Service Spooler|Select-Object Name,Status,StartType",
+    "$p='Registry::HKEY_CLASSES_ROOT\\dexterscitaq\\shell\\open\\command'",
+    "$cmd=(Get-ItemProperty $p -ErrorAction SilentlyContinue).'(default)'",
+    "$procs=@(Get-CimInstance Win32_Process|Where-Object {$_.Name -match 'dexter|citaq|bridge|pos|print' -or $_.CommandLine -match 'dexterscitaq|print-pos|hardware bridge'}|Select-Object Name,ProcessId,ExecutablePath,CommandLine)",
+    "[ordered]@{computer=$env:COMPUTERNAME;printers=$printers;pos80=@($printers|Where-Object {$_.Name -match 'POS-80|POS80|80'});ports=$ports;spooler=$spooler;protocol=[ordered]@{registered=[bool]$cmd;command=$cmd};bridge_processes=$procs}|ConvertTo-Json -Depth 7 -Compress"
+  ].join(";");
+  return parseHardwareJson(await runHardwarePowerShell(ps,45000));
+}
+async function hardwarePrinters(){
+  const ps="@(Get-CimInstance Win32_Printer|Select-Object Name,DriverName,PortName,Default,Network,WorkOffline,PrinterStatus,DetectedErrorState)|ConvertTo-Json -Depth 5 -Compress";
+  return parseHardwareJson(await runHardwarePowerShell(ps,30000))||[];
+}
+async function hardwarePorts(){
+  const ps="@(Get-PrinterPort|Select-Object Name,Description,PrinterHostAddress,PortNumber)|ConvertTo-Json -Depth 5 -Compress";
+  return parseHardwareJson(await runHardwarePowerShell(ps,30000))||[];
+}
+async function hardwareSpooler(){
+  return parseHardwareJson(await runHardwarePowerShell("Get-Service Spooler|Select-Object Name,Status,StartType|ConvertTo-Json -Compress",15000));
+}
+async function hardwareBridgeRead(){
+  const ps=[
+    "$ErrorActionPreference='SilentlyContinue'",
+    "$p='Registry::HKEY_CLASSES_ROOT\\dexterscitaq\\shell\\open\\command'",
+    "$cmd=(Get-ItemProperty $p -ErrorAction SilentlyContinue).'(default)'",
+    "$procs=@(Get-CimInstance Win32_Process|Where-Object {$_.Name -match 'dexter|citaq|bridge|pos|print' -or $_.CommandLine -match 'dexterscitaq|print-pos|hardware bridge'}|Select-Object Name,ProcessId,ExecutablePath,CommandLine)",
+    "[ordered]@{registered=[bool]$cmd;command=$cmd;processes=$procs}|ConvertTo-Json -Depth 6 -Compress"
+  ].join(";");
+  return parseHardwareJson(await runHardwarePowerShell(ps,30000));
+}
+
 async function workspaceTool(tool,request={}){
   if(tool==="system.info")return await systemInfo();
+  if(tool==="hardware.inspect")return await hardwareInspect();
+  if(tool==="hardware.printers.read")return await hardwarePrinters();
+  if(tool==="hardware.ports.read")return await hardwarePorts();
+  if(tool==="hardware.spooler.read")return await hardwareSpooler();
+  if(tool==="hardware.bridge.read")return await hardwareBridgeRead();
   if(tool==="local_ai.install_chat_model")return await installChatModel(request);
   if(tool==="image.install")return await installSdCpp();
   if(tool==="image.status"){
@@ -978,7 +1041,7 @@ async function health(){
   try{const r=await fetch(OLLAMA_URL+"/api/tags");const d=await r.json();ollamaReady=r.ok;models=(d.models||[]).map(x=>x.name).slice(0,20);}catch{}
   const comfy=await comfyStatus();
   const cpuImage=await sdCppStatus();
-  return {status:"ready",host:"home-pc",browser:"chromium",internet:true,coding_agent:true,image_generation:comfy.ready||cpuImage.ready,live_actions:LIVE_ACTIONS,cloud_agent_paired:Boolean(AGENT_TOKEN),agent_endpoint:AGENT_ENDPOINT,headless:HEADLESS,workspace:WORKSPACE,ollama:{ready:ollamaReady,url:OLLAMA_URL,model:LOCAL_MODEL,code_model:CODE_MODEL,models},image:{preferred:comfy.ready?"comfyui":cpuImage.ready?"stable-diffusion.cpp-cpu":null,comfyui:comfy,cpu:cpuImage},jobs:loadJobs().length};
+  return {status:"ready",host:"home-pc",browser:"chromium",internet:true,coding_agent:true,hardware_doctor:process.platform==="win32",hardware_tools:["hardware.inspect","hardware.printers.read","hardware.ports.read","hardware.spooler.read","hardware.bridge.read"],image_generation:comfy.ready||cpuImage.ready,live_actions:LIVE_ACTIONS,cloud_agent_paired:Boolean(AGENT_TOKEN),agent_endpoint:AGENT_ENDPOINT,headless:HEADLESS,workspace:WORKSPACE,ollama:{ready:ollamaReady,url:OLLAMA_URL,model:LOCAL_MODEL,code_model:CODE_MODEL,models},image:{preferred:comfy.ready?"comfyui":cpuImage.ready?"stable-diffusion.cpp-cpu":null,comfyui:comfy,cpu:cpuImage},jobs:loadJobs().length};
 }
 function serveFile(res,file,contentType){const data=fs.readFileSync(file);res.writeHead(200,{"Content-Type":contentType,"Cache-Control":"no-store"});res.end(data);}
 
