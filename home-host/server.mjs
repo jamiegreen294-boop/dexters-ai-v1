@@ -490,12 +490,12 @@ function scheduleSelfRestart(delayMs=3500){
     '  const child=spawn(process.execPath,['+JSON.stringify(serverFile)+'],{cwd:'+JSON.stringify(__dirname)+',env:process.env,detached:true,stdio:"ignore"});',
     '  child.unref();',
     '  process.exit(0);',
-    '},1500);'
+    '},6000);'
   ].join("\n");
   fs.writeFileSync(helper,helperCode,"utf8");
   const child=spawn(process.execPath,[helper],{cwd:__dirname,env:process.env,detached:true,stdio:"ignore"});
   child.unref();
-  setTimeout(()=>process.exit(0),Math.max(500,delayMs));
+  setTimeout(()=>process.exit(0),1000);
   return {restart_scheduled:true,restart_in_ms:Math.max(500,delayMs)};
 }
 
