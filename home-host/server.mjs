@@ -102,9 +102,14 @@ async function byRef(page,ref){
   return loc.first();
 }
 async function ollama(messages,format,model=LOCAL_MODEL){
-  const r=await fetch(OLLAMA_URL+"/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
-    model,messages,stream:false,format:format||undefined,options:{temperature:0.1}
-  })});
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),120000);
+  let r;
+  try{
+    r=await fetch(OLLAMA_URL+"/api/chat",{method:"POST",signal:controller.signal,headers:{"Content-Type":"application/json"},body:JSON.stringify({
+      model,messages,stream:false,format:format||undefined,options:{temperature:0.1}
+    })});
+  }finally{clearTimeout(timer);}
   const data=await r.json().catch(()=>({}));
   if(!r.ok)throw new Error(data?.error||"Local Ollama request failed");
   return String(data?.message?.content||"").trim();
@@ -376,6 +381,10 @@ async function agentRequest(body){
   if(!r.ok)throw new Error(d?.error||("Home-agent API failed "+r.status));
   return d;
 }
+async function heartbeat(){
+  if(!AGENT_TOKEN)return;
+  try{await agentRequest({action:"heartbeat"});}catch(e){console.error("Dexter heartbeat:",String(e?.message||e));}
+}
 async function pollHomeJobs(){
   if(!AGENT_TOKEN||agentBusy)return;
   agentBusy=true;
@@ -423,5 +432,6 @@ server.listen(PORT,"127.0.0.1",()=>{
   if(AGENT_TOKEN){
     setTimeout(pollHomeJobs,1000);
     setInterval(pollHomeJobs,5000);
+    setInterval(heartbeat,30000);
   }
 });
