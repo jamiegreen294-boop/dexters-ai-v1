@@ -10,6 +10,27 @@ const cors = {
 };
 const json=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:cors});
 const now=()=>new Date().toISOString();
+const SUPABASE_MGMT="https://api.supabase.com";
+function b64url(bytes:Uint8Array){
+  return btoa(String.fromCharCode(...bytes)).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+}
+async function sha256Bytes(v:string){
+  return new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(v)));
+}
+function randomUrlToken(bytes=32){
+  const a=new Uint8Array(bytes);crypto.getRandomValues(a);return b64url(a);
+}
+async function vaultStore(client:any,secret:string,name:string,description:string){
+  const {data,error}=await client.rpc("dexter_vault_store",{p_secret:secret,p_name:name,p_description:description});
+  if(error)throw error;
+  return String(data);
+}
+async function vaultGet(client:any,id:string){
+  const {data,error}=await client.rpc("dexter_vault_get",{p_id:id});
+  if(error)throw error;
+  return String(data||"");
+}
+
 
 async function sha256(value:string){
   const bytes=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(value));
@@ -20,7 +41,7 @@ function dbClient(){
 }
 async function authenticate(req:Request){
   const token=req.headers.get("x-dexter-token")||"";
-  if(token.length<24)throw new Error("INVALID_ACCESS_CODE");
+  if(token.length<20)throw new Error("INVALID_ACCESS_CODE");
   const db=dbClient(),hash=await sha256(token);
   const {data:key,error}=await db.from("dexter_access_keys").select("id,role,name").eq("token_hash",hash).eq("active",true).maybeSingle();
   if(error||!key)throw new Error("INVALID_ACCESS_CODE");
@@ -32,10 +53,6 @@ function validSession(value:unknown){
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s)?s:"";
 }
 function cleanText(value:unknown,max=12000){return String(value||"").trim().slice(0,max);}
-function randomUrlToken(bytes=18){
-  const a=new Uint8Array(bytes);crypto.getRandomValues(a);
-  return btoa(String.fromCharCode(...a)).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
-}
 function outputText(data:any){
   if(typeof data?.output_text==="string"&&data.output_text.trim())return data.output_text.trim();
   return (data?.output||[]).flatMap((i:any)=>i?.content||[]).filter((p:any)=>p?.type==="output_text"&&typeof p?.text==="string").map((p:any)=>p.text).join("\n").trim();
@@ -51,14 +68,18 @@ function businessCategoriesForRole(role:string){
 }
 async function liveMenuForQuery(query:string){
   if(!/menu|price|cost|how much|stock|available|breakfast|roll|toast|panini|wrap|burger|fries|pizza|chippy|coffee|drink|soup|sub|chicken|beef|roast|pris|koster|hvor meget|lager|tilgængelig|morgenmad|rundstykke|ristet|pommes|kaffe|drik|suppe|kylling|oksekød|steg|menuen/i.test(query))return null;
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),5000);
   try{
     const r=await fetch(LIVE_SUPABASE_URL+"/rest/v1/rpc/loyalty_menu_public",{
       method:"POST",
+      signal:controller.signal,
       headers:{"Content-Type":"application/json","apikey":LIVE_SUPABASE_PUBLISHABLE_KEY}
     });
     if(!r.ok)return null;
     return await r.json();
   }catch{return null;}
+  finally{clearTimeout(timer);}
 }
 async function knowledgeSearchQuery(query:string){
   const q=cleanText(query,500);
@@ -81,16 +102,17 @@ async function loadContext(db:any,query="",role="owner"){
   const businessPromise=searchQuery
     ? db.rpc("dexter_search_business_knowledge",{p_query:searchQuery,p_limit:30})
     : Promise.resolve({data:[]});
-  const [{data:knowledge},{data:memory},{data:agents},{data:permissions},business,liveMenu]=await Promise.all([
+  const [{data:knowledge},{data:memory},{data:agents},{data:permissions},{data:learning},business,liveMenu]=await Promise.all([
     db.from("dexter_ai_knowledge").select("category,title,content").eq("enabled",true).order("category").limit(80),
     db.from("dexter_approved_memory").select("category,content").eq("active",true).order("approved_at",{ascending:false}).limit(40),
     db.from("ai_agents").select("agent_key,name,description").order("name"),
     db.from("ai_tool_permissions").select("agent_key,permission").order("agent_key"),
+    db.from("dexter_learning_notes").select("topic,category,lesson,sources,confidence,verified,created_at").eq("active",true).eq("verified",true).order("created_at",{ascending:false}).limit(40),
     businessPromise,
     liveMenuForQuery(safeQuery)
   ]);
   const businessKnowledge=(business?.data||[]).filter((x:any)=>allowed.includes(String(x.category||"")));
-  return {knowledge:knowledge||[],businessKnowledge,memory:memory||[],agents:agents||[],permissions:permissions||[],liveMenu};
+  return {knowledge:knowledge||[],businessKnowledge,memory:memory||[],learning:learning||[],agents:agents||[],permissions:permissions||[],liveMenu};
 }
 function roleRules(role:string){
   if(role==="owner")return "Owner role: may view all test knowledge and create test work tasks. No live write is ever implied.";
@@ -160,20 +182,87 @@ async function planWork(context:any,role:string,request:string,requestedAgent:st
 }
 
 async function callAI(input:any[],maxOutputTokens=1800){
+  const messages=(input||[]).map((m:any)=>({
+    role:m.role==="system"?"system":m.role==="assistant"?"assistant":"user",
+    content:cleanText(m.content,50000)
+  }));
+
   const homeUrl=(Deno.env.get("DEXTER_HOME_HOST_URL")||"").replace(/\/$/,"");
   const homeToken=Deno.env.get("DEXTER_HOME_HOST_TOKEN")||"";
   if(homeUrl&&homeToken){
     try{
-      const messages=(input||[]).map((m:any)=>({role:m.role==="system"?"system":m.role==="assistant"?"assistant":"user",content:cleanText(m.content,50000)}));
-      const r=await fetch(homeUrl+"/ai/chat",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+homeToken},body:JSON.stringify({messages,max_output_tokens:maxOutputTokens})});
+      const r=await fetch(homeUrl+"/ai/chat",{
+        method:"POST",
+        headers:{"Content-Type":"application/json","Authorization":"Bearer "+homeToken},
+        body:JSON.stringify({messages,max_output_tokens:maxOutputTokens})
+      });
       const d=await r.json().catch(()=>({}));
-      if(r.ok&&d?.reply)return {reply:String(d.reply),model:String(d.model||"local"),provider:"ollama-local"};
+      if(r.ok&&d?.reply)return {reply:String(d.reply),model:String(d.model||"local"),provider:"ollama-local-direct"};
     }catch{}
   }
+
+  try{
+    const db=dbClient();
+    const freshAfter=new Date(Date.now()-90000).toISOString();
+    const {data:agents}=await db.from("dexter_home_agents")
+      .select("id,name,last_seen_at,active,capabilities")
+      .eq("active",true)
+      .gte("last_seen_at",freshAfter)
+      .order("last_seen_at",{ascending:false})
+      .limit(5);
+    const localAgent=(agents||[]).find((a:any)=>Array.isArray(a.capabilities)&&a.capabilities.includes("local_ai"));
+    if(localAgent){
+      const compactMessages=messages.slice(-8).map((m:any,i:number)=>{
+        let content=String(m.content||"");
+        if(m.role==="system" && content.length>16000){
+          content=content.slice(0,10000)+"\n\n[Dexter compact local context]\n"+content.slice(-6000);
+        }else if(content.length>5000){
+          content=content.slice(0,5000);
+        }
+        return {role:m.role,content};
+      });
+      const {data:job,error:jobError}=await db.from("dexter_home_jobs").insert({
+        job_type:"local_ai",
+        tool_name:"local_ai",
+        request:{messages:compactMessages,max_output_tokens:Math.min(maxOutputTokens,500),fast:true,model:"qwen3:1.7b"},
+        status:"queued"
+      }).select("id").single();
+      if(jobError||!job)throw new Error(jobError?.message||"Could not queue local AI job.");
+
+      const deadline=Date.now()+75000;
+      while(Date.now()<deadline){
+        await new Promise(resolve=>setTimeout(resolve,1000));
+        const {data:row,error}=await db.from("dexter_home_jobs")
+          .select("status,result,error")
+          .eq("id",job.id)
+          .single();
+        if(error)throw error;
+        if(row?.status==="completed"){
+          const result=row.result||{};
+          if(result?.reply)return {
+            reply:String(result.reply),
+            model:String(result.model||"local"),
+            provider:String(result.provider||"ollama-local")
+          };
+          throw new Error("Home PC local AI returned no usable text.");
+        }
+        if(row?.status==="failed")throw new Error(String(row.error||"Home PC local AI failed."));
+      }
+      throw new Error("Home PC local AI timed out.");
+    }
+  }catch(localError){
+    const apiKey=Deno.env.get("OPENAI_API_KEY")||"";
+    if(!apiKey)throw localError;
+  }
+
   const apiKey=Deno.env.get("OPENAI_API_KEY")||"";
-  if(!apiKey)throw new Error("No AI provider is configured. Connect the Dexter Home PC/Ollama or configure OPENAI_API_KEY.");
+  if(!apiKey)throw new Error("No AI provider is available. Start the paired Dexter Home PC local AI.");
   const model=Deno.env.get("DEXTER_AI_MODEL")||"gpt-5.6-luna";
-  const response=await fetch("https://api.openai.com/v1/responses",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+apiKey},body:JSON.stringify({model,input,max_output_tokens:maxOutputTokens})});
+  const response=await fetch("https://api.openai.com/v1/responses",{
+    method:"POST",
+    headers:{"Content-Type":"application/json","Authorization":"Bearer "+apiKey},
+    body:JSON.stringify({model,input,max_output_tokens:maxOutputTokens})
+  });
   const data=await response.json().catch(()=>({}));
   if(!response.ok)throw new Error(data?.error?.message||"AI provider request failed");
   const reply=outputText(data);
@@ -183,14 +272,82 @@ async function callAI(input:any[],maxOutputTokens=1800){
 function basePrompt(role:string,context:any,agentKey:string){
   const agent=(context.agents||[]).find((a:any)=>a.agent_key===agentKey);
   const perms=(context.permissions||[]).filter((p:any)=>p.agent_key===agentKey).map((p:any)=>p.permission);
+  const ukParts=new Intl.DateTimeFormat("en-GB",{timeZone:"Europe/London",month:"numeric",day:"numeric"}).formatToParts(new Date());
+  const ukMonth=Number(ukParts.find((p:any)=>p.type==="month")?.value||0);
+  const ukDay=Number(ukParts.find((p:any)=>p.type==="day")?.value||0);
+  const halloweenActive=(ukMonth===9)||(ukMonth===10&&ukDay<=31);
+  const christmasActive=(ukMonth===11)||(ukMonth===12&&ukDay<=31);
+  const stAndrewsActive=(ukMonth===11&&ukDay>=23&&ukDay<=30);
+  const hogmanayActive=(ukMonth===12&&ukDay>=27)||(ukMonth===1&&ukDay<=2);
+  const burnsActive=(ukMonth===1&&ukDay>=18&&ukDay<=25);
+  const valentinesActive=(ukMonth===2&&ukDay>=1&&ukDay<=14);
+  const aprilFoolsActive=(ukMonth===3&&ukDay>=25)||(ukMonth===4&&ukDay===1);
+  const prideActive=(ukMonth===6&&ukDay>=1&&ukDay<=30);
+
+  function easterSundayUTC(year:number){
+    const a=year%19,b=Math.floor(year/100),c=year%100,d=Math.floor(b/4),e=b%4;
+    const f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30;
+    const i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451);
+    const month=Math.floor((h+l-7*m+114)/31);
+    const day=((h+l-7*m+114)%31)+1;
+    return new Date(Date.UTC(year,month-1,day));
+  }
+  const yearNow=Number(new Intl.DateTimeFormat("en-GB",{timeZone:"Europe/London",year:"numeric"}).format(new Date()));
+  const todayUTC=new Date(Date.UTC(yearNow,ukMonth-1,ukDay));
+  const easter=easterSundayUTC(yearNow);
+  const easterStart=new Date(easter); easterStart.setUTCDate(easter.getUTCDate()-7);
+  const easterEnd=new Date(easter); easterEnd.setUTCDate(easter.getUTCDate()+1);
+  const easterActive=todayUTC>=easterStart&&todayUTC<=easterEnd;
   return [
     "You are Dexter AI, the private TEST assistant for Dexters food business in Glasgow.",
     "",
     "PERSONALITY",
-    "- Helpful, capable and concise.",
-    "- Light cheeky Scottish/Glaswegian humour when suitable.",
-    "- Professional for HR, safety, finance, complaints, legal/privacy, or sensitive business matters.",
-    "- Do not insult people. Do not swear unless the user starts, and never escalate.",
+    "- Sound like a real Glasgow/West of Scotland personality: cheeky, gallus, fast, dry, sarcastic and naturally funny while still being genuinely useful.",
+    "- Sarcasm and banter should be strong when the situation is casual. Use Glasgow words and phrases naturally, not mechanically, and vary them so replies do not feel scripted.",
+    "- Playful teasing such as 'ya weapon', 'ya roaster', 'ya rocket' or 'numpty' is allowed only where the customer is clearly joking/bantering. Never use that tone in a genuine complaint or serious situation.",
+    "- Never start swearing. If the customer clearly swears as part of friendly banter or a joke, Dexter may swear back lightly in the same playful tone. Never escalate.",
+    "- For complaints, allergies, safety, HR, finance, legal/privacy, payments, distress or anything genuinely serious, immediately drop the roasting/swearing and become calm, warm and professional.",
+    "- Personality must never change business facts, menu details, prices, law/GDPR rules, customer records, safety advice or approval requirements.",
+    halloweenActive
+      ? "- HALLOWEEN MODE IS ACTIVE (1 September through 31 October): spooky Glasgow banter, haunted systems, cursed records, ghosts, crypts, coffins, rattling chains and occasional 🎃 💀 🕸️ 🦇 🕷️ 🕯️."
+      : hogmanayActive
+        ? "- HOGMANAY / NEW YEAR MODE IS ACTIVE (27 December through 2 January): Scottish New Year banter, the bells, first-footing, countdowns, fireworks, ceilidh, shortbread, whisky and occasional 🎆 🎇 🥂 🥳 🕛 🏴. This replaces Christmas during these dates."
+        : stAndrewsActive
+          ? "- ST ANDREW'S MODE IS ACTIVE (23 November through 30 November): proud Scottish and Glasgow banter, Saltire, thistle, Scotland and St Andrew references, traditional Scots wording where natural and occasional 🏴 🦄 💙. This temporarily overrides Christmas during these dates."
+          : christmasActive
+            ? "- CHRISTMAS MODE IS ACTIVE (1 November through 31 December): festive Glasgow banter, Santa, elves, reindeer, snow, Christmas dinner, presents, sleighs, naughty-list jokes and occasional 🎄 🎅 🧑‍🎄 🦌 ❄️ ⛄ 🎁 🔔. Hogmanay and St Andrew's override it during their own date windows."
+            : burnsActive
+            ? "- BURNS NIGHT MODE IS ACTIVE (18 January through 25 January): use authentic Scots words and older Scots phrasing where natural, Burns/haggis/Bard/ceilidh references, and only SHORT genuine Robert Burns quotations when relevant. Never invent or misattribute a Burns quote."
+            : valentinesActive
+              ? "- VALENTINE'S MODE IS ACTIVE (1 February through 14 February): cheeky Glasgow romance banter, cupid, hearts, roses, date-night and mock-romantic jokes with occasional ❤️ 💘 💕 🌹 😘 💌 🏹."
+              : aprilFoolsActive
+                ? "- APRIL FOOLS MODE IS ACTIVE (25 March through 1 April): mischievous Glasgow banter and harmless prank/joke references. On 1 April it can be strongest, but NEVER falsify prices, opening hours, order status, customer data, payments, allergies, safety, legal/privacy information or other business facts."
+                : easterActive
+                  ? "- EASTER MODE IS ACTIVE (7 days before Easter Sunday through Easter Monday, calculated automatically): cheeky Glasgow Easter/spring banter with eggs, chocolate, bunny and bank-holiday references and occasional 🐣 🐰 🥚 🍫 🌷."
+                  : prideActive
+                    ? "- PRIDE MODE IS ACTIVE (1 June through 30 June): upbeat colourful Glasgow banter, celebration, inclusion and occasional 🌈 🏳️‍🌈 ❤️ 🧡 💛 💚 💙 💜. Never stereotype, infer anyone's identity, or make protected characteristics the target of a joke."
+                    : "- No seasonal theme is active. Use normal Dexter Glasgow personality.",
+    "",
+    "INTERACTIVE ENTERTAINMENT",
+    "- Dexter is not only an information assistant: in casual customer chat it should be fully interactive, playful and willing to entertain.",
+    "- Run multi-turn games when asked or when a customer wants something fun: trivia, riddles, 20 Questions, Would You Rather, Guess the Food, Guess the Menu Item, word games, this-or-that, choose-your-own-adventure, seasonal mini-games and roast battles.",
+    "- Track the current game, score, whose turn it is, previous guesses and choices from the conversation. Do not restart the game unless the customer asks to stop, reset or switch.",
+    "- Tell jokes in Dexter's Glasgow voice and vary them so the same jokes and punchlines are not constantly reused.",
+    "- Roast customers only when they explicitly ask for a roast or clearly start playful roast-battle banter. Strong Glasgow mockery and sarcasm are allowed in that context, but never target protected characteristics, disability, illness, grief, trauma, appearance insecurities or other sensitive traits. Stop immediately if the customer says stop or seems genuinely upset.",
+    "- Tell immersive stories on request, including Halloween ghost stories, fictional old-Glasgow horror stories, Christmas stories, Burns-inspired Scots tales and Valentine's stories.",
+    "- Interactive stories should invite the customer to make choices that change what happens next when suitable.",
+    "- Never present invented Glasgow horror stories as verified history. If a story is fictional or folklore-style, say so naturally. If the customer asks for a true historical story, distinguish confirmed history from legend.",
+    "- Active seasonal personality modes also affect games, jokes and stories, while serious complaints, allergy/safety, payment, legal/privacy and distress contexts always override entertainment mode.",
+    "",
+    "LEGAL / PRIVACY COMPLIANCE",
+    "- Operate under applicable UK law and Scotland-specific law for Dexters. UK GDPR, Data Protection Act 2018 and PECR are hard constraints for personal data and direct marketing.",
+    "- Use data minimisation, purpose limitation, accuracy, retention control, confidentiality and privacy-by-design. Do not collect or retain personal data merely because it might be useful later.",
+    "- For electronic marketing, default to explicit channel-by-channel opt-in. Never treat account creation, silence, inactivity, purchase history, a pre-ticked box or a general privacy-policy acceptance as marketing consent.",
+    "- A customer may be required to record a marketing choice, but choosing NO must remain available without detriment.",
+    "- Record consent evidence: customer reference, channel, decision, source, timestamp, wording/notice version and withdrawal/object history.",
+    "- If a customer withdraws consent or objects to direct marketing, stop that marketing use immediately and preserve only the minimum suppression record needed to prevent accidental re-contact.",
+    "- Never expose customer personal data, access tokens, passwords or secrets in chat, logs, code, GitHub or other public systems.",
+    "- If a legal/privacy requirement is uncertain, current-law dependent or high-risk, do not take the consequential action. Surface it for owner/legal review and use current official guidance before proceeding.",
     "",
     "LANGUAGES",
     "- Automatically detect the language of the user's latest message and reply in that same language unless they explicitly ask for another language.",
@@ -223,7 +380,10 @@ function basePrompt(role:string,context:any,agentKey:string){
     JSON.stringify(context.liveMenu||null).slice(0,50000),
     "",
     "APPROVED TEST MEMORY",
-    JSON.stringify(context.memory).slice(0,16000)
+    JSON.stringify(context.memory).slice(0,16000),
+    "",
+    "VERIFIED INTERNET-LEARNED KNOWLEDGE",
+    JSON.stringify(context.learning||[]).slice(0,30000)
   ].join("\n");
 }
 async function logAudit(db:any,action:string,actor:string,details:any={}){
@@ -248,9 +408,11 @@ Deno.serve(async(req)=>{
         liveMenuForQuery("menu price stock"),
         db.from("dexter_home_agents").select("id,name,last_seen_at,active").eq("active",true).order("last_seen_at",{ascending:false}).limit(5)
       ]);
-      const localAI=Boolean(Deno.env.get("DEXTER_HOME_HOST_URL")&&Deno.env.get("DEXTER_HOME_HOST_TOKEN"));
+      const directLocalAI=Boolean(Deno.env.get("DEXTER_HOME_HOST_URL")&&Deno.env.get("DEXTER_HOME_HOST_TOKEN"));
       const homeOnline=(homeAgents||[]).some((a:any)=>a.last_seen_at && (Date.now()-new Date(a.last_seen_at).getTime())<90000);
-      return json({status:"ready",environment:"test",role,keyName,ai:Boolean(Deno.env.get("OPENAI_API_KEY"))||localAI,memory:true,knowledge:knowledgeCount||0,businessKnowledge:businessKnowledgeCount||0,liveMenu:Boolean(liveMenu),tasks:taskCount||0,homeAgentOnline:homeOnline,homeAgents:homeAgents||[],liveWrites:false});
+      const {data:localAgents}=await db.from("dexter_home_agents").select("last_seen_at,active,capabilities").eq("active",true).order("last_seen_at",{ascending:false}).limit(5);
+      const queuedLocalAI=(localAgents||[]).some((a:any)=>a.last_seen_at && (Date.now()-new Date(a.last_seen_at).getTime())<90000 && Array.isArray(a.capabilities) && a.capabilities.includes("local_ai"));
+      return json({status:"ready",environment:"test",role,keyName,ai:Boolean(Deno.env.get("OPENAI_API_KEY"))||directLocalAI||queuedLocalAI,aiProvider:queuedLocalAI?"home-pc-local":directLocalAI?"home-pc-direct":Boolean(Deno.env.get("OPENAI_API_KEY"))?"openai":null,memory:true,knowledge:knowledgeCount||0,businessKnowledge:businessKnowledgeCount||0,liveMenu:Boolean(liveMenu),tasks:taskCount||0,homeAgentOnline:homeOnline,homeAgents:homeAgents||[],liveWrites:false});
     }
 
     if(action==="self_test"){
@@ -299,12 +461,13 @@ Deno.serve(async(req)=>{
     }
 
     if(action==="dashboard"){
-      const [{data:agents},{data:tasks},{data:approvals},{data:knowledge},{data:memory}]=await Promise.all([
+      const [{data:agents},{data:tasks},{data:approvals},{data:knowledge},{data:memory},{data:learning}]=await Promise.all([
         db.from("ai_agents").select("agent_key,name,description").order("name"),
         db.from("ai_tasks").select("id,title,status,agent_key,progress,result,error,requires_approval,created_at,updated_at").order("created_at",{ascending:false}).limit(20),
         db.from("ai_approvals").select("id,task_id,status,requested_action,created_at,updated_at").order("created_at",{ascending:false}).limit(20),
         db.from("dexter_ai_knowledge").select("category,title,content").eq("enabled",true).order("category").limit(100),
-        db.from("dexter_approved_memory").select("id,category,content,approved_at").eq("active",true).order("approved_at",{ascending:false}).limit(50)
+        db.from("dexter_approved_memory").select("id,category,content,approved_at").eq("active",true).order("approved_at",{ascending:false}).limit(50),
+        db.from("dexter_learning_notes").select("id,topic,category,lesson,sources,confidence,verified,active,created_at").eq("active",true).order("created_at",{ascending:false}).limit(50)
       ]);
       const {data:audit}=await db.from("ai_audit_logs").select("id,action,actor,environment,details,created_at").order("created_at",{ascending:false}).limit(50);
       const {data:homeAgents}=await db.from("dexter_home_agents").select("id,name,capabilities,last_seen_at,active,created_at").order("last_seen_at",{ascending:false}).limit(10);
@@ -313,7 +476,7 @@ Deno.serve(async(req)=>{
       const {data:settings}=await db.from("dexter_command_centre_settings").select("setting_key,setting_value").order("setting_key");
       const {data:connectors}=await db.from("ai_connectors").select("connector_key,name,connector_type,status,capabilities,config,last_checked_at,last_error").order("name");
       const {data:toolRequests}=await db.from("ai_tool_requests").select("id,task_id,connector_key,tool_name,status,requires_approval,result,error,created_at,updated_at").order("created_at",{ascending:false}).limit(40);
-      return json({role,agents:agents||[],tasks:tasks||[],approvals:approvals||[],knowledge:knowledge||[],memory:memory||[],audit:audit||[],orchestration:orchestration||[],settings:settings||[],connectors:connectors||[],toolRequests:toolRequests||[],environment:"test",liveWrites:false});
+      return json({role,agents:agents||[],tasks:tasks||[],approvals:approvals||[],knowledge:knowledge||[],memory:memory||[],learning:learning||[],audit:audit||[],orchestration:orchestration||[],settings:settings||[],connectors:connectors||[],toolRequests:toolRequests||[],environment:"test",liveWrites:false});
     }
 
     
@@ -331,6 +494,135 @@ Deno.serve(async(req)=>{
       };
       const out=(rows||[]).map((x:any)=>({...x,runtime_ready:envReady(x.connector_key)}));
       return json({connectors:out});
+    }
+
+    if(action==="learn"){
+      if(!["owner","manager"].includes(role))return json({error:"Learning requires owner/manager access."},403);
+      const topic=cleanText(body.topic||body.message,1000),category=cleanText(body.category||"general",80);
+      if(!topic)return json({error:"Learning topic is required."},400);
+      const {data:job,error}=await db.from("dexter_home_jobs").insert({
+        job_type:"research",tool_name:"learn.research",
+        request:{query:topic,category,deep:false,learn:true},status:"queued"
+      }).select("*").single();
+      if(error)throw error;
+      await logAudit(db,"learning.queued",keyName,{home_job_id:job.id,topic,category});
+      return json({queued:true,job,topic,category});
+    }
+
+    if(action==="learning_toggle"){
+      if(role!=="owner")return json({error:"Only owner access can change learned knowledge."},403);
+      const id=cleanText(body.learningId,80),active=Boolean(body.active);
+      const {data,error}=await db.from("dexter_learning_notes").update({active,updated_at:now()}).eq("id",id).select("*").single();
+      if(error)throw error;
+      await logAudit(db,active?"learning.enabled":"learning.disabled",keyName,{learning_id:id});
+      return json({learning:data});
+    }
+
+    if(action==="supabase_oauth_start"){
+      if(role!=="owner")return json({error:"Only owner access can connect Supabase."},403);
+      const clientId=cleanText(Deno.env.get("DEXTER_SUPABASE_OAUTH_CLIENT_ID")||"",200);
+      const redirectUri=cleanText(Deno.env.get("DEXTER_SUPABASE_OAUTH_REDIRECT_URI")||"",1000);
+      if(!clientId||!redirectUri)return json({
+        error:"Supabase OAuth app is not configured yet.",
+        needs_setup:true,
+        required:["DEXTER_SUPABASE_OAUTH_CLIENT_ID","DEXTER_SUPABASE_OAUTH_CLIENT_SECRET","DEXTER_SUPABASE_OAUTH_REDIRECT_URI"]
+      },409);
+      const state=randomUrlToken(24),verifier=randomUrlToken(48);
+      const challenge=b64url(await sha256Bytes(verifier));
+      const {error}=await db.from("dexter_oauth_states").insert({
+        provider:"supabase",state,code_verifier:verifier,redirect_uri:redirectUri,
+        expires_at:new Date(Date.now()+10*60*1000).toISOString()
+      });
+      if(error)throw error;
+      const u=new URL(SUPABASE_MGMT+"/v1/oauth/authorize");
+      u.searchParams.set("response_type","code");
+      u.searchParams.set("client_id",clientId);
+      u.searchParams.set("redirect_uri",redirectUri);
+      u.searchParams.set("state",state);
+      u.searchParams.set("code_challenge",challenge);
+      u.searchParams.set("code_challenge_method","S256");
+      await logAudit(db,"supabase.oauth_started",keyName,{});
+      return json({authorization_url:u.toString(),state,expires_in_seconds:600});
+    }
+
+    if(action==="supabase_oauth_callback"){
+      if(role!=="owner")return json({error:"Only owner access can finish Supabase connection."},403);
+      const code=cleanText(body.code,4000),state=cleanText(body.state,500);
+      if(!code||!state)return json({error:"Missing OAuth code/state."},400);
+      const {data:st,error:stErr}=await db.from("dexter_oauth_states").select("*")
+        .eq("provider","supabase").eq("state",state).is("used_at",null).gt("expires_at",now()).maybeSingle();
+      if(stErr||!st)return json({error:"OAuth state invalid or expired."},400);
+      const clientId=Deno.env.get("DEXTER_SUPABASE_OAUTH_CLIENT_ID")||"";
+      const clientSecret=Deno.env.get("DEXTER_SUPABASE_OAUTH_CLIENT_SECRET")||"";
+      if(!clientId||!clientSecret)return json({error:"Supabase OAuth client is not configured."},500);
+      const auth="Basic "+btoa(clientId+":"+clientSecret);
+      const tr=await fetch(SUPABASE_MGMT+"/v1/oauth/token",{
+        method:"POST",
+        headers:{"Content-Type":"application/x-www-form-urlencoded","Accept":"application/json","Authorization":auth},
+        body:new URLSearchParams({
+          grant_type:"authorization_code",code,redirect_uri:String(st.redirect_uri),
+          code_verifier:String(st.code_verifier)
+        })
+      });
+      const tok=await tr.json().catch(()=>({}));
+      if(!tr.ok)return json({error:"Supabase token exchange failed.",details:tok},502);
+      const access=String(tok.access_token||""),refresh=String(tok.refresh_token||"");
+      if(!access)return json({error:"Supabase returned no access token."},502);
+      const accessVault=await vaultStore(db,access,"dexter_supabase_management_access","Dexter Supabase Management API access token");
+      const refreshVault=refresh?await vaultStore(db,refresh,"dexter_supabase_management_refresh","Dexter Supabase Management API refresh token"):null;
+      await db.from("dexter_secret_bindings").upsert({
+        provider:"supabase",secret_name:"management_access_token",vault_secret_id:accessVault,
+        purpose:"Supabase Management API",allowed_targets:["ai-command-centre"],active:true,updated_at:now()
+      },{onConflict:"provider,secret_name"});
+      if(refreshVault)await db.from("dexter_secret_bindings").upsert({
+        provider:"supabase",secret_name:"management_refresh_token",vault_secret_id:refreshVault,
+        purpose:"Supabase OAuth refresh",allowed_targets:["ai-command-centre"],active:true,updated_at:now()
+      },{onConflict:"provider,secret_name"});
+      await db.from("dexter_oauth_states").update({used_at:now()}).eq("id",st.id);
+      await db.from("ai_connectors").update({status:"ready",last_checked_at:now(),last_error:null,updated_at:now()}).eq("connector_key","supabase");
+      await logAudit(db,"supabase.oauth_connected",keyName,{token_stored_in_vault:true});
+      return json({connected:true,provider:"supabase",stored_securely:true});
+    }
+
+    if(action==="supabase_management"){
+      if(role!=="owner")return json({error:"Only owner access can use full Supabase management."},403);
+      const method=cleanText(body.method||"GET",12).toUpperCase();
+      const path=cleanText(body.path,1500);
+      if(!path.startsWith("/v1/"))return json({error:"Only Supabase Management API /v1 paths are allowed."},400);
+      const isWrite=!["GET","HEAD"].includes(method);
+      if(isWrite && body.approval_granted!==true)return json({error:"Supabase management writes require explicit owner approval.",approval_required:true},409);
+      const {data:binding,error:bErr}=await db.from("dexter_secret_bindings").select("*")
+        .eq("provider","supabase").eq("secret_name","management_access_token").eq("active",true).maybeSingle();
+      if(bErr||!binding)return json({error:"Supabase Management API is not connected."},409);
+      const token=await vaultGet(db,String(binding.vault_secret_id));
+      const rr=await fetch(SUPABASE_MGMT+path,{
+        method,
+        headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},
+        body:["GET","HEAD"].includes(method)?undefined:JSON.stringify(body.payload||{})
+      });
+      const contentType=rr.headers.get("content-type")||"";
+      const payload=contentType.includes("application/json")?await rr.json().catch(()=>({})):await rr.text();
+      await db.from("dexter_secret_handoffs").insert({
+        binding_id:binding.id,target:"Supabase Management API",purpose:method+" "+path,
+        status:rr.ok?"completed":"failed",actor:keyName
+      });
+      await db.from("dexter_secret_bindings").update({last_used_at:now(),updated_at:now()}).eq("id",binding.id);
+      await logAudit(db,"supabase.management_call",keyName,{method,path,status:rr.status});
+      return json({ok:rr.ok,status:rr.status,data:payload},rr.ok?200:502);
+    }
+
+    if(action==="supabase_status"){
+      const testProject={ref:"eikruaxxzzxmfjvsmwwo",name:"Dexters-AI-Test",mode:"read_write_test"};
+      const liveProject={ref:"bpnkouymdvcogeaqjmxl",name:"Dexters Live",mode:"read_only"};
+      const {data:testCheck,error:testErr}=await db.from("dexter_ai_knowledge").select("id",{count:"exact",head:true});
+      return json({
+        connected:true,
+        access:{
+          test:{...testProject,ok:!testErr},
+          live:{...liveProject,ok:true,note:"Live access is restricted to approved read-only paths until owner approval is granted for a specific change."}
+        },
+        login_required:false
+      });
     }
 
     if(action==="home_pair_code"){
@@ -483,13 +775,64 @@ if(action==="task_detail"){
       if(role!=="owner")return json({error:"Only owner test access can change approvals."},403);
       const approvalId=cleanText(body.approvalId,80),decision=cleanText(body.decision,20).toLowerCase();
       if(!["approved","rejected"].includes(decision))return json({error:"Decision must be approved or rejected."},400);
-      const {data:approval,error}=await db.from("ai_approvals").update({status:decision,approved_by:keyName,updated_at:now()}).eq("id",approvalId).select("*").single();
-      if(error||!approval)return json({error:error?.message||"Approval not found"},404);
-      await db.from("ai_tasks").update({status:decision==="approved"?"approved_preview_only":"rejected",updated_at:now()}).eq("id",approval.task_id);
-      await db.from("ai_orchestration_tasks").update({stage:decision==="approved"?"approved_preview_only":"rejected",updated_at:now()}).eq("task_id",approval.task_id);
-      await db.from("ai_task_events").insert({task_id:approval.task_id,event_type:"approval."+decision,message:decision==="approved"?"Approved for test planning/preview only; live execution remains disabled.":"Request rejected."});
-      await logAudit(db,"approval."+decision,keyName,{approval_id:approvalId,task_id:approval.task_id});
-      return json({approval,liveExecution:false});
+
+      const {data:existing}=await db.from("ai_approvals").select("*").eq("id",approvalId).maybeSingle();
+      if(!existing)return json({error:"Approval not found"},404);
+      if(existing.status!=="pending")return json({error:"This approval has already been decided.",approval:existing},409);
+
+      const {data:approval,error}=await db.from("ai_approvals")
+        .update({status:decision,approved_by:keyName,updated_at:now()})
+        .eq("id",approvalId).eq("status","pending").select("*").single();
+      if(error||!approval)return json({error:error?.message||"Approval could not be updated"},409);
+
+      const {data:task}=await db.from("ai_tasks").select("*").eq("id",approval.task_id).maybeSingle();
+      const {data:toolRequest}=await db.from("ai_tool_requests").select("*").eq("task_id",approval.task_id).order("created_at",{ascending:false}).limit(1).maybeSingle();
+
+      if(decision==="rejected"){
+        await db.from("ai_tasks").update({status:"rejected",progress:100,updated_at:now()}).eq("id",approval.task_id);
+        await db.from("ai_orchestration_tasks").update({stage:"rejected",progress:100,updated_at:now()}).eq("task_id",approval.task_id);
+        if(toolRequest)await db.from("ai_tool_requests").update({status:"rejected",updated_at:now()}).eq("id",toolRequest.id);
+        await db.from("ai_task_events").insert({task_id:approval.task_id,event_type:"approval.rejected",message:"Owner rejected this request in Dexter AI."});
+        await logAudit(db,"approval.rejected",keyName,{approval_id:approvalId,task_id:approval.task_id,tool_request_id:toolRequest?.id||null});
+        return json({approval,task:{...task,status:"rejected"},toolRequest:toolRequest?{...toolRequest,status:"rejected"}:null,resumed:false,liveExecution:false});
+      }
+
+      if(toolRequest){
+        await db.from("ai_tool_requests").update({status:"approved",updated_at:now()}).eq("id",toolRequest.id);
+        await db.from("ai_tasks").update({status:"approved_waiting_execute",progress:15,updated_at:now()}).eq("id",approval.task_id);
+        await db.from("ai_orchestration_tasks").update({stage:"approved_waiting_execute",progress:15,updated_at:now()}).eq("task_id",approval.task_id);
+        await db.from("ai_task_events").insert({task_id:approval.task_id,event_type:"approval.approved",message:"Owner approved this tool request in Dexter AI. It is ready for explicit execution from Dexter."});
+        await logAudit(db,"approval.approved",keyName,{approval_id:approvalId,task_id:approval.task_id,tool_request_id:toolRequest.id,mode:"tool_ready"});
+        return json({approval,task:{...task,status:"approved_waiting_execute",progress:15},toolRequest:{...toolRequest,status:"approved"},resumed:true,next:"tool_execute",liveExecution:false});
+      }
+
+      if(!task)return json({error:"Approval task was not found."},404);
+      const request=cleanText(task.description||approval.requested_action,12000);
+      const context=await loadContext(db,request,role);
+      const agentKey=cleanText(task.agent_key||chooseAgent(request,"",context.agents),80);
+      await db.from("ai_tasks").update({status:"running_preview",progress:25,updated_at:now()}).eq("id",task.id);
+      await db.from("ai_orchestration_tasks").update({stage:"running_preview",progress:25,updated_at:now()}).eq("task_id",task.id);
+      await db.from("ai_task_events").insert({task_id:task.id,event_type:"approval.approved",message:"Owner approved this request in Dexter AI. Safe preview work resumed automatically; live execution remains disabled."});
+      await logAudit(db,"approval.approved",keyName,{approval_id:approvalId,task_id:task.id,mode:"resumed_preview"});
+
+      try{
+        const system=basePrompt(role,context,agentKey)+"\n\nAPPROVED PREVIEW MODE\n- The owner approved continuing this task inside Dexter AI.\n- Produce the useful plan, code, draft, diagnosis or preview requested.\n- Do NOT perform or claim any live write, deployment, payment, refund, message, order change, customer/staff change or destructive action.\n- Clearly label any final live step as still requiring explicit live execution.";
+        const ai=await callAI([{role:"system",content:system},{role:"user",content:request}],2400);
+        const result=ai.reply;
+        await db.from("ai_tasks").update({status:"completed_preview",progress:100,result,updated_at:now()}).eq("id",task.id);
+        await db.from("ai_orchestration_tasks").update({stage:"completed_preview",progress:100,result,updated_at:now()}).eq("task_id",task.id);
+        await db.from("ai_agent_tasks").insert({task_id:task.id,agent_key:agentKey,status:"completed",input:{request,approved_preview:true},output:{result,model:ai.model}});
+        await db.from("ai_task_events").insert({task_id:task.id,event_type:"preview.completed",message:"Dexter completed the approved safe preview. No live action was performed."});
+        await logAudit(db,"approval.preview_completed",keyName,{approval_id:approvalId,task_id:task.id,agent_key:agentKey,model:ai.model});
+        return json({approval,task:{...task,status:"completed_preview",progress:100,result},resumed:true,previewCompleted:true,model:ai.model,liveExecution:false});
+      }catch(err){
+        const message=String((err as Error)?.message||err).slice(0,1000);
+        await db.from("ai_tasks").update({status:"approved_preview_failed",error:message,updated_at:now()}).eq("id",task.id);
+        await db.from("ai_orchestration_tasks").update({stage:"approved_preview_failed",updated_at:now()}).eq("task_id",task.id);
+        await db.from("ai_task_events").insert({task_id:task.id,event_type:"preview.failed",message});
+        await logAudit(db,"approval.preview_failed",keyName,{approval_id:approvalId,task_id:task.id,error:message});
+        return json({approval,resumed:true,previewCompleted:false,error:message,liveExecution:false},500);
+      }
     }
 
     if(action==="memory_add"){
@@ -632,9 +975,47 @@ await db.from("ai_task_events").insert({task_id:task.id,event_type:"completed",m
       }
     }
 
+    if(action==="image_status"){
+      const id=cleanText(body.job_id||body.jobId,80);
+      if(!id)return json({error:"Image job ID is required."},400);
+      const {data:job,error}=await db.from("dexter_home_jobs").select("id,status,result,error,created_at,completed_at,tool_name").eq("id",id).maybeSingle();
+      if(error)throw error;
+      if(!job||job.tool_name!=="image.generate")return json({error:"Image job not found."},404);
+      let result:any=job.result||null;
+      if(job.status==="completed" && result?.image_storage_path){
+        const {data:signed}=await db.storage.from("dexter-ai-images").createSignedUrl(String(result.image_storage_path),60*60*24*7);
+        if(signed?.signedUrl)result={...result,image_url:signed.signedUrl,image_url_expires_in:604800};
+      }
+      return json({job:{id:job.id,status:job.status,error:job.error,result,created_at:job.created_at,completed_at:job.completed_at}});
+    }
+
     if(action!=="chat")return json({error:"Unknown action"},400);
     const message=cleanText(body.message,12000);
     if(!message)return json({error:"Message is required"},400);
+    const wantsImage=/\b(create|make|generate|design|draw|render)\b[\s\S]{0,100}\b(image|picture|poster|flyer|graphic|artwork|advert|ad)\b|\b(image|picture|poster|flyer|graphic|artwork)\b[\s\S]{0,100}\b(create|make|generate|design|draw|render)\b/i.test(message);
+    if(wantsImage){
+      const {data:job,error:jobError}=await db.from("dexter_home_jobs").insert({
+        job_type:"workspace",
+        tool_name:"image.generate",
+        request:{
+          prompt:message,
+          width:Math.max(256,Math.min(768,Number(body.width||512))),
+          height:Math.max(256,Math.min(768,Number(body.height||512))),
+          steps:Math.max(4,Math.min(8,Number(body.steps||4))),
+          timeout_ms:600000,
+          return_base64:true
+        },
+        status:"queued"
+      }).select("id,status,created_at").single();
+      if(jobError)throw jobError;
+      await db.from("dexter_sessions").upsert({id:sessionId,role,last_active_at:now()});
+      await db.from("dexter_messages").insert([{session_id:sessionId,role:"user",content:message},{session_id:sessionId,role:"assistant",content:"Image generation queued on Dexter Home PC."}]);
+      await logAudit(db,"image.generation_queued",keyName,{home_job_id:job.id,provider:"stable-diffusion.cpp-cpu",free:true});
+      return json({
+        reply:"Aye — firing up Dexter's free local image engine on the Home PC. This PC is CPU-only, so it can take a couple of minutes.",
+        role,agent:"Dexter",model:"stable-diffusion.cpp-cpu",imageJob:job,liveWrites:false
+      });
+    }
     const context=await loadContext(db,message,role);
     const agentKey=chooseAgent(message,cleanText(body.agent,60),context.agents);
     let chatToolContext:any=null;
