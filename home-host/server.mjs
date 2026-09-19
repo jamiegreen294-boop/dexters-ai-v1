@@ -439,12 +439,30 @@ async function createJob(body){
   }catch(e){job.status="failed";job.error=String(e?.message||e);}finally{job.updated_at=new Date().toISOString();saveJob(job);}});
   return job;
 }
+async function selfUpdateWorker(){
+  const rawUrl="https://raw.githubusercontent.com/jamiegreen294-boop/dexters-ai-v1/build/real-dexter-ai/home-host/server.mjs";
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),30000);
+  try{
+    const r=await fetch(rawUrl,{signal:controller.signal,headers:{"Cache-Control":"no-cache"}});
+    if(!r.ok)throw new Error("Worker update download failed: HTTP "+r.status);
+    const next=await r.text();
+    if(!next.includes("Dexter AI Home Host running")||!next.includes("executeCloudJob"))throw new Error("Downloaded worker failed validation.");
+    const current=path.join(__dirname,"server.mjs");
+    const backup=path.join(__dirname,"server.mjs.backup");
+    fs.copyFileSync(current,backup);
+    fs.writeFileSync(current,next,"utf8");
+    return {updated:true,bytes:Buffer.byteLength(next),restart_required:true};
+  }finally{clearTimeout(timer);}
+}
+
 async function executeCloudJob(job){
   const request=job?.request||{};
   if(job.job_type==="browser")return await browserTool(String(job.tool_name||"browser.navigate_and_act"),request);
   if(job.job_type==="workspace")return await workspaceTool(String(job.tool_name||""),request);
   if(job.job_type==="research")return await internetResearch(request);
   if(job.job_type==="coding")return await codingAgent(request);
+  if(job.job_type==="self_update")return await selfUpdateWorker();
   if(job.job_type==="local_ai"){
     const messages=Array.isArray(request.messages)?request.messages:[{role:"user",content:String(request.prompt||"")}];
     const reply=await ollama(messages,request.format,request.model||LOCAL_MODEL);
