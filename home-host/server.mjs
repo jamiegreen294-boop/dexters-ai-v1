@@ -178,6 +178,13 @@ async function browserTool(tool,request={}){
   }
   if(tool==="browser.snapshot")return await snapshot(page);
   if(tool==="browser.click"){const el=await byRef(page,request.ref);await el.click({timeout:15000});await page.waitForTimeout(700);return await snapshot(page);}
+  if(tool==="browser.click_text"){
+    const label=String(request.text||"").trim();
+    if(!label)throw new Error("Button text is required.");
+    const el=page.getByRole("button",{name:label,exact:false}).first();
+    if(await el.count()<1)throw new Error("Button text not found.");
+    await el.click({timeout:15000});await page.waitForTimeout(700);return await snapshot(page);
+  }
   if(tool==="browser.fill"){const el=await byRef(page,request.ref);await el.fill(String(request.value??""));return {ok:true,url:page.url()};}
   if(tool==="browser.select"){const el=await byRef(page,request.ref);await el.selectOption(String(request.value??""));return {ok:true,url:page.url()};}
   if(tool==="browser.press"){await page.keyboard.press(String(request.key||"Enter"));await page.waitForTimeout(500);return await snapshot(page);}
