@@ -907,8 +907,11 @@ async function executeCloudJob(job){
   if(job.job_type==="self_restart")return scheduleSelfRestart(3000);
   if(job.job_type==="local_ai"){
     const messages=Array.isArray(request.messages)?request.messages:[{role:"user",content:String(request.prompt||"")}];
-    const reply=await ollama(messages,request.format,request.model||LOCAL_MODEL);
-    return {reply,model:request.model||LOCAL_MODEL,provider:"ollama-local"};
+    const fast=request.fast!==false;
+    const reply=fast
+      ? await ollamaFast(messages,request.format,request.model||LOCAL_MODEL)
+      : await ollama(messages,request.format,request.model||LOCAL_MODEL);
+    return {reply,model:request.model||LOCAL_MODEL,provider:fast?"ollama-local-fast":"ollama-local"};
   }
   throw new Error("Unsupported cloud job type: "+job.job_type);
 }
