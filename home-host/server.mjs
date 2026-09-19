@@ -770,9 +770,19 @@ async function comfyGenerate(request={}){
 async function installChatModel(request={}){
   const model=String(request.model||"qwen3:1.7b").trim();
   if(!/^qwen3:(?:0\.6b|1\.7b|4b)$/i.test(model))throw new Error("Unsupported local chat model.");
-  const r=await runProcess("ollama",["pull",model],WORKSPACE,600000);
-  if(r.code!==0)throw new Error("Ollama model install failed: "+String(r.stderr||r.stdout).slice(-2500));
-  return {installed:true,model,free:true,provider:"ollama-local"};
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),600000);
+  try{
+    const r=await fetch(OLLAMA_URL+"/api/pull",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({name:model,stream:false}),
+      signal:controller.signal
+    });
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error("Ollama model install failed: "+String(d?.error||r.status));
+    return {installed:true,model,free:true,provider:"ollama-local",status:d?.status||"success"};
+  }finally{clearTimeout(timer);}
 }
 
 async function workspaceTool(tool,request={}){
