@@ -44,10 +44,10 @@ const LIVE_SUPABASE_URL="https://bpnkouymdvcogeaqjmxl.supabase.co";
 const LIVE_SUPABASE_PUBLISHABLE_KEY="sb_publishable_v6rJbF4IfGZTKtbuQtmsmQ_lS3sXWFa";
 
 function businessCategoriesForRole(role:string){
-  if(role==="owner")return ["menu","modifier","allergen","offer","sunday_roast","supplier","recipe","training","policy"];
-  if(role==="manager")return ["menu","modifier","allergen","offer","sunday_roast","supplier","recipe","training","policy"];
-  if(role==="staff")return ["menu","modifier","allergen","offer","sunday_roast","training","policy"];
-  return ["menu","modifier","allergen","offer","sunday_roast"];
+  if(role==="owner")return ["menu","modifier","allergen","offer","sunday_roast","supplier","recipe","training","policy","catering","procedure","backoffice"];
+  if(role==="manager")return ["menu","modifier","allergen","offer","sunday_roast","supplier","recipe","training","policy","catering","procedure","backoffice"];
+  if(role==="staff")return ["menu","modifier","allergen","offer","sunday_roast","training","policy","catering","procedure"];
+  return ["menu","modifier","allergen","offer","sunday_roast","catering"];
 }
 async function liveMenuForQuery(query:string){
   if(!/menu|price|cost|how much|stock|available|breakfast|roll|toast|panini|wrap|burger|fries|pizza|chippy|coffee|drink|soup|sub|chicken|beef|roast/i.test(query))return null;
@@ -177,6 +177,13 @@ function basePrompt(role:string,context:any,agentKey:string){
     "- Professional for HR, safety, finance, complaints, legal/privacy, or sensitive business matters.",
     "- Do not insult people. Do not swear unless the user starts, and never escalate.",
     "",
+    "LANGUAGES",
+    "- Automatically detect the language of the user's latest message and reply in that same language unless they explicitly ask for another language.",
+    "- Danish is a first-class supported language. If the user writes in Danish, answer naturally in Danish, not translated-English phrasing.",
+    "- Also support other major languages and preserve the user's language across follow-up turns unless they switch languages.",
+    "- If a message mixes languages, reply mainly in the dominant language while keeping product names, code, commands and technical identifiers unchanged where appropriate.",
+    "- Never translate code, file paths, API names, database identifiers, product names or URLs unless the user asks.",
+    "",
     "OPERATING BOUNDARY",
     "- This is the isolated Dexter AI test environment.",
     "- You have NO authority to change any live Dexters application, production database, POS, KDS, Back Office, Loyalty App, WhatsApp, payment system, staff record or customer record.",
@@ -257,6 +264,13 @@ Deno.serve(async(req)=>{
         const ai=await callAI([{role:"system",content:"You are Dexter AI. Reply with exactly DEXTER_SELF_TEST_OK"},{role:"user",content:"Self test"}],80);
         add("ai_provider",/DEXTER_SELF_TEST_OK/i.test(ai.reply),{model:ai.model,provider:ai.provider||"unknown"});
       }catch(e){add("ai_provider",false,{error:String((e as Error)?.message||e)});}
+      try{
+        const da=await callAI([
+          {role:"system",content:"Du er Dexter AI. Svar kun på dansk med præcis teksten: DEXTER_DANSK_OK"},
+          {role:"user",content:"Kan du svare på dansk?"}
+        ],80);
+        add("danish_language",/DEXTER_DANSK_OK/i.test(da.reply),{model:da.model});
+      }catch(e){add("danish_language",false,{error:String((e as Error)?.message||e)});}
       const {data:conns}=await db.from("ai_connectors").select("connector_key,status");
       add("connectors_registry",Array.isArray(conns)&&conns.length>=5,{connectors:conns||[]});
       const passed=checks.filter(x=>x.ok).length;
@@ -575,7 +589,7 @@ if(action==="work"){
         await db.from("ai_task_events").insert({task_id:task.id,event_type:"home.queued",message:"Queued for Dexter Home PC internet research."});
         return json({task:{...task,status:"queued_home",progress:25},plan,homeJob:job,reply:"Dexter queued this internet-research task for the Home PC. It will run automatically when the paired PC is online.",liveWrites:false});
       }
-      const system=basePrompt(role,context,agentKey)+(toolContext?"\n\nHOME PC TOOL CONTEXT\n"+JSON.stringify(toolContext).slice(0,30000):"")+"\n\nWORK MODE\n- Produce a completed, practical work result using only reasoning and supplied test knowledge.\n- When code is requested, provide concrete code or exact changes, but do not pretend they were applied.\n- When diagnosis is requested, separate confirmed facts from hypotheses.\n- If a request requires a live or external action, mark that part as Needs approved tool connection and continue with everything that can be completed safely.\n- Do not ask unnecessary follow-up questions; make a best effort.";
+      const system=basePrompt(role,context,agentKey)+(toolContext?"\n\nHOME PC TOOL CONTEXT\n"+JSON.stringify(toolContext).slice(0,30000):"")+"\n\nWORK MODE\n- Produce the result in the same language as the user's request unless they ask for another language. Danish requests must receive natural Danish output.\n- Produce a completed, practical work result using reasoning, supplied business knowledge and available tool results.\n- When code is requested, provide concrete code or exact changes, but do not pretend they were applied.\n- When diagnosis is requested, separate confirmed facts from hypotheses.\n- If a request requires a live or external action, mark that part as Needs approved tool connection and continue with everything that can be completed safely.\n- Do not ask unnecessary follow-up questions; make a best effort.";
       try{
         const {reply,model}=await callAI([{role:"system",content:system},{role:"user",content:request}],3000);
         await db.from("ai_tasks").update({status:"completed",progress:100,result:reply,updated_at:now()}).eq("id",task.id);
@@ -625,7 +639,7 @@ await db.from("ai_task_events").insert({task_id:task.id,event_type:"completed",m
     }
     const {data:historyRows}=await db.from("dexter_messages").select("role,content,created_at").eq("session_id",sessionId).order("created_at",{ascending:true}).limit(30);
     const history=(historyRows||[]).slice(-18).map((m:any)=>({role:m.role==="assistant"?"assistant":"user",content:cleanText(m.content,12000)}));
-    const system=basePrompt(role,context,agentKey)+"\n\nCHAT MODE\n- Answer directly.\n- Use test knowledge and approved memory when relevant.\n- For volatile facts such as current prices, stock, orders, deployments or system status, say when the test knowledge cannot confirm live state.\n- For coding questions, give useful technical guidance and code while respecting the no-live-write boundary.";
+    const system=basePrompt(role,context,agentKey)+"\n\nCHAT MODE\n- Answer directly in the same language as the user's latest message unless they ask for another language.\n- Danish must sound natural and fluent when the user writes Danish.\n- Use live menu data, synced business knowledge and approved memory when relevant.\n- For volatile facts outside confirmed live sources, say when Dexter only has a synced snapshot.\n- For coding questions, give useful technical guidance and code while respecting the no-live-write boundary.";
     const {reply,model}=await callAI([{role:"system",content:system},...history,{role:"user",content:message}],1800);
     await db.from("dexter_sessions").upsert({id:sessionId,role,last_active_at:now()});
     const {error:saveError}=await db.from("dexter_messages").insert([{session_id:sessionId,role:"user",content:message},{session_id:sessionId,role:"assistant",content:reply}]);
