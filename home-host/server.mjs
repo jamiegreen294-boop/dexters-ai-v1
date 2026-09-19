@@ -306,6 +306,39 @@ async function directCodingPlan(request={}){
   return {status:"completed",direct:true,repo_path:repoPath,files_written:written,verification,checks,git_status,git_diff};
 }
 
+const TRUSTED_CODING_SOURCES=[
+  "MDN Web Docs — https://developer.mozilla.org/",
+  "Node.js Docs — https://nodejs.org/docs/latest/api/",
+  "TypeScript Docs — https://www.typescriptlang.org/docs/",
+  "React Docs — https://react.dev/",
+  "GitHub Docs — https://docs.github.com/",
+  "Supabase Docs — https://supabase.com/docs",
+  "PostgreSQL Docs — https://www.postgresql.org/docs/current/",
+  "Vercel Docs — https://vercel.com/docs",
+  "Playwright Docs — https://playwright.dev/docs/intro",
+  "Square Developer Docs — https://developer.squareup.com/docs",
+  "OWASP — https://owasp.org/www-project-top-ten/",
+  "Web.dev — https://web.dev/learn/"
+];
+
+function codingNeedsResearch(goal=""){
+  return /\b(api|sdk|oauth|webhook|supabase|square|vercel|github|playwright|react|typescript|node|postgres|pwa|security|auth|payment|terminal|browser|deploy|edge function|rls|realtime)\b/i.test(String(goal));
+}
+
+async function codingLearningContext(goal){
+  if(!codingNeedsResearch(goal))return null;
+  try{
+    const result=await internetResearch({
+      query:"Official current developer documentation for: "+String(goal).slice(0,500),
+      deep:false,
+      session:"coding-learning-"+crypto.randomUUID()
+    });
+    return {trusted_sources:TRUSTED_CODING_SOURCES,research:result};
+  }catch(e){
+    return {trusted_sources:TRUSTED_CODING_SOURCES,research_error:String(e?.message||e)};
+  }
+}
+
 async function codingAgent(request={}){
   const goal=String(request.goal||request.instruction||"").trim();
   if(!goal)throw new Error("Coding goal is required.");
@@ -332,6 +365,7 @@ async function codingAgent(request={}){
     return path.relative(WORKSPACE,full);
   }
 
+  const learningContext=await codingLearningContext(goal);
   let fastPathError=null;
   try{
     const initialTree=await listTree(repoPath,2,120);
@@ -344,6 +378,11 @@ async function codingAgent(request={}){
       "files must contain complete replacement contents, never patches, placeholders or ellipses.",
       "Use no more than 8 files in this fast pass.",
       "Allowed checks: node-check only. If no lightweight check fits, return an empty checks array.",
+      "For difficult, unfamiliar, security-sensitive or version-sensitive work, use current official documentation before deciding implementation details.",
+      "Prefer primary sources from this trusted list: "+TRUSTED_CODING_SOURCES.join(" | "),
+      "Never blindly copy snippets. Adapt them to the actual repository and installed versions, then verify the result.",
+      "Never store or expose passwords, API keys, tokens, secrets, private customer data or credentials as learned knowledge.",
+      "CURRENT LEARNING CONTEXT: "+JSON.stringify(learningContext||{}).slice(0,12000),
       "Existing tree: "+JSON.stringify(initialTree).slice(0,5000)
     ].join("\n");
     const plan=parseJson(await ollamaFast([{role:"user",content:fastPrompt}],"json",CODE_MODEL));
@@ -402,7 +441,10 @@ async function codingAgent(request={}){
       "Choose one action only from: list, read, write, mkdir, git_status, git_diff, check, research, done, blocked.",
       "For write, provide the COMPLETE replacement content for one file. Never use placeholders or ellipses.",
       "For check, kind must be one of npm-build, npm-test, node-check.",
-      "Use research only when current public documentation is genuinely needed.",
+      "Use research whenever current official documentation would materially improve correctness, especially for APIs, SDKs, authentication, payments, security or version-sensitive frameworks.",
+      "Prefer these sources: "+TRUSTED_CODING_SOURCES.join(" | "),
+      "Do not blindly paste community snippets. Understand, adapt and verify them against the repository.",
+      "CURRENT LEARNING CONTEXT: "+JSON.stringify(learningContext||{}).slice(0,12000),
       "When the requested work is complete, run relevant checks and inspect git_diff before returning done.",
       "Return JSON only with fields: action,path,content,file,kind,query,reason,result.",
       "REPO PATH: "+repoPath,
