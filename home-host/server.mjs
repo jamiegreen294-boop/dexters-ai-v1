@@ -244,7 +244,15 @@ async function autonomousBrowser(page,request={}){
 }
 function runProcess(command,args,cwd,timeout=120000){
   return new Promise((resolve,reject)=>{
-    const executable=process.platform==="win32"&&["npm","npx"].includes(command)?command+".cmd":command;
+    let executable=process.platform==="win32"&&["npm","npx"].includes(command)?command+".cmd":command;
+    if(process.platform==="win32"&&command==="ollama"){
+      const candidates=[
+        path.join(process.env.LOCALAPPDATA||"","Programs","Ollama","ollama.exe"),
+        path.join(process.env.USERPROFILE||"","AppData","Local","Programs","Ollama","ollama.exe")
+      ];
+      const found=candidates.find(p=>p&&fs.existsSync(p));
+      if(found)executable=found;
+    }
     const child=spawn(executable,args,{cwd,windowsHide:true,shell:false,env:{...process.env,CI:"1"}});
     let stdout="",stderr="",killed=false;
     const timer=setTimeout(()=>{killed=true;child.kill();},timeout);
