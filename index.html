@@ -26,6 +26,24 @@ button,input,textarea,select{font:inherit}button{cursor:pointer}.hidden{display:
 .notice{max-width:920px;margin:12px auto;border:1px solid #554224;background:#2b2113;border-radius:14px;padding:12px;color:#f5d7a0;font-size:12px}.approval,.memoryrow,.auditrow,.detailbox{background:#171513;border:1px solid var(--line);border-radius:14px;padding:13px}.approval-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}.danger{border:1px solid #5d302e;background:#2b1715;color:#ffb1aa;font-weight:800;border-radius:10px;padding:8px 11px}.good{border:1px solid #315445;background:#15271f;color:#9be8bf;font-weight:800;border-radius:10px;padding:8px 11px}.detailbox{max-width:920px;margin:12px auto}.detailbox pre{white-space:pre-wrap;word-break:break-word;color:#ddd4cd;font:inherit;font-size:12px;line-height:1.5}.miniinput{width:100%;background:#0e0d0c;color:#fff;border:1px solid #3b3530;border-radius:10px;padding:10px}.muted{color:var(--muted);font-size:12px}.auditrow code{font-size:11px;white-space:pre-wrap;word-break:break-word}
 .gate{position:fixed;inset:0;z-index:30;background:#080808f4;display:grid;place-items:center;padding:20px}.gate form{width:min(430px,100%);background:#191716;border:1px solid #3d352f;border-radius:24px;padding:26px;box-shadow:0 20px 80px #000}.gate h2{margin-bottom:6px}.gate p{color:var(--muted);line-height:1.45}.gate input{width:100%;margin:10px 0;padding:13px;border:1px solid #463d36;border-radius:12px;background:#0f0e0d;color:#fff}.gate button{width:100%;height:46px;border:0;border-radius:13px;background:var(--accent);font-weight:900}.error{color:#ffad9d;font-size:12px}
 .mobile-nav{display:none}.mobile-nav button{flex:1;border:0;border-top:1px solid var(--line);background:#151312;color:#cfc7c0;padding:11px 5px;font-size:11px;font-weight:800}.mobile-nav button.active{color:var(--accent);background:#201b17}@media(max-width:820px){body{overflow:auto;padding-bottom:52px}.shell{grid-template-columns:1fr;height:auto;min-height:100vh}.sidebar{display:none}.mobile-nav{display:flex;position:fixed;bottom:0;left:0;right:0;z-index:20;background:#11100f}.main{height:auto;min-height:100vh}.content{padding:12px}.topbar{position:sticky;top:0;z-index:10}.grid,.system-grid{grid-template-columns:1fr}.bubble{max-width:92%}.select{max-width:145px}.hero h3{font-size:23px}}
+
+/* Dexter automatic seasonal themes */
+body.theme-burns{--accent:#d7b56d;--panel:#171515;--panel2:#241d1d;--line:#57433d;background:radial-gradient(circle at 12% 0,#3a2320 0,#171111 28%,#090909 65%)}
+body.theme-valentines{--accent:#ff6f91;--panel:#1b1116;--panel2:#26131c;--line:#5b2d3c;background:radial-gradient(circle at 12% 0,#5a1730 0,#201018 30%,#090909 68%)}
+body.theme-april-fools{--accent:#ffd54f;--panel:#16151d;--panel2:#241f2f;--line:#51446e;background:radial-gradient(circle at 12% 0,#432a67 0,#171322 30%,#090909 68%)}
+body.theme-easter{--accent:#f2c1ff;--panel:#14171b;--panel2:#1d2427;--line:#46555c;background:radial-gradient(circle at 12% 0,#294a4d 0,#141b1c 30%,#090909 68%)}
+body.theme-pride{--accent:#ffcf4d;--panel:#15151b;--panel2:#20202a;--line:#4c4c67;background:linear-gradient(135deg,#401840 0,#18234a 38%,#153e39 68%,#090909 100%)}
+body.theme-halloween{--accent:#ff7a18;--panel:#17120f;--panel2:#24170f;--line:#5b351b;background:radial-gradient(circle at 12% 0,#5d2608 0,#1c130e 30%,#070606 68%)}
+body.theme-christmas{--accent:#e6c86e;--panel:#111714;--panel2:#17231d;--line:#355443;background:radial-gradient(circle at 12% 0,#143b2a 0,#101914 32%,#080a09 68%)}
+body.theme-st-andrews{--accent:#78b7ff;--panel:#101722;--panel2:#16243a;--line:#34577d;background:radial-gradient(circle at 12% 0,#17467a 0,#101827 34%,#080a0f 68%)}
+body.theme-hogmanay{--accent:#e7d994;--panel:#12131b;--panel2:#1b1e2a;--line:#454b66;background:radial-gradient(circle at 12% 0,#29365f 0,#131826 34%,#07080d 70%)}
+body[class*="theme-"] .logo{box-shadow:0 0 22px color-mix(in srgb,var(--accent) 45%,transparent)}
+body.theme-pride .topbar{background:linear-gradient(90deg,#2a1333e8,#16263de8,#15352de8)}
+body.theme-halloween .topbar{background:#160d08e8}
+body.theme-christmas .topbar{background:#0f1813e8}
+body.theme-st-andrews .topbar{background:#0d1726e8}
+body.theme-hogmanay .topbar{background:#10131fe8}
+
 </style>
 </head>
 <body>
@@ -61,7 +79,7 @@ button,input,textarea,select{font:inherit}button{cursor:pointer}.hidden{display:
 <section class="main">
 <header class="topbar">
 <div><h2 id="pageTitle">Chat</h2><p id="subtitle">Ask Dexter about Dexters, systems, coding or operations.</p></div>
-<div class="top-actions">
+<div class="top-actions"><span id="themeBadge" class="status">Standard</span>
 <select id="agentSelect" class="select"></select>
 <button id="installApp" class="iconbtn" type="button">Install App</button>
 <button id="newChat" class="iconbtn" type="button">New</button>
@@ -199,6 +217,42 @@ var token=sessionStorage.dexterToken||"";
 var sessionId=localStorage.dexterSession||crypto.randomUUID();
 var dashboard={agents:[],tasks:[],knowledge:[],learning:[],memory:[],approvals:[],audit:[],orchestration:[],settings:[],connectors:[],toolRequests:[],homeAgents:[],homeJobs:[]};
 var currentPage="chat";
+
+function easterSundayUTC(year){
+  var a=year%19,b=Math.floor(year/100),c=year%100,d=Math.floor(b/4),e=b%4;
+  var f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30;
+  var i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451);
+  var month=Math.floor((h+l-7*m+114)/31),day=((h+l-7*m+114)%31)+1;
+  return new Date(Date.UTC(year,month-1,day));
+}
+function currentDexterTheme(now){
+  now=now||new Date();
+  var parts=new Intl.DateTimeFormat("en-GB",{timeZone:"Europe/London",year:"numeric",month:"numeric",day:"numeric"}).formatToParts(now);
+  var get=function(t){return Number((parts.find(function(p){return p.type===t})||{}).value||0)};
+  var y=get("year"),m=get("month"),d=get("day");
+  if((m===12&&d>=27)||(m===1&&d<=2))return {key:"hogmanay",label:"Hogmanay 🎆"};
+  if(m===1&&d>=18&&d<=25)return {key:"burns",label:"Burns Night 🥃"};
+  if(m===2&&d>=1&&d<=14)return {key:"valentines",label:"Valentine’s ❤️"};
+  if((m===3&&d>=25)||(m===4&&d===1))return {key:"april-fools",label:"April Fools 🤡"};
+  var easter=easterSundayUTC(y),start=new Date(easter),end=new Date(easter),today=new Date(Date.UTC(y,m-1,d));
+  start.setUTCDate(easter.getUTCDate()-7);end.setUTCDate(easter.getUTCDate()+1);
+  if(today>=start&&today<=end)return {key:"easter",label:"Easter 🐣"};
+  if(m===6&&d>=1&&d<=30)return {key:"pride",label:"Pride 🌈"};
+  if(m===9||(m===10&&d<=31))return {key:"halloween",label:"Halloween 🎃"};
+  if(m===11&&d>=23&&d<=30)return {key:"st-andrews",label:"St Andrew’s 🏴"};
+  if(m===11||(m===12&&d<=31))return {key:"christmas",label:"Christmas 🎄"};
+  return {key:"standard",label:"Standard"};
+}
+function applyDexterTheme(){
+  var t=currentDexterTheme();
+  Array.from(document.body.classList).filter(function(c){return c.indexOf("theme-")===0}).forEach(function(c){document.body.classList.remove(c)});
+  if(t.key!=="standard")document.body.classList.add("theme-"+t.key);
+  var badge=document.getElementById("themeBadge");if(badge)badge.textContent=t.label;
+  document.documentElement.setAttribute("data-dexter-theme",t.key);
+  return t;
+}
+applyDexterTheme();
+
 
 function api(body){
   body.sessionId=sessionId;
