@@ -32,6 +32,10 @@ function validSession(value:unknown){
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s)?s:"";
 }
 function cleanText(value:unknown,max=12000){return String(value||"").trim().slice(0,max);}
+function randomUrlToken(bytes=18){
+  const a=new Uint8Array(bytes);crypto.getRandomValues(a);
+  return btoa(String.fromCharCode(...a)).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+}
 function outputText(data:any){
   if(typeof data?.output_text==="string"&&data.output_text.trim())return data.output_text.trim();
   return (data?.output||[]).flatMap((i:any)=>i?.content||[]).filter((p:any)=>p?.type==="output_text"&&typeof p?.text==="string").map((p:any)=>p.text).join("\n").trim();
@@ -215,14 +219,16 @@ Deno.serve(async(req)=>{
     if(!sessionId)return json({error:"Invalid session"},400);
 
     if(action==="health"){
-      const [{count:knowledgeCount},{count:businessKnowledgeCount},{count:taskCount},liveMenu]=await Promise.all([
+      const [{count:knowledgeCount},{count:businessKnowledgeCount},{count:taskCount},liveMenu,{data:homeAgents}]=await Promise.all([
         db.from("dexter_ai_knowledge").select("*",{count:"exact",head:true}).eq("enabled",true),
         db.from("dexter_business_knowledge").select("*",{count:"exact",head:true}),
         db.from("ai_tasks").select("*",{count:"exact",head:true}),
-        liveMenuForQuery("menu price stock")
+        liveMenuForQuery("menu price stock"),
+        db.from("dexter_home_agents").select("id,name,last_seen_at,active").eq("active",true).order("last_seen_at",{ascending:false}).limit(5)
       ]);
       const localAI=Boolean(Deno.env.get("DEXTER_HOME_HOST_URL")&&Deno.env.get("DEXTER_HOME_HOST_TOKEN"));
-      return json({status:"ready",environment:"test",role,keyName,ai:Boolean(Deno.env.get("OPENAI_API_KEY"))||localAI,localAI,memory:true,knowledge:knowledgeCount||0,businessKnowledge:businessKnowledgeCount||0,liveMenu:Boolean(liveMenu),tasks:taskCount||0,liveWrites:false});
+      const homeOnline=(homeAgents||[]).some((a:any)=>a.last_seen_at && (Date.now()-new Date(a.last_seen_at).getTime())<90000);
+      return json({status:"ready",environment:"test",role,keyName,ai:Boolean(Deno.env.get("OPENAI_API_KEY"))||localAI,memory:true,knowledge:knowledgeCount||0,businessKnowledge:businessKnowledgeCount||0,liveMenu:Boolean(liveMenu),tasks:taskCount||0,homeAgentOnline:homeOnline,homeAgents:homeAgents||[],liveWrites:false});
     }
 
     if(action==="self_test"){
@@ -272,6 +278,8 @@ Deno.serve(async(req)=>{
         db.from("dexter_approved_memory").select("id,category,content,approved_at").eq("active",true).order("approved_at",{ascending:false}).limit(50)
       ]);
       const {data:audit}=await db.from("ai_audit_logs").select("id,action,actor,environment,details,created_at").order("created_at",{ascending:false}).limit(50);
+      const {data:homeAgents}=await db.from("dexter_home_agents").select("id,name,capabilities,last_seen_at,active,created_at").order("last_seen_at",{ascending:false}).limit(10);
+      const {data:homeJobs}=await db.from("dexter_home_jobs").select("id,task_id,tool_request_id,job_type,tool_name,status,error,claimed_at,completed_at,created_at,updated_at").order("created_at",{ascending:false}).limit(30);
       const {data:orchestration}=await db.from("ai_orchestration_tasks").select("id,task_id,requested_action,selected_agent,stage,progress,result,created_at,updated_at").order("created_at",{ascending:false}).limit(30);
       const {data:settings}=await db.from("dexter_command_centre_settings").select("setting_key,setting_value").order("setting_key");
       const {data:connectors}=await db.from("ai_connectors").select("connector_key,name,connector_type,status,capabilities,config,last_checked_at,last_error").order("name");
@@ -294,6 +302,19 @@ Deno.serve(async(req)=>{
       };
       const out=(rows||[]).map((x:any)=>({...x,runtime_ready:envReady(x.connector_key)}));
       return json({connectors:out});
+    }
+
+    if(action==="home_pair_code"){
+      if(role!=="owner")return json({error:"Owner access required to pair a home PC."},403);
+      const code=randomUrlToken(18),hash=await sha256(code);
+      const expiresAt=new Date(Date.now()+15*60*1000).toISOString();
+      await db.from("dexter_home_pairings").insert({code_hash:hash,created_by:keyName,expires_at:expiresAt});
+      await logAudit(db,"home_pairing.created",keyName,{expires_at:expiresAt});
+      return json({
+        code,
+        expires_at:expiresAt,
+        endpoint:"https://eikruaxxzzxmfjvsmwwo.supabase.co/functions/v1/dexter-home-agent"
+      });
     }
 
     if(action==="square_authorize"){
@@ -372,17 +393,35 @@ Deno.serve(async(req)=>{
         }else if(tr.connector_key==="browser"||tr.connector_key==="home-host"){
           const base=(Deno.env.get("DEXTER_HOME_HOST_URL")||Deno.env.get("DEXTER_BROWSER_WORKER_URL")||"").replace(/\/$/,"");
           const workerToken=Deno.env.get("DEXTER_HOME_HOST_TOKEN")||Deno.env.get("DEXTER_BROWSER_WORKER_TOKEN")||"";
-          if(!base||!workerToken)throw new Error("Dexter Home PC is built but not connected to the command centre yet.");
           const workspace=/^(workspace\.|git\.|github\.|vercel\.|code\.|web\.research$)/.test(tr.tool_name);
-          const endpoint=workspace?base+"/workspace/tool":base+"/browser/tool";
           const approvedRequest={...(tr.request||{}),approval_granted:tr.requires_approval===true};
+          if(!base||!workerToken){
+            const jobType=tr.tool_name==="web.research"?"research":tr.tool_name==="code.agent"?"coding":workspace?"workspace":"browser";
+            const {data:job,error:jobError}=await db.from("dexter_home_jobs").insert({
+              tool_request_id:tr.id,task_id:tr.task_id||null,job_type:jobType,tool_name:tr.tool_name,
+              request:approvedRequest,status:"queued"
+            }).select("*").single();
+            if(jobError)throw jobError;
+            await db.from("ai_tool_requests").update({status:"running",result:{queued_home_job:job.id},updated_at:now()}).eq("id",tr.id);
+            await logAudit(db,"home_job.queued",keyName,{home_job_id:job.id,tool_request_id:tr.id,tool:tr.tool_name});
+            return json({queued:true,homeJob:job});
+          }
+          const endpoint=workspace?base+"/workspace/tool":base+"/browser/tool";
           const r=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+workerToken},body:JSON.stringify({tool:tr.tool_name,request:approvedRequest,environment:"test"})});
           const d=await r.json().catch(()=>({}));
           result=d?.result??d;
           if(!r.ok)throw new Error(d?.error||"Dexter Home PC request failed");
         }else if(tr.connector_key==="local-ai"){
           const base=(Deno.env.get("DEXTER_HOME_HOST_URL")||"").replace(/\/$/,""),workerToken=Deno.env.get("DEXTER_HOME_HOST_TOKEN")||"";
-          if(!base||!workerToken)throw new Error("Dexter Home PC is not connected.");
+          if(!base||!workerToken){
+            const {data:job,error:jobError}=await db.from("dexter_home_jobs").insert({
+              tool_request_id:tr.id,task_id:tr.task_id||null,job_type:"local_ai",tool_name:"local_ai.chat",
+              request:tr.request||{},status:"queued"
+            }).select("*").single();
+            if(jobError)throw jobError;
+            await db.from("ai_tool_requests").update({status:"running",result:{queued_home_job:job.id},updated_at:now()}).eq("id",tr.id);
+            return json({queued:true,homeJob:job});
+          }
           const r=await fetch(base+"/ai/chat",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+workerToken},body:JSON.stringify(tr.request||{})});
           const d=await r.json().catch(()=>({}));result=d;if(!r.ok)throw new Error(d?.error||"Local AI request failed");
         }else{
@@ -513,6 +552,28 @@ if(action==="work"){
         }catch(err){
           await db.from("ai_task_events").insert({task_id:task.id,event_type:"tool.failed",message:String((err as Error)?.message||err).slice(0,500)});
         }
+      }
+      if(!toolContext&&!homeUrl&&codingIntent){
+        const {data:job,error:jobError}=await db.from("dexter_home_jobs").insert({
+          task_id:task.id,job_type:"coding",tool_name:"code.agent",
+          request:{goal:request,repo_url:githubMatch?.[0]||undefined,project_name:title},status:"queued"
+        }).select("*").single();
+        if(jobError)throw jobError;
+        await db.from("ai_tasks").update({status:"queued_home",progress:25,updated_at:now()}).eq("id",task.id);
+        await db.from("ai_orchestration_tasks").update({stage:"queued_home",progress:25,updated_at:now()}).eq("task_id",task.id);
+        await db.from("ai_task_events").insert({task_id:task.id,event_type:"home.queued",message:"Queued for Dexter Home PC coding agent."});
+        return json({task:{...task,status:"queued_home",progress:25},plan,homeJob:job,reply:"Dexter queued this coding/build task for the Home PC. It will run automatically when the paired PC is online.",liveWrites:false});
+      }
+      if(!toolContext&&!homeUrl&&researchIntent){
+        const {data:job,error:jobError}=await db.from("dexter_home_jobs").insert({
+          task_id:task.id,job_type:"research",tool_name:"web.research",
+          request:{query:request,session:"research-"+task.id},status:"queued"
+        }).select("*").single();
+        if(jobError)throw jobError;
+        await db.from("ai_tasks").update({status:"queued_home",progress:25,updated_at:now()}).eq("id",task.id);
+        await db.from("ai_orchestration_tasks").update({stage:"queued_home",progress:25,updated_at:now()}).eq("task_id",task.id);
+        await db.from("ai_task_events").insert({task_id:task.id,event_type:"home.queued",message:"Queued for Dexter Home PC internet research."});
+        return json({task:{...task,status:"queued_home",progress:25},plan,homeJob:job,reply:"Dexter queued this internet-research task for the Home PC. It will run automatically when the paired PC is online.",liveWrites:false});
       }
       const system=basePrompt(role,context,agentKey)+(toolContext?"\n\nHOME PC TOOL CONTEXT\n"+JSON.stringify(toolContext).slice(0,30000):"")+"\n\nWORK MODE\n- Produce a completed, practical work result using only reasoning and supplied test knowledge.\n- When code is requested, provide concrete code or exact changes, but do not pretend they were applied.\n- When diagnosis is requested, separate confirmed facts from hypotheses.\n- If a request requires a live or external action, mark that part as Needs approved tool connection and continue with everything that can be completed safely.\n- Do not ask unnecessary follow-up questions; make a best effort.";
       try{
