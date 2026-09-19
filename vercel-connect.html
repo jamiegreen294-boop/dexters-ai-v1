@@ -1,0 +1,47 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Connect Dexter to Vercel</title>
+<style>
+body{font-family:system-ui;background:#0b0b0b;color:#fff;max-width:760px;margin:35px auto;padding:20px}
+.card{background:#151515;border:1px solid #333;border-radius:18px;padding:24px;margin-bottom:18px}
+input,button,a.btn{width:100%;box-sizing:border-box;padding:14px;margin:7px 0;border-radius:10px;border:1px solid #333;background:#171717;color:#fff;text-decoration:none;display:block}
+button,a.btn{background:#fff;color:#111;font-weight:800;border:0;text-align:center}
+small,.muted{color:#aaa}.ok{border-color:#2d5;background:#102016}.err{border-color:#d55;background:#241010}
+code{background:#222;padding:2px 6px;border-radius:6px}
+</style>
+</head>
+<body>
+<div id="result"></div>
+<div class="card">
+<h1>Connect Dexter to Vercel</h1>
+<p>Dexter will store the Vercel token encrypted in Supabase Vault. Your Vercel password is never entered here.</p>
+<a class="btn" href="https://vercel.com/account/tokens" target="_blank" rel="noopener">1. Open Vercel Tokens</a>
+<p><b>Create a token called:</b> <code>Dexter AI</code></p>
+<p class="muted">Use your normal Vercel account/team access so Dexter can see the projects you already manage. The connector will verify access to the <b>dexter-ai-test</b> project before marking Vercel ready.</p>
+<p>After Vercel creates the token, copy it once and paste it below. Do not send it in ChatGPT.</p>
+<form method="post" action="https://eikruaxxzzxmfjvsmwwo.supabase.co/functions/v1/dexter-vercel-connect">
+<label>Dexter owner access code</label>
+<input name="owner_code" type="password" autocomplete="off" required>
+<label>Vercel access token</label>
+<input name="vercel_token" type="password" autocomplete="off" required>
+<button type="submit">2. Securely connect Vercel</button>
+</form>
+<small>Deployments and other Vercel writes remain owner-approval gated inside Dexter.</small>
+</div>
+<script>
+const p=new URLSearchParams(location.search),s=p.get('status'),n=p.get('projects')||'';
+const r=document.getElementById('result');
+const msg={
+connected:'Vercel connected ✓ Dexter verified the dexter-ai-test project'+(n?' and can see '+n+' projects.':''),
+token_invalid:'The Vercel token was not accepted. Create a new token and try again.',
+team_denied:'The token works but cannot access the Dexter Vercel team.',
+project_denied:'The token works but cannot see dexter-ai-test. Check the token/account access.',
+owner_invalid:'The Dexter owner access code was not accepted.',
+missing:'Both fields are required.',
+error:'The connector hit an error. Nothing was marked ready; try again.'
+};
+if(s&&msg[s])r.innerHTML='<div class="card '+(s==='connected'?'ok':'err')+'"><h2>'+msg[s]+'</h2></div>';
+</script>
+</body></html>
