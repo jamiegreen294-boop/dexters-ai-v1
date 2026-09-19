@@ -255,6 +255,39 @@ async function internetResearch(request={}){
     }
     return out;
   });
+  if(!results.length && /(?:\+?44|0)[\s()\-]*\d(?:[\s()\-]*\d){8,}/.test(query)){
+    try{
+      const digits=query.replace(/\D/g,"");
+      const local=digits.startsWith("44")?"0"+digits.slice(2):digits;
+      const mapsUrl="https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(local);
+      await page.goto(mapsUrl,{waitUntil:"domcontentloaded",timeout:45000});
+      await page.waitForTimeout(1000);
+      const reject=page.getByRole("button",{name:/Reject all/i});
+      if(await reject.count()) {
+        await reject.first().click().catch(()=>{});
+        await page.waitForTimeout(1500);
+      }
+      const mapText=(await page.locator("body").innerText().catch(()=> "")).slice(0,12000);
+      if(mapText && !/unusual traffic/i.test(mapText)){
+        const phoneMatch=mapText.match(/(?:\+44\s?|0)\d[\d\s]{8,}/);
+        const addressMatch=mapText.match(/\d+[A-Za-z]?[^\n]{2,80},\s*Glasgow[^\n]{0,40}/i);
+        return {
+          status:"completed",
+          mode:"business-phone-fallback",
+          query,
+          search_url:mapsUrl,
+          results:[],
+          business_match:{
+            title:await page.title().catch(()=> ""),
+            url:page.url(),
+            phone:phoneMatch?.[0]?.trim()||null,
+            address:addressMatch?.[0]?.trim()||null,
+            text:mapText
+          }
+        };
+      }
+    }catch(e){}
+  }
   if(request.deep===true){
     const result=await autonomousBrowser(page,{
       session,
