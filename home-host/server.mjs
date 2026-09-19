@@ -146,7 +146,10 @@ async function autonomousBrowser(page,request={}){
   const allowConsequential=LIVE_ACTIONS&&request.approval_granted===true;
   if(request.url)await page.goto(safeUrl(request.url),{waitUntil:"domcontentloaded",timeout:45000});
   const history=[];
-  for(let step=1;step<=MAX_AGENT_STEPS;step++){
+  const stepLimit=Math.max(1,Math.min(MAX_AGENT_STEPS,Number(request.max_steps||MAX_AGENT_STEPS)));
+  const deadline=Date.now()+Math.max(15000,Math.min(180000,Number(request.timeout_ms||120000)));
+  for(let step=1;step<=stepLimit;step++){
+    if(Date.now()>deadline)return {status:"timeout",reason:"Browser task exceeded its time limit.",history,state:await snapshot(page)};
     const state=await snapshot(page);
     const prompt=[
       "You are Dexter Browser Agent running on the owner's local PC.",
@@ -160,6 +163,7 @@ async function autonomousBrowser(page,request={}){
       "PAGE STATE:",JSON.stringify(state).slice(0,30000),
       "RECENT ACTIONS:",JSON.stringify(history.slice(-8))
     ].join("\n");
+    if(Date.now()>deadline)return {status:"timeout",reason:"Browser task exceeded its time limit before the next AI step.",history,state};
     const decision=parseJson(await ollama([{role:"user",content:prompt}],"json",LOCAL_MODEL));
     if(isConsequence(decision)&&!allowConsequential)return {status:"blocked",reason:"Consequence requires separate owner approval and live mode.",state,history};
     if(decision.action==="done")return {status:"completed",result:String(decision.result||decision.reason||"Completed"),state,history};
@@ -213,7 +217,9 @@ async function internetResearch(request={}){
   const result=await autonomousBrowser(page,{
     session,
     instruction:"Research this question using the public web and return when you have enough evidence: "+query+". Read pages only. Do not log in, submit forms, send messages, purchase anything, publish, deploy, delete, or change accounts.",
-    url:page.url()
+    url:page.url(),
+    max_steps:5,
+    timeout_ms:90000
   });
   return {query,search:state,result};
 }
