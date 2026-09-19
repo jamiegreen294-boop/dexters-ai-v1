@@ -61,21 +61,51 @@ function requireApprovedLive(request,action){
   if(!LIVE_ACTIONS)throw new Error(action+" is disabled while Dexter is in TEST mode.");
   if(request?.approval_granted!==true)throw new Error(action+" requires owner approval.");
 }
-async function getContext(){
-  if(!context){
-    context=await chromium.launchPersistentContext(PROFILE,{
-      headless:HEADLESS,viewport:{width:1440,height:1000},acceptDownloads:true
-    });
+async function resetBrowserContext(){
+  pageSessions.clear();
+  if(context){
+    try{await context.close();}catch{}
+    context=null;
   }
+}
+async function getContext(){
+  if(context){
+    try{
+      context.pages();
+      return context;
+    }catch{
+      context=null;
+      pageSessions.clear();
+    }
+  }
+  context=await chromium.launchPersistentContext(PROFILE,{
+    headless:HEADLESS,viewport:{width:1440,height:1000},acceptDownloads:true
+  });
+  context.on("close",()=>{
+    context=null;
+    pageSessions.clear();
+  });
   return context;
 }
 async function getPage(session="default"){
-  const ctx=await getContext();
+  let ctx=await getContext();
   if(pageSessions.has(session)){
     const p=pageSessions.get(session);
     if(!p.isClosed())return p;
+    pageSessions.delete(session);
   }
-  const p=await ctx.newPage();pageSessions.set(session,p);return p;
+  try{
+    const p=await ctx.newPage();
+    pageSessions.set(session,p);
+    return p;
+  }catch(err){
+    if(!/Target page, context or browser has been closed|Target closed/i.test(String(err?.message||err)))throw err;
+    await resetBrowserContext();
+    ctx=await getContext();
+    const p=await ctx.newPage();
+    pageSessions.set(session,p);
+    return p;
+  }
 }
 async function snapshot(page){
   const elements=await page.evaluate(()=>{
