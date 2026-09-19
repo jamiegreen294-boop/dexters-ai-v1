@@ -109,6 +109,7 @@ async function getPage(session="default"){
 }
 async function snapshot(page){
   const elements=await page.evaluate(()=>{
+    document.querySelectorAll("[data-dexter-ref]").forEach(el=>el.removeAttribute("data-dexter-ref"));
     const selectors=["a[href]","button","input","textarea","select","[role=button]","[contenteditable=true]"];
     return Array.from(document.querySelectorAll(selectors.join(","))).filter(el=>{
       const r=el.getBoundingClientRect();return r.width>0&&r.height>0;
