@@ -44,6 +44,7 @@ button,input,textarea,select{font:inherit}button{cursor:pointer}.hidden{display:
 <button data-page="work">Work <small>Tasks</small></button>
 <button data-page="agents">Agents <small>4</small></button>
 <button data-page="knowledge">Knowledge <small id="knowledgeNav">—</small></button>
+<button data-page="learning">Learning <small id="learningNav">—</small></button>
 <button data-page="memory">Memory <small id="memoryNav">—</small></button>
 <button data-page="approvals">Approvals <small id="approvalNav">—</small></button>
 <button data-page="audit">Audit <small>Logs</small></button>
@@ -91,6 +92,26 @@ button,input,textarea,select{font:inherit}button{cursor:pointer}.hidden{display:
 <section id="page-knowledge" class="page">
 <div class="hero"><h3>Test knowledge</h3><p>This is the business/system knowledge Dexter is allowed to use in the isolated build. Volatile live facts are deliberately not treated as current unless connected later with approval.</p></div>
 <div id="knowledgeList" class="knowledge-list"></div>
+</section>
+
+<section id="page-learning" class="page">
+<div class="hero"><h3>Learning</h3><p>Tell Dexter what to learn. It will research the public internet, keep source links, cross-check where possible, and save verified lessons for future work.</p></div>
+<div class="workbox">
+<select id="learningCategory" class="miniinput">
+<option value="coding">Coding</option>
+<option value="systems">Systems</option>
+<option value="payments">Payments</option>
+<option value="business">Business</option>
+<option value="hardware">Hardware</option>
+<option value="food-safety">Food safety</option>
+<option value="suppliers">Suppliers</option>
+<option value="operations">Operations</option>
+<option value="general">General</option>
+</select>
+<textarea id="learningTopic" placeholder="Example: Learn the latest Square Terminal API flow for launching a card payment from a POS." style="min-height:110px;margin-top:8px"></textarea>
+<div class="row" style="margin-top:10px"><button id="runLearning" class="primary">Learn from internet</button><span id="learningState" class="status">Ready</span></div>
+</div>
+<div id="learningList" class="knowledge-list"></div>
 </section>
 
 <section id="page-memory" class="page">
@@ -171,7 +192,7 @@ var ENDPOINT="https://eikruaxxzzxmfjvsmwwo.supabase.co/functions/v1/ai-command-c
 var $=function(id){return document.getElementById(id)};
 var token=sessionStorage.dexterToken||"";
 var sessionId=localStorage.dexterSession||crypto.randomUUID();
-var dashboard={agents:[],tasks:[],knowledge:[],memory:[],approvals:[],audit:[],orchestration:[],settings:[],connectors:[],toolRequests:[],homeAgents:[],homeJobs:[]};
+var dashboard={agents:[],tasks:[],knowledge:[],learning:[],memory:[],approvals:[],audit:[],orchestration:[],settings:[],connectors:[],toolRequests:[],homeAgents:[],homeJobs:[]};
 var currentPage="chat";
 
 function api(body){
@@ -194,7 +215,7 @@ function setPage(name){
   document.querySelectorAll(".page").forEach(function(x){x.classList.remove("active")});
   document.querySelectorAll("[data-page]").forEach(function(x){x.classList.toggle("active",x.dataset.page===name)});
   $("page-"+name).classList.add("active");
-  var titles={chat:["Chat","Ask Dexter about Dexters, systems, coding or operations."],work:["Work","Run substantial tasks through Dexter's planner and specialist agents."],agents:["Agents","Choose the specialist Dexter should use."],knowledge:["Knowledge","Review the facts available to Dexter."],memory:["Memory","Manage approved test memory."],approvals:["Approvals","Review consequential requests before any preview work continues."],audit:["Audit","Inspect recent command-centre activity."],connectors:["Connectors","Manage Square, developer APIs and Dexter's browser worker."],system:["System","Check backend, AI, brain settings and isolation status."]};
+  var titles={chat:["Chat","Ask Dexter about Dexters, systems, coding or operations."],work:["Work","Run substantial tasks through Dexter's planner and specialist agents."],agents:["Agents","Choose the specialist Dexter should use."],knowledge:["Knowledge","Review the facts available to Dexter."],learning:["Learning","Teach Dexter using sourced public internet research."],memory:["Memory","Manage approved test memory."],approvals:["Approvals","Review consequential requests before any preview work continues."],audit:["Audit","Inspect recent command-centre activity."],connectors:["Connectors","Manage Square, developer APIs and Dexter's browser worker."],system:["System","Check backend, AI, brain settings and isolation status."]};
   $("pageTitle").textContent=titles[name][0];$("subtitle").textContent=titles[name][1];
   if(name!=="chat")loadDashboard();
   if(name==="system")health();
@@ -236,6 +257,19 @@ function renderKnowledge(){
     div.innerHTML='<span class="kcat">'+escapeHtml(k.category)+'</span><b>'+escapeHtml(k.title)+'</b><p>'+escapeHtml(k.content)+'</p>';list.appendChild(div);
   });
   $("knowledgeNav").textContent=(dashboard.knowledge||[]).length;
+}
+function renderLearning(){
+  var list=$("learningList");if(!list)return;list.innerHTML="";
+  var rows=dashboard.learning||[];$("learningNav").textContent=rows.length;
+  if(!rows.length){list.innerHTML='<div class="knowledge"><p>No learned internet knowledge yet.</p></div>';return;}
+  rows.forEach(function(x){
+    var div=document.createElement("div");div.className="knowledge";
+    var srcs=Array.isArray(x.sources)?x.sources.slice(0,4):[];
+    var links=srcs.map(function(s){return escapeHtml(s.title||s.url||"source")+" — "+escapeHtml(s.url||"")}).join("\n");
+    div.innerHTML='<span class="kcat">'+escapeHtml(x.category||"general")+'</span><b>'+escapeHtml(x.topic||"Learned topic")+'</b><p>'+escapeHtml(x.lesson||"")+'</p><div class="meta">Confidence '+Math.round(Number(x.confidence||0)*100)+'% · '+(x.verified?"verified":"needs more checking")+'</div><pre>'+links+'</pre><div class="approval-actions"><button class="danger learning-toggle" data-id="'+escapeHtml(x.id)+'">Disable lesson</button></div>';
+    list.appendChild(div);
+  });
+  document.querySelectorAll(".learning-toggle").forEach(function(b){b.onclick=async function(){await api({action:"learning_toggle",learningId:b.dataset.id,active:false});await loadDashboard();}});
 }
 function renderTasks(){
   var list=$("taskList");list.innerHTML="";
@@ -327,7 +361,7 @@ async function openTask(id){
 }
 async function loadDashboard(){
   try{
-    dashboard=await api({action:"dashboard"});renderAgents();renderKnowledge();renderTasks();renderMemory();renderApprovals();renderAudit();renderConnectors();renderSystem();
+    dashboard=await api({action:"dashboard"});renderAgents();renderKnowledge();renderLearning();renderTasks();renderMemory();renderApprovals();renderAudit();renderConnectors();renderSystem();
   }catch(e){}
 }
 $("login").onsubmit=async function(e){
@@ -386,6 +420,16 @@ $("queueBrowser").onclick=async function(){
     await api({action:"tool_request",connector:"browser",tool:"browser.navigate_and_act",request:{url:url,instruction:instruction}});
     $("browserInstruction").value="";await loadDashboard();alert("Browser request queued for approval.");
   }catch(e){alert(e.message);}
+};
+$("runLearning").onclick=async function(){
+  var topic=$("learningTopic").value.trim();if(!topic)return;
+  var b=$("runLearning"),state=$("learningState");b.disabled=true;state.textContent="Researching…";
+  try{
+    await api({action:"learn",topic:topic,category:$("learningCategory").value});
+    $("learningTopic").value="";
+    state.textContent="Queued on Home PC";
+    setTimeout(function(){loadDashboard();},7000);
+  }catch(e){state.textContent=e.message;}finally{b.disabled=false;}
 };
 $("addMemory").onclick=async function(){
   var content=$("memoryContent").value.trim();if(!content)return;
