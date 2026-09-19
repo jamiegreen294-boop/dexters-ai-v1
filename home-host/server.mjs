@@ -114,6 +114,22 @@ async function ollama(messages,format,model=LOCAL_MODEL){
   if(!r.ok)throw new Error(data?.error||"Local Ollama request failed");
   return String(data?.message?.content||"").trim();
 }
+async function ollamaFast(messages,format,model=CODE_MODEL){
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),90000);
+  const fastMessages=(Array.isArray(messages)?messages:[]).map((m,i)=>i===0&&m?.role==="user"
+    ?{...m,content:"/no_think\n"+String(m.content||"")}
+    :m);
+  let r;
+  try{
+    r=await fetch(OLLAMA_URL+"/api/chat",{method:"POST",signal:controller.signal,headers:{"Content-Type":"application/json"},body:JSON.stringify({
+      model,messages:fastMessages,stream:false,format:format||undefined,options:{temperature:0,num_ctx:2048,num_predict:768}
+    })});
+  }finally{clearTimeout(timer);}
+  const data=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(data?.error||"Local Ollama fast request failed");
+  return String(data?.message?.content||"").trim();
+}
 function parseJson(s){
   try{return JSON.parse(s)}catch{}
   const m=String(s).match(/\{[\s\S]*\}/);if(m){try{return JSON.parse(m[0])}catch{}}
@@ -248,7 +264,63 @@ async function codingAgent(request={}){
     if(full!==root&&!full.startsWith(root+path.sep))throw new Error("Coding-agent path escapes its project workspace.");
     return path.relative(WORKSPACE,full);
   }
+
+  let fastPathError=null;
+  try{
+    const initialTree=await listTree(repoPath,2,120);
+    const fastPrompt=[
+      "You are Dexter Fast Coding Agent running locally for Dexters.",
+      "Goal: "+goal,
+      "Work only inside this project. Never push, deploy, publish, merge, access credentials, or touch live systems.",
+      "Return ONE JSON object only.",
+      "Schema: {files:[{path,content}],checks:[{kind,file}],result}.",
+      "files must contain complete replacement contents, never patches, placeholders or ellipses.",
+      "Use no more than 8 files in this fast pass.",
+      "Allowed checks: node-check only. If no lightweight check fits, return an empty checks array.",
+      "Existing tree: "+JSON.stringify(initialTree).slice(0,5000)
+    ].join("\n");
+    const plan=parseJson(await ollamaFast([{role:"user",content:fastPrompt}],"json",CODE_MODEL));
+    if(Array.isArray(plan?.files)&&plan.files.length>0&&plan.files.length<=8){
+      const written=[];
+      for(const item of plan.files){
+        const rel=String(item?.path||"").trim();
+        if(!rel)throw new Error("Fast coding plan returned an empty file path.");
+        const workspaceRel=repoRelative(rel);
+        await workspaceTool("workspace.write",{path:workspaceRel,content:String(item?.content??"")});
+        written.push(rel);
+      }
+      const checks=[];
+      for(const chk of (Array.isArray(plan.checks)?plan.checks:[]).slice(0,4)){
+        if(String(chk?.kind||"")!=="node-check")continue;
+        const result=await workspaceTool("code.check",{path:repoPath,kind:"node-check",file:String(chk?.file||"")});
+        checks.push({kind:"node-check",file:String(chk?.file||""),result});
+      }
+      const verification=[];
+      for(const rel of written.slice(0,8)){
+        const content=fs.readFileSync(path.resolve(root,rel),"utf8");
+        verification.push({path:rel,bytes:Buffer.byteLength(content),preview:content.slice(0,500)});
+      }
+      const finalStatus=await workspaceTool("git.status",{path:repoPath}).catch(()=>null);
+      const diff=await workspaceTool("git.diff",{path:repoPath,file:"."}).catch(()=>null);
+      return {
+        status:"completed",
+        result:String(plan.result||"Fast coding pass completed"),
+        repo_path:repoPath,
+        fast_path:true,
+        files_written:written,
+        verification,
+        checks,
+        git_status:finalStatus,
+        git_diff:diff
+      };
+    }
+    fastPathError="Fast coding plan did not return a usable files array.";
+  }catch(e){
+    fastPathError=String(e?.message||e);
+  }
+
   const history=[];
+  history.push({step:0,fast_path_fallback:true,error:fastPathError});
   for(let step=1;step<=Math.max(5,MAX_AGENT_STEPS);step++){
     const tree=await listTree(repoPath,3,350);
     const status=await runProcess("git",["status","--short","--branch"],root,30000).catch(()=>({code:1,stdout:"",stderr:"not a git repo"}));
