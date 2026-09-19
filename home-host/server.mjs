@@ -226,79 +226,116 @@ async function internetResearch(request={}){
   if(!query)throw new Error("Research query is required.");
   const session=String(request.session||("research-"+crypto.randomUUID())).slice(0,80);
   const page=await getPage(session);
-  const searchUrl="https://html.duckduckgo.com/html/?q="+encodeURIComponent(query);
-  await page.goto(searchUrl,{waitUntil:"domcontentloaded",timeout:45000});
-  await page.waitForTimeout(800);
-  const results=await page.evaluate(()=>{
-    const out=[];
-    const seen=new Set();
-    function cleanHref(raw){
-      try{
-        const u=new URL(raw,location.href);
-        const uddg=u.searchParams.get("uddg");
-        if(uddg)return decodeURIComponent(uddg);
-        if(u.hostname.endsWith("duckduckgo.com"))return "";
-        return u.href;
-      }catch{return "";}
-    }
-    const nodes=Array.from(document.querySelectorAll(".result"));
-    for(const node of nodes){
-      const a=node.querySelector("a.result__a[href],a[href]");
-      if(!a)continue;
-      const href=cleanHref(a.getAttribute("href")||a.href||"");
-      const title=(a.textContent||"").trim();
-      const snippet=(node.querySelector(".result__snippet")?.textContent||"").trim();
-      if(!href||!title||seen.has(href))continue;
-      seen.add(href);
-      out.push({title:title.slice(0,300),url:href,snippet:snippet.slice(0,700)});
-      if(out.length>=10)break;
-    }
-    return out;
-  });
-  if(!results.length && /(?:\+?44|0)[\s()\-]*\d(?:[\s()\-]*\d){8,}/.test(query)){
+  const attempts=[];
+  const combined=[];
+  const seen=new Set();
+
+  async function ddgSearch(q,label){
+    const searchUrl="https://html.duckduckgo.com/html/?q="+encodeURIComponent(q);
     try{
-      const digits=query.replace(/\D/g,"");
-      const local=digits.startsWith("44")?"0"+digits.slice(2):digits;
+      await page.goto(searchUrl,{waitUntil:"domcontentloaded",timeout:45000});
+      await page.waitForTimeout(700);
+      const rows=await page.evaluate(()=>{
+        const out=[];
+        function cleanHref(raw){
+          try{
+            const u=new URL(raw,location.href);
+            const uddg=u.searchParams.get("uddg");
+            if(uddg)return decodeURIComponent(uddg);
+            if(u.hostname.endsWith("duckduckgo.com"))return "";
+            return u.href;
+          }catch{return "";}
+        }
+        for(const node of Array.from(document.querySelectorAll(".result"))){
+          const a=node.querySelector("a.result__a[href]");
+          if(!a)continue;
+          const href=cleanHref(a.getAttribute("href")||a.href||"");
+          const title=(a.textContent||"").trim();
+          const snippet=(node.querySelector(".result__snippet")?.textContent||"").trim();
+          if(href&&title)out.push({title:title.slice(0,300),url:href,snippet:snippet.slice(0,700)});
+          if(out.length>=10)break;
+        }
+        return out;
+      });
+      attempts.push({source:"duckduckgo",label,query:q,url:searchUrl,count:rows.length});
+      for(const row of rows){
+        if(seen.has(row.url))continue;
+        seen.add(row.url);combined.push(row);
+        if(combined.length>=20)break;
+      }
+      return rows.length;
+    }catch(e){
+      attempts.push({source:"duckduckgo",label,query:q,url:searchUrl,count:0,error:String(e?.message||e).slice(0,300)});
+      return 0;
+    }
+  }
+
+  await ddgSearch(query,"exact");
+
+  const cleaned=query
+    .replace(/\bOR\b/gi," ")
+    .replace(/["']/g," ")
+    .replace(/\s+/g," ")
+    .trim();
+  if(cleaned && cleaned!==query && combined.length<8) await ddgSearch(cleaned,"broader");
+
+  const phoneLike=/(?:\+?44|0)[\s()\-]*\d(?:[\s()\-]*\d){8,}/.test(query);
+  let businessMatch=null;
+  if(phoneLike){
+    const digits=query.replace(/\D/g,"");
+    const local=digits.startsWith("44")?"0"+digits.slice(2):digits;
+    const intl=local.startsWith("0")?"+44"+local.slice(1):"+"+digits;
+    if(combined.length<8) await ddgSearch(local,"phone-local");
+    if(combined.length<8) await ddgSearch(intl,"phone-international");
+
+    try{
       const mapsUrl="https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(local);
       await page.goto(mapsUrl,{waitUntil:"domcontentloaded",timeout:45000});
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(900);
       const reject=page.getByRole("button",{name:/Reject all/i});
-      if(await reject.count()) {
+      if(await reject.count()){
         await reject.first().click().catch(()=>{});
-        await page.waitForTimeout(1500);
+        await page.waitForTimeout(1400);
       }
-      const mapText=(await page.locator("body").innerText().catch(()=> "")).slice(0,12000);
-      if(mapText && !/unusual traffic/i.test(mapText)){
+      const mapText=(await page.locator("body").innerText().catch(()=> "")).slice(0,16000);
+      attempts.push({source:"google-maps",label:"business-phone",query:local,url:page.url(),count:mapText?1:0});
+      if(mapText && !/unusual traffic/i.test(mapText) && !/Before you continue to Google/i.test(mapText)){
         const phoneMatch=mapText.match(/(?:\+44\s?|0)\d[\d\s]{8,}/);
-        const addressMatch=mapText.match(/\d+[A-Za-z]?[^\n]{2,80},\s*Glasgow[^\n]{0,40}/i);
-        return {
-          status:"completed",
-          mode:"business-phone-fallback",
-          query,
-          search_url:mapsUrl,
-          results:[],
-          business_match:{
-            title:await page.title().catch(()=> ""),
-            url:page.url(),
-            phone:phoneMatch?.[0]?.trim()||null,
-            address:addressMatch?.[0]?.trim()||null,
-            text:mapText
-          }
+        const addressMatch=mapText.match(/\d+[A-Za-z]?[^\n]{2,90},\s*Glasgow[^\n]{0,50}/i);
+        const title=(await page.title().catch(()=> "")).replace(/\s*-\s*Google Maps\s*$/i,"").trim();
+        businessMatch={
+          title:title||null,
+          url:page.url(),
+          phone:phoneMatch?.[0]?.trim()||null,
+          address:addressMatch?.[0]?.trim()||null,
+          text:mapText
         };
       }
-    }catch(e){}
+    }catch(e){
+      attempts.push({source:"google-maps",label:"business-phone",query:local,count:0,error:String(e?.message||e).slice(0,300)});
+    }
   }
+
   if(request.deep===true){
     const result=await autonomousBrowser(page,{
       session,
-      instruction:"Research this question using the public web and return when you have enough evidence: "+query+". Read pages only. Do not log in, submit forms, send messages, purchase anything, publish, deploy, delete, or change accounts.",
+      instruction:"Research this question using the public web and continue across reasonable alternative sources if the first source is blocked or empty. Return when you have enough evidence or the bounded research budget is exhausted: "+query+". Read pages only. Do not log in, submit forms, send messages, purchase anything, publish, deploy, delete, or change accounts.",
       url:page.url(),
-      max_steps:Math.max(1,Math.min(3,Number(request.max_steps||3))),
-      timeout_ms:Math.max(15000,Math.min(60000,Number(request.timeout_ms||45000)))
+      max_steps:Math.max(1,Math.min(5,Number(request.max_steps||5))),
+      timeout_ms:Math.max(15000,Math.min(90000,Number(request.timeout_ms||60000)))
     });
-    return {status:"completed",mode:"deep",query,search_url:searchUrl,results,result};
+    return {status:"completed",mode:"deep",query,results:combined,business_match:businessMatch,attempts,result};
   }
-  return {status:"completed",mode:"fast-search",query,search_url:searchUrl,results};
+
+  return {
+    status:"completed",
+    mode:businessMatch?"multi-source-business":"multi-source",
+    query,
+    results:combined,
+    business_match:businessMatch,
+    attempts,
+    searched_all_planned_sources:true
+  };
 }
 
 async function directCodingPlan(request={}){
