@@ -239,6 +239,44 @@ async function internetResearch(request={}){
   });
   return {query,search:state,result};
 }
+async function directCodingPlan(request={}){
+  const repoPath=String(request.path||request.project_path||"").trim();
+  if(!repoPath)throw new Error("Direct coding requires a project path.");
+  const root=safeWorkspacePath(repoPath);
+  fs.mkdirSync(root,{recursive:true});
+  if(!fs.existsSync(path.join(root,".git"))){
+    await runProcess("git",["init"],root,30000).catch(()=>null);
+  }
+  const files=Array.isArray(request.files)?request.files:[];
+  if(!files.length)throw new Error("Direct coding requires at least one file.");
+  if(files.length>25)throw new Error("Too many files in one direct coding job.");
+  const written=[];
+  for(const item of files){
+    const rel=String(item?.path||"").trim();
+    if(!rel)throw new Error("A direct coding file path was empty.");
+    const full=path.resolve(root,rel);
+    if(full!==root&&!full.startsWith(root+path.sep))throw new Error("Direct coding path escapes project workspace.");
+    fs.mkdirSync(path.dirname(full),{recursive:true});
+    fs.writeFileSync(full,String(item?.content??""),"utf8");
+    written.push(rel);
+  }
+  const verification=written.map(rel=>{
+    const full=path.resolve(root,rel);
+    const content=fs.readFileSync(full,"utf8");
+    return {path:rel,bytes:Buffer.byteLength(content),preview:content.slice(0,500)};
+  });
+  const checks=[];
+  for(const chk of (Array.isArray(request.checks)?request.checks:[]).slice(0,8)){
+    const kind=String(chk?.kind||"");
+    if(!["node-check","npm-test","npm-build"].includes(kind))continue;
+    const result=await workspaceTool("code.check",{path:repoPath,kind,file:String(chk?.file||"")});
+    checks.push({kind,file:String(chk?.file||""),result});
+  }
+  const git_status=await workspaceTool("git.status",{path:repoPath}).catch(()=>null);
+  const git_diff=await workspaceTool("git.diff",{path:repoPath,file:"."}).catch(()=>null);
+  return {status:"completed",direct:true,repo_path:repoPath,files_written:written,verification,checks,git_status,git_diff};
+}
+
 async function codingAgent(request={}){
   const goal=String(request.goal||request.instruction||"").trim();
   if(!goal)throw new Error("Coding goal is required.");
@@ -317,6 +355,9 @@ async function codingAgent(request={}){
     fastPathError="Fast coding plan did not return a usable files array.";
   }catch(e){
     fastPathError=String(e?.message||e);
+    if(/aborted|timeout|timed out/i.test(fastPathError)){
+      return {status:"failed",reason:"Fast local coding planner timed out.",repo_path:repoPath,fast_path:true,error:fastPathError};
+    }
   }
 
   const history=[];
@@ -368,6 +409,7 @@ async function workspaceTool(tool,request={}){
   if(tool==="workspace.tree")return {path:String(request.path||""),entries:await listTree(String(request.path||""),Number(request.depth||3),Number(request.max_entries||500))};
   if(tool==="web.research")return await internetResearch(request);
   if(tool==="code.agent")return await codingAgent(request);
+  if(tool==="code.direct")return await directCodingPlan(request);
   if(tool==="workspace.read"){
     const file=safeWorkspacePath(request.path);return {path:request.path,content:fs.readFileSync(file,"utf8").slice(0,200000)};
   }
@@ -461,7 +503,10 @@ async function executeCloudJob(job){
   if(job.job_type==="browser")return await browserTool(String(job.tool_name||"browser.navigate_and_act"),request);
   if(job.job_type==="workspace")return await workspaceTool(String(job.tool_name||""),request);
   if(job.job_type==="research")return await internetResearch(request);
-  if(job.job_type==="coding")return await codingAgent(request);
+  if(job.job_type==="coding"){
+    if(String(job.tool_name||"")==="code.direct"||Array.isArray(request.files))return await directCodingPlan(request);
+    return await codingAgent(request);
+  }
   if(job.job_type==="self_update")return await selfUpdateWorker();
   if(job.job_type==="local_ai"){
     const messages=Array.isArray(request.messages)?request.messages:[{role:"user",content:String(request.prompt||"")}];
