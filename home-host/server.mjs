@@ -107,7 +107,7 @@ async function ollama(messages,format,model=LOCAL_MODEL){
   let r;
   try{
     r=await fetch(OLLAMA_URL+"/api/chat",{method:"POST",signal:controller.signal,headers:{"Content-Type":"application/json"},body:JSON.stringify({
-      model,messages,stream:false,format:format||undefined,options:{temperature:0.1}
+      model,messages,stream:false,format:format||undefined,options:{temperature:0.1,num_ctx:4096,num_predict:384}
     })});
   }finally{clearTimeout(timer);}
   const data=await r.json().catch(()=>({}));
@@ -264,9 +264,9 @@ async function codingAgent(request={}){
       "When the requested work is complete, run relevant checks and inspect git_diff before returning done.",
       "Return JSON only with fields: action,path,content,file,kind,query,reason,result.",
       "REPO PATH: "+repoPath,
-      "TREE: "+JSON.stringify(tree).slice(0,22000),
-      "GIT STATUS: "+JSON.stringify(status).slice(0,6000),
-      "RECENT STEPS: "+JSON.stringify(history.slice(-10)).slice(0,14000)
+      "TREE: "+JSON.stringify(tree).slice(0,8000),
+      "GIT STATUS: "+JSON.stringify(status).slice(0,2500),
+      "RECENT STEPS: "+JSON.stringify(history.slice(-6)).slice(0,6000)
     ].join("\n");
     const decision=parseJson(await ollama([{role:"user",content:prompt}],"json",CODE_MODEL));
     let result;
