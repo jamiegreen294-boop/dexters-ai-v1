@@ -1,0 +1,20 @@
+{
+  "name": "Dexter AI",
+  "short_name": "Dexter AI",
+  "description": "Dexters private AI command centre",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["standalone", "window-controls-overlay"],
+  "background_color": "#090909",
+  "theme_color": "#11100f",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "./app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
