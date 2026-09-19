@@ -482,21 +482,36 @@ async function createJob(body){
   return job;
 }
 function scheduleSelfRestart(delayMs=3500){
-  const helper=path.join(__dirname,"restart-helper.cjs");
+  if(process.platform!=="win32")throw new Error("Self-restart is currently implemented for the Windows Home PC.");
+  const helper=path.join(__dirname,"restart-helper.cmd");
+  const nodeExe=process.execPath;
   const serverFile=path.join(__dirname,"server.mjs");
-  const helperCode=[
-    'const {spawn}=require("child_process");',
-    'setTimeout(()=>{',
-    '  const child=spawn(process.execPath,['+JSON.stringify(serverFile)+'],{cwd:'+JSON.stringify(__dirname)+',env:process.env,detached:true,stdio:"ignore"});',
-    '  child.unref();',
-    '  process.exit(0);',
-    '},6000);'
-  ].join("\n");
-  fs.writeFileSync(helper,helperCode,"utf8");
-  const child=spawn(process.execPath,[helper],{cwd:__dirname,env:process.env,detached:true,stdio:"ignore"});
+  const logFile=path.join(__dirname,"restart.log");
+  const lines=[
+    "@echo off",
+    "timeout /t 6 /nobreak >nul",
+    'for /f "tokens=2,*" %%A in (\'reg query "HKCU\\Environment" /v DEXTER_BROWSER_WORKER_TOKEN 2^>nul ^| find "DEXTER_BROWSER_WORKER_TOKEN"\') do set "DEXTER_BROWSER_WORKER_TOKEN=%%B"',
+    'for /f "tokens=2,*" %%A in (\'reg query "HKCU\\Environment" /v DEXTER_AGENT_ENDPOINT 2^>nul ^| find "DEXTER_AGENT_ENDPOINT"\') do set "DEXTER_AGENT_ENDPOINT=%%B"',
+    'for /f "tokens=2,*" %%A in (\'reg query "HKCU\\Environment" /v DEXTER_AGENT_TOKEN 2^>nul ^| find "DEXTER_AGENT_TOKEN"\') do set "DEXTER_AGENT_TOKEN=%%B"',
+    'for /f "tokens=2,*" %%A in (\'reg query "HKCU\\Environment" /v DEXTER_LOCAL_MODEL 2^>nul ^| find "DEXTER_LOCAL_MODEL"\') do set "DEXTER_LOCAL_MODEL=%%B"',
+    'for /f "tokens=2,*" %%A in (\'reg query "HKCU\\Environment" /v DEXTER_CODE_MODEL 2^>nul ^| find "DEXTER_CODE_MODEL"\') do set "DEXTER_CODE_MODEL=%%B"',
+    'if "%DEXTER_LOCAL_MODEL%"=="" set "DEXTER_LOCAL_MODEL=qwen3:4b"',
+    'if "%DEXTER_CODE_MODEL%"=="" set "DEXTER_CODE_MODEL=qwen3:4b"',
+    'set "DEXTER_LIVE_ACTIONS=false"',
+    'cd /d '+JSON.stringify(__dirname),
+    JSON.stringify(nodeExe)+' '+JSON.stringify(serverFile)+' >> '+JSON.stringify(logFile)+' 2>&1'
+  ];
+  fs.writeFileSync(helper,lines.join("\r\n"),"utf8");
+  const child=spawn("cmd.exe",["/d","/c",helper],{
+    cwd:__dirname,
+    detached:true,
+    stdio:"ignore",
+    windowsHide:true,
+    env:{...process.env}
+  });
   child.unref();
-  setTimeout(()=>process.exit(0),1000);
-  return {restart_scheduled:true,restart_in_ms:Math.max(500,delayMs)};
+  setTimeout(()=>process.exit(0),1200);
+  return {restart_scheduled:true,restart_in_ms:6000,method:"windows-cmd-handoff",log_file:"restart.log"};
 }
 
 async function selfUpdateWorker(){
