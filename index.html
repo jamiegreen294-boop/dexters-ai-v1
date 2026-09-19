@@ -104,7 +104,7 @@ button,input,textarea,select{font:inherit}button{cursor:pointer}.hidden{display:
 </section>
 
 <section id="page-approvals" class="page">
-<div class="hero"><h3>Approvals</h3><p>Consequential or live-looking requests are stopped here. In test mode, approval allows planning/preview only — never live execution.</p></div>
+<div class="hero"><h3>Approvals</h3><p>Dexter pauses consequential requests here for owner approval. Approving resumes safe test work automatically; approval-gated tools become ready for explicit execution inside Dexter. Live actions remain disabled in test mode.</p></div>
 <div id="approvalList" class="approval-list"></div>
 </section>
 
@@ -267,10 +267,10 @@ function renderApprovals(){
   if(!rows.length){list.innerHTML='<div class="approval"><p>No pending approvals.</p></div>';return;}
   rows.forEach(function(a){
     var div=document.createElement("div");div.className="approval";
-    div.innerHTML='<div class="tasktop"><b>Approval required</b><span class="status">'+escapeHtml(a.status)+'</span></div><p>'+escapeHtml(a.requested_action||"")+'</p><div class="meta">Task '+escapeHtml(a.task_id||"")+'</div><div class="approval-actions"><button class="good approval-do" data-id="'+escapeHtml(a.id)+'" data-decision="approved">Approve preview</button><button class="danger approval-do" data-id="'+escapeHtml(a.id)+'" data-decision="rejected">Reject</button></div>';
+    div.innerHTML='<div class="tasktop"><b>Approval required</b><span class="status">'+escapeHtml(a.status)+'</span></div><p>'+escapeHtml(a.requested_action||"")+'</p><div class="meta">Task '+escapeHtml(a.task_id||"")+'</div><div class="approval-actions"><button class="good approval-do" data-id="'+escapeHtml(a.id)+'" data-decision="approved">Approve &amp; continue</button><button class="danger approval-do" data-id="'+escapeHtml(a.id)+'" data-decision="rejected">Reject</button></div>';
     list.appendChild(div);
   });
-  document.querySelectorAll(".approval-do").forEach(function(b){b.onclick=async function(){await api({action:"approval",approvalId:b.dataset.id,decision:b.dataset.decision});await loadDashboard();}});
+  document.querySelectorAll(".approval-do").forEach(function(b){b.onclick=async function(){b.disabled=true;try{var d=await api({action:"approval",approvalId:b.dataset.id,decision:b.dataset.decision});await loadDashboard();if(d&&d.next==="tool_execute")alert("Approved. The tool is now ready to execute inside Dexter.");else if(d&&d.previewCompleted)alert("Approved. Dexter completed the safe preview.");}catch(e){alert(e.message);}finally{b.disabled=false;}}});
 }
 function renderAudit(){
   var list=$("auditList");list.innerHTML="";
