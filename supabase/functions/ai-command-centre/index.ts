@@ -41,7 +41,7 @@ function dbClient(){
 }
 async function authenticate(req:Request){
   const token=req.headers.get("x-dexter-token")||"";
-  if(token.length<20)throw new Error("INVALID_ACCESS_CODE");
+  if(token.length<12)throw new Error("INVALID_ACCESS_CODE");
   const db=dbClient(),hash=await sha256(token);
   const {data:key,error}=await db.from("dexter_access_keys").select("id,role,name").eq("token_hash",hash).eq("active",true).maybeSingle();
   if(error||!key)throw new Error("INVALID_ACCESS_CODE");
