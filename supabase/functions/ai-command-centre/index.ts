@@ -559,11 +559,166 @@ Deno.serve(async(req)=>{
       const {data:connectors}=await db.from("ai_connectors").select("connector_key,name,connector_type,status,capabilities,config,last_checked_at,last_error").order("name");
       const {data:toolRequests}=await db.from("ai_tool_requests").select("id,task_id,connector_key,tool_name,status,requires_approval,result,error,created_at,updated_at").order("created_at",{ascending:false}).limit(40);
       const {data:artifacts}=await db.from("dexter_work_artifacts").select("id,task_id,name,artifact_type,metadata,created_at,updated_at").order("created_at",{ascending:false}).limit(100);
-      return json({role,agents:agents||[],tasks:tasks||[],approvals:approvals||[],knowledge:knowledge||[],memory:memory||[],learning:learning||[],audit:audit||[],orchestration:orchestration||[],settings:settings||[],connectors:connectors||[],toolRequests:toolRequests||[],artifacts:artifacts||[],environment:"test",liveWrites:false});
+      const [{data:projects},{data:projectFiles},{data:artifactVersions},{data:memoryProposals},{data:postmortems},{data:operationsHealth},{data:operationsChecks}]=await Promise.all([
+        db.from("dexter_projects").select("*").order("name"),
+        db.from("dexter_project_files").select("id,project_id,name,file_type,mime_type,size_bytes,version,source,metadata,created_at,updated_at").order("updated_at",{ascending:false}).limit(200),
+        db.from("dexter_artifact_versions").select("id,artifact_id,version,name,created_by,created_at").order("created_at",{ascending:false}).limit(200),
+        db.from("dexter_memory_proposals").select("*").order("created_at",{ascending:false}).limit(100),
+        db.from("dexter_postmortems").select("*").order("created_at",{ascending:false}).limit(100),
+        db.from("dexter_operations_health").select("*").order("checked_at",{ascending:false}).limit(100),
+        db.from("dexter_operations_checks").select("*").order("name")
+      ]);
+      return json({role,agents:agents||[],tasks:tasks||[],approvals:approvals||[],knowledge:knowledge||[],memory:memory||[],learning:learning||[],audit:audit||[],orchestration:orchestration||[],settings:settings||[],connectors:connectors||[],toolRequests:toolRequests||[],artifacts:artifacts||[],projects:projects||[],projectFiles:projectFiles||[],artifactVersions:artifactVersions||[],memoryProposals:memoryProposals||[],postmortems:postmortems||[],operationsHealth:operationsHealth||[],operationsChecks:operationsChecks||[],homeAgents:homeAgents||[],homeJobs:homeJobs||[],environment:"test",liveWrites:false});
     }
 
     
     
+    
+    if(action==="project_create"){
+      if(role!=="owner")return json({error:"Only owner access can create projects."},403);
+      const name=cleanText(body.name,120),description=cleanText(body.description,2000);
+      if(!name)return json({error:"Project name is required."},400);
+      const slug=(cleanText(body.slug||name,120).toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,80)||("project-"+Date.now()));
+      const {data,error}=await db.from("dexter_projects").insert({name,slug,description,system_scope:Array.isArray(body.systemScope)?body.systemScope.slice(0,20):[],default_agent:cleanText(body.defaultAgent,80)||null}).select("*").single();
+      if(error)throw error;
+      await logAudit(db,"project.created",keyName,{project_id:data.id,slug});
+      return json({project:data});
+    }
+
+    if(action==="project_file_upload"){
+      if(!["owner","manager"].includes(role))return json({error:"Project file upload requires owner/manager access."},403);
+      const projectId=cleanText(body.projectId,80),name=cleanText(body.name,240),mime=cleanText(body.mimeType||"application/octet-stream",160);
+      const base64=String(body.base64||"");
+      const textContent=typeof body.contentText==="string"?String(body.contentText):null;
+      if(!projectId||!name)return json({error:"Project and file name are required."},400);
+      const {data:project}=await db.from("dexter_projects").select("id").eq("id",projectId).maybeSingle();
+      if(!project)return json({error:"Project not found."},404);
+      let bytes:Uint8Array|null=null;
+      if(base64){
+        if(base64.length>14_000_000)return json({error:"File is too large. Dexter test files are limited to 10 MB."},413);
+        try{bytes=Uint8Array.from(atob(base64),c=>c.charCodeAt(0));}catch{return json({error:"Invalid base64 file data."},400);}
+      } else if(textContent!==null) bytes=new TextEncoder().encode(textContent);
+      else return json({error:"File content is required."},400);
+      if(bytes.length>10_485_760)return json({error:"File is too large. Dexter test files are limited to 10 MB."},413);
+      const hash=await sha256(Array.from(bytes).map(b=>String.fromCharCode(b)).join(""));
+      const safeName=name.replace(/[^a-zA-Z0-9._-]+/g,"_").slice(0,180);
+      const storagePath=projectId+"/"+crypto.randomUUID()+"-"+safeName;
+      const {error:uploadError}=await db.storage.from("dexter-ai-project-files").upload(storagePath,bytes,{contentType:mime,upsert:false});
+      if(uploadError)throw uploadError;
+      const readable=/^(text\/|application\/(json|javascript|xml)|image\/svg\+xml)/i.test(mime);
+      const storedText=readable&&textContent!==null?textContent:null;
+      const {data,error}=await db.from("dexter_project_files").insert({project_id:projectId,name,file_type:cleanText(body.fileType||"",80)||null,mime_type:mime,storage_path:storagePath,content_text:storedText,size_bytes:bytes.length,sha256:hash,source:"upload",metadata:{original_name:name}}).select("*").single();
+      if(error)throw error;
+      await logAudit(db,"project.file_uploaded",keyName,{project_id:projectId,file_id:data.id,name,size_bytes:bytes.length});
+      return json({file:data});
+    }
+
+    if(action==="project_file_get"){
+      if(!["owner","manager"].includes(role))return json({error:"Project file access requires owner/manager access."},403);
+      const id=cleanText(body.fileId,80);
+      const {data,error}=await db.from("dexter_project_files").select("*").eq("id",id).maybeSingle();
+      if(error||!data)return json({error:"Project file not found."},404);
+      let signedUrl:string|null=null;
+      if(data.storage_path){
+        const {data:signed}=await db.storage.from("dexter-ai-project-files").createSignedUrl(String(data.storage_path),3600);
+        signedUrl=signed?.signedUrl||null;
+      }
+      return json({file:data,signedUrl});
+    }
+
+    if(action==="artifact_update"){
+      if(role!=="owner")return json({error:"Only owner access can edit artifacts."},403);
+      const id=cleanText(body.artifactId,80),content=cleanText(body.content,200000),name=cleanText(body.name,240);
+      const {data:artifact,error:getError}=await db.from("dexter_work_artifacts").select("*").eq("id",id).maybeSingle();
+      if(getError||!artifact)return json({error:"Artifact not found."},404);
+      const {data:last}=await db.from("dexter_artifact_versions").select("version").eq("artifact_id",id).order("version",{ascending:false}).limit(1).maybeSingle();
+      let next=Number(last?.version||0)+1;
+      if(next===1){
+        await db.from("dexter_artifact_versions").insert({artifact_id:id,version:1,name:artifact.name,content:artifact.content||"",metadata:artifact.metadata||{},created_by:"original"});
+        next=2;
+      }
+      await db.from("dexter_artifact_versions").insert({artifact_id:id,version:next,name:name||artifact.name,content,metadata:{...(artifact.metadata||{}),version:next},created_by:keyName});
+      const {data,error}=await db.from("dexter_work_artifacts").update({name:name||artifact.name,content,metadata:{...(artifact.metadata||{}),version:next},updated_at:now()}).eq("id",id).select("*").single();
+      if(error)throw error;
+      await logAudit(db,"artifact.updated",keyName,{artifact_id:id,version:next});
+      return json({artifact:data,version:next});
+    }
+
+    if(action==="artifact_restore"){
+      if(role!=="owner")return json({error:"Only owner access can restore artifacts."},403);
+      const id=cleanText(body.artifactId,80),version=Number(body.version||0);
+      const {data:v,error}=await db.from("dexter_artifact_versions").select("*").eq("artifact_id",id).eq("version",version).maybeSingle();
+      if(error||!v)return json({error:"Artifact version not found."},404);
+      const {data:artifact, error:updateError}=await db.from("dexter_work_artifacts").update({name:v.name,content:v.content,metadata:{...(v.metadata||{}),restored_from:version},updated_at:now()}).eq("id",id).select("*").single();
+      if(updateError)throw updateError;
+      await logAudit(db,"artifact.restored",keyName,{artifact_id:id,version});
+      return json({artifact,restoredFrom:version});
+    }
+
+    if(action==="memory_propose"){
+      if(!["owner","manager"].includes(role))return json({error:"Memory proposals require owner/manager access."},403);
+      const content=cleanText(body.content,8000),category=cleanText(body.category||"general",80);
+      if(!content)return json({error:"Memory proposal content is required."},400);
+      const {data,error}=await db.from("dexter_memory_proposals").insert({project_id:cleanText(body.projectId,80)||null,task_id:cleanText(body.taskId,80)||null,category,content,reason:cleanText(body.reason,1000),confidence:Math.max(0,Math.min(1,Number(body.confidence||0.8))),proposed_by:keyName}).select("*").single();
+      if(error)throw error;
+      return json({proposal:data});
+    }
+
+    if(action==="memory_proposal_review"){
+      if(role!=="owner")return json({error:"Only owner access can review memory proposals."},403);
+      const id=cleanText(body.proposalId,80),decision=body.decision==="approved"?"approved":"rejected";
+      const {data:proposal,error}=await db.from("dexter_memory_proposals").update({status:decision,reviewed_by:keyName,reviewed_at:now()}).eq("id",id).select("*").single();
+      if(error)throw error;
+      let memory=null;
+      if(decision==="approved"){
+        const {data:m,error:memError}=await db.from("dexter_approved_memory").insert({category:proposal.category,content:proposal.content,approved_by:keyName,approved_at:now(),active:true}).select("*").single();
+        if(memError)throw memError;
+        memory=m;
+      }
+      await logAudit(db,"memory.proposal_reviewed",keyName,{proposal_id:id,decision,memory_id:memory?.id||null});
+      return json({proposal,memory});
+    }
+
+    if(action==="postmortem_create"){
+      if(!["owner","manager"].includes(role))return json({error:"Post-mortems require owner/manager access."},403);
+      const title=cleanText(body.title,180),incident=cleanText(body.incident,12000);
+      if(!title||!incident)return json({error:"Post-mortem title and incident are required."},400);
+      const {data,error}=await db.from("dexter_postmortems").insert({
+        project_id:cleanText(body.projectId,80)||null,task_id:cleanText(body.taskId,80)||null,title,incident,
+        root_cause:cleanText(body.rootCause,12000),resolution:cleanText(body.resolution,12000),
+        prevention:cleanText(body.prevention,12000),evidence:Array.isArray(body.evidence)?body.evidence.slice(0,30):[],created_by:keyName
+      }).select("*").single();
+      if(error)throw error;
+      return json({postmortem:data});
+    }
+
+    if(action==="operations_run_check"){
+      if(!["owner","manager"].includes(role))return json({error:"Operations checks require owner/manager access."},403);
+      const freshAfter=new Date(Date.now()-120000).toISOString();
+      const dayAgo=new Date(Date.now()-86400000).toISOString();
+      const staleBefore=new Date(Date.now()-30*86400000).toISOString();
+      const [{data:onlineAgents},{data:failedJobs},{data:connectorRows},{data:staleLearning},{data:activeTasks}]=await Promise.all([
+        db.from("dexter_home_agents").select("id,name,last_seen_at").eq("active",true).gte("last_seen_at",freshAfter),
+        db.from("dexter_home_jobs").select("id,error,tool_name,created_at").eq("status","failed").gte("created_at",dayAgo).limit(50),
+        db.from("ai_connectors").select("connector_key,name,status,last_checked_at,last_error"),
+        db.from("dexter_learning_notes").select("id,topic,updated_at").eq("active",true).lt("updated_at",staleBefore).limit(100),
+        db.from("ai_tasks").select("id,status,error,updated_at").in("status",["running","queued_home","failed","waiting_approval"]).limit(100)
+      ]);
+      const rows=[
+        {system_key:"home-pc",system_name:"Dexter Home PC",status:(onlineAgents||[]).length?"healthy":"offline",summary:(onlineAgents||[]).length?"Home PC online":"Home PC has not checked in during the last 2 minutes",details:{agents:onlineAgents||[]}},
+        {system_key:"failed-jobs",system_name:"Home PC jobs",status:(failedJobs||[]).length?"warning":"healthy",summary:(failedJobs||[]).length+" failed job(s) in the last 24 hours",details:{failed:failedJobs||[]}},
+        {system_key:"connectors",system_name:"Connectors",status:(connectorRows||[]).some((x:any)=>x.status==="error")?"warning":"healthy",summary:(connectorRows||[]).filter((x:any)=>x.status==="ready").length+" connector(s) ready",details:{connectors:connectorRows||[]}},
+        {system_key:"knowledge",system_name:"Knowledge freshness",status:(staleLearning||[]).length?"warning":"healthy",summary:(staleLearning||[]).length+" learned item(s) older than 30 days",details:{stale:staleLearning||[]}},
+        {system_key:"tasks",system_name:"Work queue",status:(activeTasks||[]).some((x:any)=>x.status==="failed")?"warning":"healthy",summary:(activeTasks||[]).length+" active/attention task(s)",details:{tasks:activeTasks||[]}}
+      ];
+      await db.from("dexter_operations_health").insert(rows.map((x:any)=>({...x,checked_at:now()})));
+      for(const row of rows){
+        await db.from("dexter_operations_checks").update({last_run_at:now(),next_run_at:new Date(Date.now()+60*60000).toISOString(),last_status:row.status,last_summary:row.summary,updated_at:now()}).eq("check_key",row.system_key==="knowledge"?"stale-learning":row.system_key==="tasks"?"project-health":row.system_key);
+      }
+      await logAudit(db,"operations.checked",keyName,{checks:rows.map((x:any)=>({key:x.system_key,status:x.status}))});
+      return json({checks:rows,checkedAt:now()});
+    }
+
     if(action==="connectors"){
       const {data:rows}=await db.from("ai_connectors").select("*").order("name");
       const envReady=(key:string)=>{
@@ -961,12 +1116,12 @@ if(action==="work"){
       const plan=await planWork(context,role,request,cleanText(body.agent,60));
       const agentKey=plan.primary_agent;
       const title=(cleanText(body.title||plan.summary||request.split(/\n/)[0],120)||"Dexter work task").slice(0,120);
-      const {data:task,error:taskError}=await db.from("ai_tasks").insert({title,description:request,status:plan.needs_approval?"waiting_approval":"running",agent_key:agentKey,progress:plan.needs_approval?5:10,requires_approval:plan.needs_approval}).select("id,title,status,agent_key,progress").single();
+      const {data:task,error:taskError}=await db.from("ai_tasks").insert({title,description:request,project_id:cleanText(body.projectId,80)||null,status:plan.needs_approval?"waiting_approval":"running",agent_key:agentKey,progress:plan.needs_approval?5:10,requires_approval:plan.needs_approval}).select("id,title,status,agent_key,progress").single();
       if(taskError||!task)throw new Error(taskError?.message||"Could not create test task");
       await db.from("ai_orchestration_tasks").insert({task_id:task.id,requested_action:request,selected_agent:agentKey,stage:plan.needs_approval?"waiting_approval":"planned",progress:plan.needs_approval?5:10,result:JSON.stringify({plan})});
       await db.from("ai_task_events").insert({task_id:task.id,event_type:"planned",message:"Planner selected "+agentKey+(plan.reviewer_agent?" with reviewer "+plan.reviewer_agent:"")+". " + (plan.steps||[]).join(" → ")});
       await db.from("dexter_work_artifacts").insert({
-        task_id:task.id,name:"Work plan",artifact_type:"plan",
+        task_id:task.id,project_id:cleanText(body.projectId,80)||null,name:"Work plan",artifact_type:"plan",
         content:JSON.stringify(plan,null,2),metadata:{agent:agentKey,reviewer:plan.reviewer_agent||null}
       });
       if(plan.needs_approval){
@@ -1090,11 +1245,11 @@ await db.from("ai_task_events").insert({task_id:task.id,event_type:"completed",m
         await logAudit(db,"work.completed",keyName,{task_id:task.id,agent_key:agentKey});
         const {data:finalTask}=await db.from("ai_tasks").select("*").eq("id",task.id).single();
         await db.from("dexter_work_artifacts").insert({
-          task_id:task.id,name:"Dexter result",artifact_type:codingIntent?"code":researchIntent?"research":"report",
+          task_id:task.id,project_id:cleanText(body.projectId,80)||null,name:"Dexter result",artifact_type:codingIntent?"code":researchIntent?"research":"report",
           content:String(finalTask?.result||reply),metadata:{agent:agentKey,reviewer:plan.reviewer_agent||null,model}
         });
         if(Object.keys(connectorContext).length)await db.from("dexter_work_artifacts").insert({
-          task_id:task.id,name:"Connected system evidence",artifact_type:"data",
+          task_id:task.id,project_id:cleanText(body.projectId,80)||null,name:"Connected system evidence",artifact_type:"data",
           content:JSON.stringify(connectorContext,null,2),metadata:{read_only:true,environment:"test"}
         });
         return json({task:finalTask||{...task,status:"completed",progress:100,result:reply},reply:finalTask?.result||reply,agent:agentKey,reviewer:plan.reviewer_agent,plan,model,liveWrites:false});
