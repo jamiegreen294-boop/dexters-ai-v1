@@ -199,6 +199,54 @@ function isConsequence(action){
   const text=JSON.stringify(action).toLowerCase();
   return /purchase|pay|refund|delete|publish|deploy|merge|send|submit|login|sign in|create account|change password|confirm order|place order/.test(text);
 }
+async function githubActionsSecretsTool(page,request={}){
+  if(request?.approval_granted!==true)throw new Error("GitHub Actions secret changes require explicit owner approval.");
+  const repo=String(request.repo||"").trim();
+  if(repo!=="jamiegreen294-boop/dexters-ai-v1")throw new Error("Secure secret sync is restricted to Dexter AI's own repository.");
+  const values=request.secure_values&&typeof request.secure_values==="object"?request.secure_values:{};
+  const allowed=new Set([
+    "DEXTER_ANDROID_KEYSTORE_B64",
+    "DEXTER_ANDROID_KEYSTORE_PASSWORD",
+    "DEXTER_ANDROID_KEY_ALIAS",
+    "DEXTER_ANDROID_KEY_PASSWORD"
+  ]);
+  const names=Object.keys(values);
+  if(!names.length||names.some(n=>!allowed.has(n)))throw new Error("Unexpected GitHub Actions secret name.");
+  const completed=[];
+  for(const name of names){
+    const value=String(values[name]??"");
+    if(!value)throw new Error("Missing secure value for "+name);
+    const base="https://github.com/"+repo+"/settings/secrets/actions";
+    await page.goto(base+"/new",{waitUntil:"domcontentloaded",timeout:45000});
+    if(/\/login(?:\?|$)/.test(page.url())||/Sign in to GitHub/i.test((await page.locator("body").innerText().catch(()=>"")).slice(0,5000))){
+      throw new Error("Dexter Home PC GitHub browser session is not signed in.");
+    }
+    const nameInput=page.locator('input[name="secret_name"],#secret_name').first();
+    const valueInput=page.locator('textarea[name="secret_value"],#secret_value').first();
+    if(await nameInput.count()<1||await valueInput.count()<1)throw new Error("GitHub Actions secret form was not found.");
+    await nameInput.fill(name);
+    await valueInput.fill(value);
+    const submit=page.getByRole("button",{name:/Add secret|Save secret|Update secret/i}).first();
+    if(await submit.count()<1)throw new Error("GitHub Actions secret save button was not found.");
+    await submit.click({timeout:15000});
+    await page.waitForTimeout(1200);
+    const body=(await page.locator("body").innerText().catch(()=>"")).slice(0,8000);
+    if(/already (?:exists|been taken)|name has already been taken/i.test(body)){
+      await page.goto(base+"/"+encodeURIComponent(name),{waitUntil:"domcontentloaded",timeout:45000});
+      const editValue=page.locator('textarea[name="secret_value"],#secret_value').first();
+      if(await editValue.count()<1)throw new Error("Existing GitHub Actions secret could not be opened for update: "+name);
+      await editValue.fill(value);
+      const update=page.getByRole("button",{name:/Update secret|Save secret/i}).first();
+      if(await update.count()<1)throw new Error("GitHub Actions secret update button was not found.");
+      await update.click({timeout:15000});
+      await page.waitForTimeout(1000);
+    }
+    // Do not snapshot or return form state: secret values must never enter logs/results.
+    completed.push(name);
+  }
+  return {ok:true,repo,updated:completed};
+}
+
 async function browserTool(tool,request={}){
   const session=String(request.session||"default").slice(0,80),page=await getPage(session);
   if(tool==="browser.navigate"){
@@ -221,6 +269,7 @@ async function browserTool(tool,request={}){
   if(tool==="browser.screenshot"){const b=await page.screenshot({fullPage:Boolean(request.fullPage)});return {url:page.url(),image_base64:b.toString("base64")};}
   if(tool==="browser.close"){await page.close();pageSessions.delete(session);return {ok:true};}
   if(tool==="browser.navigate_and_act")return await autonomousBrowser(page,request);
+  if(tool==="browser.github_actions_secrets")return await githubActionsSecretsTool(page,request);
   throw new Error("Unsupported browser tool: "+tool);
 }
 async function autonomousBrowser(page,request={}){
