@@ -1,11 +1,19 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"/>
     <application
         android:allowBackup="false"
         android:usesCleartextTraffic="false"
-        android:label="Dexter AI"
+        android:label="Dexter Business Phone"
         android:icon="@drawable/ic_launcher"
         android:theme="@style/AppTheme">
+        <service
+            android:name=".DeviceAgentService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync"/>
         <activity
             android:name=".MainActivity"
             android:exported="true"
