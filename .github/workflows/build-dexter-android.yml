@@ -22,20 +22,37 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.7'
-      - name: Build debug APK
-        run: gradle :app:assembleDebug --stacktrace
-      - name: Upload APK
+
+      - name: Restore permanent Dexter signing keystore
+        working-directory: .
+        env:
+          DEXTER_ANDROID_KEYSTORE_B64: ${{ secrets.DEXTER_ANDROID_KEYSTORE_B64 }}
+        run: |
+          test -n "$DEXTER_ANDROID_KEYSTORE_B64"
+          printf '%s' "$DEXTER_ANDROID_KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/dexter-business-phone.jks"
+
+      - name: Build signed release APK
+        env:
+          DEXTER_ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/dexter-business-phone.jks
+          DEXTER_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.DEXTER_ANDROID_KEYSTORE_PASSWORD }}
+          DEXTER_ANDROID_KEY_ALIAS: ${{ secrets.DEXTER_ANDROID_KEY_ALIAS }}
+          DEXTER_ANDROID_KEY_PASSWORD: ${{ secrets.DEXTER_ANDROID_KEY_PASSWORD }}
+        run: gradle :app:assembleRelease --stacktrace
+
+      - name: Upload signed APK
         uses: actions/upload-artifact@v4
         with:
-          name: Dexter-AI-Android
-          path: android-app/app/build/outputs/apk/debug/app-debug.apk
+          name: Dexter-Business-Phone-v4
+          path: android-app/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
