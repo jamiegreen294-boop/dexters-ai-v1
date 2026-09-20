@@ -68,6 +68,9 @@
         </activity>
 
 
+        <activity android:name=".BusinessAppsActivity" android:exported="false"/>
+        <activity android:name=".QuickStartActivity" android:exported="false"/>
+
         <activity
             android:name=".DexterHomeActivity"
             android:exported="true"
