@@ -92,6 +92,7 @@ public class MainActivity extends Activity {
                 c.put("silentInstall", DexterDeviceAdminReceiver.isDeviceOwner(context));
                 c.put("deviceOwner", DexterDeviceAdminReceiver.isDeviceOwner(context));
                 c.put("wirelessDebugging", Build.VERSION.SDK_INT >= 30);
+                c.put("localAdbDiagnostics", Build.VERSION.SDK_INT >= 30);
                 j.put("capabilities", c);
                 j.put("management", DeviceOwnerPolicy.status(context));
                 return j.toString();
@@ -122,7 +123,42 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface public String applyBusinessMode() {
             try { return DeviceOwnerPolicy.applyBusinessMode(context).toString(); }
-            catch (Exception e) { return "{\"error\":\""+e.getMessage().replace("\"","'")+"\"}"; }
+            catch (Exception e) {
+                String m = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+                return "{\"error\":\"" + m.replace("\"", "'") + "\"}";
+            }
+        }
+
+        @JavascriptInterface public String pairLocalAdb(String host, int port, String code) {
+            try { return DexterLocalAdb.get(context).pairLocal(host, port, code).toString(); }
+            catch (Exception e) { return errorJson(e); }
+        }
+
+        @JavascriptInterface public String connectLocalAdb(String host, int port) {
+            try { return DexterLocalAdb.get(context).connectLocal(host, port).toString(); }
+            catch (Exception e) { return errorJson(e); }
+        }
+
+        @JavascriptInterface public String runLocalOwnerDiagnostics(String host, int port) {
+            try { return DexterLocalAdb.get(context).runOwnerDiagnostics(host, port).toString(); }
+            catch (Exception e) { return errorJson(e); }
+        }
+
+        private String errorJson(Exception e) {
+            try {
+                JSONObject j = new JSONObject();
+                String m = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+                j.put("error", m);
+                return j.toString();
+            } catch (Exception ignored) { return "{\"error\":\"Local ADB failed\"}"; }
+        }
+
+        @JavascriptInterface public void openWirelessDebuggingSettings() {
+            try {
+                Intent i = new Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS);
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                context.startActivity(i);
+            } catch (Exception ignored) {}
         }
 
         @JavascriptInterface public void openUnknownSourcesSettings() {
