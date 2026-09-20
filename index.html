@@ -64,6 +64,7 @@ body.theme-hogmanay .topbar{background:#10131fe8}
 <div class="nav">
 <button class="active" data-page="chat">Chat <small>AI</small></button>
 <button data-page="work">Work <small>Tasks</small></button>
+<button data-page="artifacts">Artifacts <small id="artifactNav">—</small></button>
 <button data-page="agents">Agents <small>4</small></button>
 <button data-page="knowledge">Knowledge <small id="knowledgeNav">—</small></button>
 <button data-page="learning">Learning <small id="learningNav">—</small></button>
@@ -105,6 +106,11 @@ body.theme-hogmanay .topbar{background:#10131fe8}
 <div class="row" style="margin-top:10px"><button id="runWork" class="primary">Run work task</button><button id="refreshTasks" class="secondary">Refresh tasks</button><span id="workState" class="status">Ready</span></div>
 </div>
 <div id="taskList" class="tasklist"></div>
+</section>
+
+<section id="page-artifacts" class="page">
+<div class="hero"><h3>Work artifacts</h3><p>Persistent plans, code, reviews, research and diagnostics produced by Dexter Work. These stay attached to their task instead of disappearing into chat.</p></div>
+<div id="artifactList" class="tasklist"></div>
 </section>
 
 <section id="page-agents" class="page">
@@ -203,6 +209,7 @@ body.theme-hogmanay .topbar{background:#10131fe8}
 <div class="approval-actions"><button id="createPairCode" class="primary">Create pairing code</button></div>
 <pre id="pairCodeResult">Not paired from this device yet.</pre>
 </div>
+<div class="detailbox"><b>Home PC job health</b><p class="muted">Recent local AI, coding, browser and hardware jobs. Failed test jobs can be retried after the underlying problem is fixed.</p><div id="homeJobList" class="agent-list"></div></div>
 <div class="detailbox"><b>Full Dexter readiness test</b><p class="muted">Checks AI, live read-only menu, business knowledge, memory, agents and connector registry. It does not make live changes.</p><div class="approval-actions"><button id="runSelfTest" class="primary">Run Full Dexter Test</button></div><pre id="selfTestResult">Not run yet.</pre></div>
 <div class="notice">Environment: TEST. Live writes are disabled. Git pushes, deployments and consequential browser actions remain locked until live mode is explicitly enabled after testing.</div>
 </section>
@@ -306,7 +313,7 @@ function setPage(name){
   document.querySelectorAll(".page").forEach(function(x){x.classList.remove("active")});
   document.querySelectorAll("[data-page]").forEach(function(x){x.classList.toggle("active",x.dataset.page===name)});
   $("page-"+name).classList.add("active");
-  var titles={chat:["Chat","Ask Dexter about Dexters, systems, coding or operations."],work:["Work","Run substantial tasks through Dexter's planner and specialist agents."],agents:["Agents","Choose the specialist Dexter should use."],knowledge:["Knowledge","Review the facts available to Dexter."],learning:["Learning","Teach Dexter using sourced public internet research."],memory:["Memory","Manage approved test memory."],approvals:["Approvals","Review consequential requests before any preview work continues."],audit:["Audit","Inspect recent command-centre activity."],connectors:["Connectors","Manage Square, developer APIs and Dexter's browser worker."],system:["System","Check backend, AI, brain settings and isolation status."]};
+  var titles={chat:["Chat","Ask Dexter about Dexters, systems, coding or operations."],work:["Work","Run substantial tasks through Dexter's planner and specialist agents."],artifacts:["Artifacts","Open persistent outputs produced by Dexter Work."],agents:["Agents","Choose the specialist Dexter should use."],knowledge:["Knowledge","Review the facts available to Dexter."],learning:["Learning","Teach Dexter using sourced public internet research."],memory:["Memory","Manage approved test memory."],approvals:["Approvals","Review consequential requests before any preview work continues."],audit:["Audit","Inspect recent command-centre activity."],connectors:["Connectors","Manage Square, developer APIs and Dexter's browser worker."],system:["System","Check backend, AI, brain settings and isolation status."]};
   $("pageTitle").textContent=titles[name][0];$("subtitle").textContent=titles[name][1];
   if(name!=="chat")loadDashboard();
   if(name==="system")health();
@@ -441,6 +448,29 @@ function renderConnectors(){
     catch(e){alert(e.message);}finally{b.disabled=false;}
   }});
 }
+function renderArtifacts(){
+  var list=$("artifactList");if(!list)return;list.innerHTML="";
+  var rows=dashboard.artifacts||[];$("artifactNav").textContent=rows.length;
+  if(!rows.length){list.innerHTML='<div class="task"><p>No work artifacts yet.</p></div>';return;}
+  rows.forEach(function(a){
+    var div=document.createElement("div");div.className="task";
+    div.innerHTML='<div class="tasktop"><b>'+escapeHtml(a.name||a.artifact_type||"Artifact")+'</b><span class="status">'+escapeHtml(a.artifact_type||"artifact")+'</span></div><div class="meta">Task '+escapeHtml(a.task_id||"")+" · "+escapeHtml(a.created_at||"")+'</div><div class="approval-actions"><button class="secondary artifact-page-open" data-artifact="'+escapeHtml(a.id)+'">Open artifact</button></div>';
+    list.appendChild(div);
+  });
+  document.querySelectorAll(".artifact-page-open").forEach(function(b){b.onclick=function(){openArtifact(b.dataset.artifact)}});
+}
+function renderHomeJobs(){
+  var list=$("homeJobList");if(!list)return;list.innerHTML="";
+  var rows=(dashboard.homeJobs||[]).slice(0,20);
+  if(!rows.length){list.innerHTML='<div class="agent"><p>No Home PC jobs yet.</p></div>';return;}
+  rows.forEach(function(j){
+    var div=document.createElement("div");div.className="agent";
+    var retry=j.status==="failed"?'<div class="approval-actions"><button class="secondary home-retry" data-id="'+escapeHtml(j.id)+'">Retry failed job</button></div>':'';
+    div.innerHTML='<div class="agenttop"><b>'+escapeHtml(j.tool_name||j.job_type||"Home job")+'</b><span class="status">'+escapeHtml(j.status||"unknown")+'</span></div><div class="meta">'+escapeHtml(j.created_at||"")+'</div>'+(j.error?'<div class="result error">'+escapeHtml(j.error)+'</div>':'')+retry;
+    list.appendChild(div);
+  });
+  document.querySelectorAll(".home-retry").forEach(function(b){b.onclick=async function(){b.disabled=true;try{await api({action:"home_job_retry",jobId:b.dataset.id});await loadDashboard();}catch(e){alert(e.message)}finally{b.disabled=false;}}});
+}
 function renderSystem(){
   var box=$("systemSettings");
   if(!box)return;
@@ -452,7 +482,7 @@ async function openTask(id){
   var old=document.getElementById("taskDetail");if(old)old.remove();
   var box=document.createElement("div");box.id="taskDetail";box.className="detailbox";
   box.innerHTML='<div class="tasktop"><b>Task detail</b><button class="secondary" onclick="this.parentNode.parentNode.remove()">Close</button></div><pre>'+escapeHtml(JSON.stringify(d,null,2))+'</pre>';
-  $("taskList").prepend(box);
+  (currentPage==="artifacts"&&$("artifactList")?$("artifactList"):$("taskList")).prepend(box);
 }
 async function openArtifact(id){
   var d=await api({action:"artifact_get",artifactId:id});
@@ -465,7 +495,7 @@ async function openArtifact(id){
 }
 async function loadDashboard(){
   try{
-    dashboard=await api({action:"dashboard"});renderAgents();renderKnowledge();renderLearning();renderTasks();renderMemory();renderApprovals();renderAudit();renderConnectors();renderSystem();
+    dashboard=await api({action:"dashboard"});renderAgents();renderKnowledge();renderLearning();renderTasks();renderArtifacts();renderMemory();renderApprovals();renderAudit();renderConnectors();renderHomeJobs();renderSystem();
   }catch(e){}
 }
 $("login").onsubmit=async function(e){
