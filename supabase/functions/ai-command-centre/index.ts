@@ -545,7 +545,7 @@ Deno.serve(async(req)=>{
     if(action==="dashboard"){
       const [{data:agents},{data:tasks},{data:approvals},{data:knowledge},{data:memory},{data:learning}]=await Promise.all([
         db.from("ai_agents").select("agent_key,name,description").order("name"),
-        db.from("ai_tasks").select("id,title,status,agent_key,progress,result,error,requires_approval,created_at,updated_at").order("created_at",{ascending:false}).limit(20),
+        db.from("ai_tasks").select("id,title,status,agent_key,project_id,progress,result,error,requires_approval,created_at,updated_at").order("created_at",{ascending:false}).limit(20),
         db.from("ai_approvals").select("id,task_id,status,requested_action,created_at,updated_at").order("created_at",{ascending:false}).limit(20),
         db.from("dexter_ai_knowledge").select("category,title,content").eq("enabled",true).order("category").limit(100),
         db.from("dexter_approved_memory").select("id,category,content,approved_at").eq("active",true).order("approved_at",{ascending:false}).limit(50),
@@ -558,7 +558,7 @@ Deno.serve(async(req)=>{
       const {data:settings}=await db.from("dexter_command_centre_settings").select("setting_key,setting_value").order("setting_key");
       const {data:connectors}=await db.from("ai_connectors").select("connector_key,name,connector_type,status,capabilities,config,last_checked_at,last_error").order("name");
       const {data:toolRequests}=await db.from("ai_tool_requests").select("id,task_id,connector_key,tool_name,status,requires_approval,result,error,created_at,updated_at").order("created_at",{ascending:false}).limit(40);
-      const {data:artifacts}=await db.from("dexter_work_artifacts").select("id,task_id,name,artifact_type,metadata,created_at,updated_at").order("created_at",{ascending:false}).limit(100);
+      const {data:artifacts}=await db.from("dexter_work_artifacts").select("id,task_id,project_id,name,artifact_type,metadata,created_at,updated_at").order("created_at",{ascending:false}).limit(100);
       const [{data:projects},{data:projectFiles},{data:artifactVersions},{data:memoryProposals},{data:postmortems},{data:operationsHealth},{data:operationsChecks}]=await Promise.all([
         db.from("dexter_projects").select("*").order("name"),
         db.from("dexter_project_files").select("id,project_id,name,file_type,mime_type,size_bytes,version,source,metadata,created_at,updated_at").order("updated_at",{ascending:false}).limit(200),
@@ -1252,12 +1252,39 @@ await db.from("ai_task_events").insert({task_id:task.id,event_type:"completed",m
           task_id:task.id,project_id:cleanText(body.projectId,80)||null,name:"Connected system evidence",artifact_type:"data",
           content:JSON.stringify(connectorContext,null,2),metadata:{read_only:true,environment:"test"}
         });
+        try{
+          const memoryExtract=await callAI([
+            {role:"system",content:"Review this completed Dexter TEST task and decide whether it contains ONE durable business/system fact worth remembering for future work. Return JSON only: {remember:boolean,category:string,content:string,reason:string,confidence:number}. Do not store temporary task details, secrets, credentials, personal data, or guesses."},
+            {role:"user",content:"REQUEST:\n"+request+"\n\nRESULT:\n"+String(finalTask?.result||reply).slice(0,12000)}
+          ],350);
+          const proposal=extractJson(memoryExtract.reply);
+          if(proposal?.remember&&cleanText(proposal.content,4000)){
+            await db.from("dexter_memory_proposals").insert({
+              project_id:cleanText(body.projectId,80)||null,task_id:task.id,
+              category:cleanText(proposal.category||"general",80),
+              content:cleanText(proposal.content,4000),
+              reason:cleanText(proposal.reason||"Derived from completed Dexter work.",1000),
+              confidence:Math.max(0,Math.min(1,Number(proposal.confidence||0.75))),
+              proposed_by:"dexter-auto"
+            });
+          }
+        }catch{}
         return json({task:finalTask||{...task,status:"completed",progress:100,result:reply},reply:finalTask?.result||reply,agent:agentKey,reviewer:plan.reviewer_agent,plan,model,liveWrites:false});
       }catch(err){
         const error=String((err as Error)?.message||err).slice(0,1000);
         await db.from("ai_tasks").update({status:"failed",progress:100,error,updated_at:now()}).eq("id",task.id);
         await db.from("ai_agent_tasks").update({status:"failed",output:{error},updated_at:now()}).eq("task_id",task.id).eq("agent_key",agentKey);
         await db.from("ai_task_events").insert({task_id:task.id,event_type:"failed",message:error.slice(0,500)});
+        await db.from("dexter_postmortems").insert({
+          project_id:cleanText(body.projectId,80)||null,task_id:task.id,
+          title:"Failed work task: "+title,
+          incident:request,
+          root_cause:error,
+          resolution:"Not resolved automatically. Review the failed task and retry after the underlying issue is corrected.",
+          prevention:"Dexter recorded this failure so the cause can be reviewed before the same workflow is repeated.",
+          evidence:[{type:"error",value:error}],
+          created_by:"dexter-auto"
+        }).catch(()=>null);
         throw err;
       }
     }
