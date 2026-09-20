@@ -99,7 +99,7 @@ body.theme-hogmanay .topbar{background:#10131fe8}
 </section>
 
 <section id="page-work" class="page">
-<div class="hero"><h3>Dexter Work</h3><p>Give Dexter a substantial job. It will create a real test task, select the best agent, complete the reasoning/code work it can safely do, and save the result in the test database.</p></div>
+<div class="hero"><h3>Dexter Work</h3><p>Give Dexter a substantial job. It plans the work, selects specialist agents, grounds itself in connected GitHub/Vercel/Supabase evidence, uses the paired PC for browser/research/coding when useful, reviews the result, and saves persistent plan/result/evidence artifacts.</p></div>
 <div class="workbox">
 <textarea id="workRequest" placeholder="Example: Review the POS order flow, identify likely failure points and produce the exact code changes that should be made in a test branch."></textarea>
 <div class="row" style="margin-top:10px"><button id="runWork" class="primary">Run work task</button><button id="refreshTasks" class="secondary">Refresh tasks</button><span id="workState" class="status">Ready</span></div>
@@ -215,7 +215,7 @@ var ENDPOINT="https://eikruaxxzzxmfjvsmwwo.supabase.co/functions/v1/ai-command-c
 var $=function(id){return document.getElementById(id)};
 var token=sessionStorage.dexterToken||"";
 var sessionId=localStorage.dexterSession||crypto.randomUUID();
-var dashboard={agents:[],tasks:[],knowledge:[],learning:[],memory:[],approvals:[],audit:[],orchestration:[],settings:[],connectors:[],toolRequests:[],homeAgents:[],homeJobs:[]};
+var dashboard={agents:[],tasks:[],knowledge:[],learning:[],memory:[],approvals:[],audit:[],orchestration:[],settings:[],connectors:[],toolRequests:[],artifacts:[],homeAgents:[],homeJobs:[]};
 var currentPage="chat";
 
 function easterSundayUTC(year){
@@ -367,13 +367,17 @@ function renderTasks(){
   if(!(dashboard.tasks||[]).length){list.innerHTML='<div class="task"><p>No work tasks yet.</p></div>';return;}
   (dashboard.tasks||[]).forEach(function(t){
     var div=document.createElement("div");div.className="task";
-    var body='<div class="tasktop"><b>'+escapeHtml(t.title)+'</b><span class="status">'+escapeHtml(t.status)+'</span></div><div class="meta">'+escapeHtml(t.agent_key||"")+" · "+escapeHtml(String(t.progress||0))+'%</div>';
+    var arts=(dashboard.artifacts||[]).filter(function(a){return a.task_id===t.id});
+    var body='<div class="tasktop"><b>'+escapeHtml(t.title)+'</b><span class="status">'+escapeHtml(t.status)+'</span></div><div class="meta">'+escapeHtml(t.agent_key||"")+" · "+escapeHtml(String(t.progress||0))+'% · '+arts.length+' artifact'+(arts.length===1?'':'s')+'</div>';
     if(t.result)body+='<div class="result">'+escapeHtml(t.result)+'</div>';
     if(t.error)body+='<div class="result error">'+escapeHtml(t.error)+'</div>';
-    body+='<div class="approval-actions"><button class="secondary task-detail" data-task="'+escapeHtml(t.id)+'">Open task details</button></div>';
+    body+='<div class="approval-actions"><button class="secondary task-detail" data-task="'+escapeHtml(t.id)+'">Open task details</button>';
+    arts.slice(0,6).forEach(function(a){body+='<button class="secondary artifact-open" data-artifact="'+escapeHtml(a.id)+'">'+escapeHtml(a.name||a.artifact_type||"Artifact")+'</button>'});
+    body+='</div>';
     div.innerHTML=body;list.appendChild(div);
   });
   document.querySelectorAll(".task-detail").forEach(function(b){b.onclick=function(){openTask(b.dataset.task)}});
+  document.querySelectorAll(".artifact-open").forEach(function(b){b.onclick=function(){openArtifact(b.dataset.artifact)}});
 }
 function renderMemory(){
   var list=$("memoryList");list.innerHTML="";
@@ -449,6 +453,15 @@ async function openTask(id){
   var box=document.createElement("div");box.id="taskDetail";box.className="detailbox";
   box.innerHTML='<div class="tasktop"><b>Task detail</b><button class="secondary" onclick="this.parentNode.parentNode.remove()">Close</button></div><pre>'+escapeHtml(JSON.stringify(d,null,2))+'</pre>';
   $("taskList").prepend(box);
+}
+async function openArtifact(id){
+  var d=await api({action:"artifact_get",artifactId:id});
+  var a=d.artifact||{};
+  var old=document.getElementById("artifactDetail");if(old)old.remove();
+  var box=document.createElement("div");box.id="artifactDetail";box.className="detailbox";
+  box.innerHTML='<div class="tasktop"><b>'+escapeHtml(a.name||"Work artifact")+'</b><button class="secondary" onclick="this.parentNode.parentNode.remove()">Close</button></div><div class="meta">'+escapeHtml(a.artifact_type||"artifact")+' · '+escapeHtml(a.created_at||"")+'</div><pre>'+escapeHtml(a.content||"")+'</pre><div class="approval-actions"><button id="copyArtifact" class="secondary">Copy artifact</button></div>';
+  $("taskList").prepend(box);
+  var copy=document.getElementById("copyArtifact");if(copy)copy.onclick=function(){navigator.clipboard.writeText(a.content||"");copy.textContent="Copied";};
 }
 async function loadDashboard(){
   try{
