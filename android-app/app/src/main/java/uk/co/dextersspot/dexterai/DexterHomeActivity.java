@@ -79,6 +79,7 @@ public class DexterHomeActivity extends Activity {
 
         addTile(grid,"Dexter AI","AI",v->openWeb("https://jamiegreen294-boop.github.io/dexters-ai-v1/?android-app=1"));
         addTile(grid,"Loyalty","★",v->openWeb("https://app.dextersspot.co.uk"));
+        addTile(grid,"Loyalty Scan","QR",v->openWeb("https://backoffice.dextersspot.co.uk/pc-pos-test/scanner/"));
         addTile(grid,"Back Office","BO",v->openWeb("https://backoffice.dextersspot.co.uk/"));
         addTile(grid,"POS","POS",v->openWeb("https://backoffice.dextersspot.co.uk/pc-pos-test/"));
         addTile(grid,"WhatsApp","WA",v->launchPackageOrLabel(new String[]{"com.whatsapp.w4b","com.whatsapp"},"WhatsApp"));
