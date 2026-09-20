@@ -231,6 +231,10 @@ body.theme-hogmanay .topbar{background:#10131fe8}
 <p class="muted">Import Dexter's private signing file once. The values are sent directly to Dexter's backend and stored in Supabase Vault. They are not shown again or written into normal job records.</p>
 <div class="approval-actions">
 <input id="androidSigningFile" type="file" accept=".txt,text/plain" class="secondary" />
+</div>
+<textarea id="androidSigningPaste" placeholder="If Choose file does nothing on Android, open the Dexter signing text file, copy all of it, then paste it here." style="width:100%;min-height:150px;margin-top:10px;background:#0e0d0c;color:#fff;border:1px solid #3b3530;border-radius:13px;padding:12px;box-sizing:border-box"></textarea>
+<div class="approval-actions" style="margin-top:10px">
+<button id="loadAndroidSigningPaste" class="secondary">Use pasted signing text</button>
 <button id="storeAndroidSigning" class="primary">Store signing secrets in Vault</button>
 <button id="syncAndroidSigning" class="secondary">Sync to GitHub Actions</button>
 </div>
@@ -584,14 +588,30 @@ $("androidSigningFile").onchange=async function(){
     out.textContent="Signing file loaded locally: 4 values ready to store securely.";
   }catch(e){out.textContent="FAILED: "+e.message;}
 };
+$("loadAndroidSigningPaste").onclick=function(){
+  var out=$("androidSigningState"),text=$("androidSigningPaste").value.trim();
+  pendingAndroidSigningSecrets=null;
+  if(!text){out.textContent="Paste the complete Dexter signing text first.";return;}
+  try{
+    pendingAndroidSigningSecrets=parseAndroidSigningFile(text);
+    out.textContent="Pasted signing text loaded: 4 values ready to store securely.";
+  }catch(e){out.textContent="FAILED: "+e.message;}
+};
 $("storeAndroidSigning").onclick=async function(){
   var b=$("storeAndroidSigning"),out=$("androidSigningState");
-  if(!pendingAndroidSigningSecrets){out.textContent="Choose the Dexter GitHub Actions secrets file first.";return;}
+  if(!pendingAndroidSigningSecrets){
+    var pasted=$("androidSigningPaste").value.trim();
+    if(pasted){
+      try{pendingAndroidSigningSecrets=parseAndroidSigningFile(pasted);}
+      catch(e){out.textContent="FAILED: "+e.message;return;}
+    }
+  }
+  if(!pendingAndroidSigningSecrets){out.textContent="Choose the file or paste the complete signing text first.";return;}
   b.disabled=true;out.textContent="Storing signing values securely in Dexter Vault…";
   try{
     var d=await api({action:"android_signing_secrets_store",secrets:pendingAndroidSigningSecrets});
-    pendingAndroidSigningSecrets=null;$("androidSigningFile").value="";
-    out.textContent="Stored securely in Dexter Vault. Plaintext was not retained in normal job records.";
+    pendingAndroidSigningSecrets=null;$("androidSigningFile").value="";$("androidSigningPaste").value="";
+    out.textContent="Stored securely in Dexter Vault. Plaintext was cleared from this page and not retained in normal job records.";
   }catch(e){out.textContent="FAILED: "+e.message;}
   finally{b.disabled=false;}
 };
