@@ -916,10 +916,9 @@ Deno.serve(async(req)=>{
       if(!projectId||!query)return json({error:"Project and search query are required."},400);
       if(!(await projectAccessAllowed(db,projectId,keyName,role,false)))return json({error:"You do not have access to this project."},403);
       const searchQuery=await knowledgeSearchQuery(query);
-      const {data,error}=await db.rpc("dexter_search_project_files",{p_project_id:projectId,p_query:searchQuery,p_limit:Math.min(30,Math.max(1,Number(body.limit)||12))});
-      if(error)throw error;
-      await logAudit(db,"project.files_searched",keyName,{project_id:projectId,query:searchQuery,matches:(data||[]).length});
-      return json({results:data||[],query:searchQuery});
+      const data=await hybridProjectSearch(db,projectId,searchQuery,Math.min(30,Math.max(1,Number(body.limit)||12)));
+      await logAudit(db,"project.files_searched",keyName,{project_id:projectId,query:searchQuery,matches:(data||[]).length,hybrid:true});
+      return json({results:data||[],query:searchQuery,hybrid:true});
     }
 
     if(action==="artifact_export"){
