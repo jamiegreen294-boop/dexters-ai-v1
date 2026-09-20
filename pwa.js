@@ -40,7 +40,7 @@
     if(!document.querySelector(".mobile-nav")){
       var nav=document.createElement("nav");
       nav.className="mobile-nav";
-      [["chat","Chat"],["work","Work"],["learning","Learn"],["approvals","Approve"],["system","System"]].forEach(function(item,i){
+      [["chat","Chat"],["work","Work"],["phone","Phone"],["learning","Learn"],["approvals","Approve"],["system","System"]].forEach(function(item,i){
         var b=document.createElement("button");
         b.type="button";b.dataset.page=item[0];b.textContent=item[1];
         if(i===0)b.className="active";
