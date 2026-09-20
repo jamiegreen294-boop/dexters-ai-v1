@@ -46,13 +46,13 @@
         info.textContent="This device: "+(d.manufacturer||"Android")+" "+(d.model||"")+" · "+(window.DexterDevice.isPaired()?"paired":"not paired");
       }else info.textContent="Open this page inside the Dexter Business Phone Android app to pair the Meizu.";
     }
-    const phones=await getPhones();
+    const phones=(await getPhones()).filter(x=>x.active!==false);
     const badge=document.getElementById("phoneNav");if(badge)badge.textContent=phones.filter(x=>x.status==="online").length||phones.length||"—";
     const list=document.getElementById("phoneList");if(!list)return;list.innerHTML="";
     phones.forEach(ph=>{
       const card=document.createElement("div");card.className="task";
       card.innerHTML='<div class="tasktop"><b>'+esc(ph.name||"Dexter Phone")+'</b><span class="status">'+esc(ph.status||"unknown")+'</span></div>'+
-      '<p>'+esc((ph.manufacturer||"")+" "+(ph.model||""))+'</p><div class="meta">Android '+esc(ph.os_version||"")+' · Agent '+esc(ph.app_version||"")+' · last seen '+esc(ph.last_seen_at||"never")+'</div>'+
+      '<p>'+esc((ph.manufacturer||"")+" "+(ph.model||""))+'</p><div class="meta">Android '+esc(ph.os_version||"")+' · Agent '+esc(ph.app_version||"")+' · '+(ph.capabilities&&ph.capabilities.deviceOwner?'<b>Device Owner</b> · ':'')+'last seen '+esc(ph.last_seen_at||"never")+'</div>'+
       '<div class="approval-actions"><button class="secondary phone-health">Health</button><button class="secondary phone-apps">Apps</button><button class="secondary phone-launch">Launch app</button><button class="secondary phone-install">Install APK</button><button class="secondary phone-uninstall">Uninstall app</button></div>';
       const q=(type,request={})=>api({action:"device_job_create",deviceId:ph.id,jobType:type,request});
       card.querySelector(".phone-health").onclick=async()=>{await q("device.health");state.textContent="Health check queued";};
