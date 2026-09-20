@@ -592,11 +592,11 @@ Deno.serve(async(req)=>{
     if(action==="device_job_create"){
       if(role!=="owner")return json({error:"Owner access required."},403);
       const target=cleanText(body.deviceId,80),jobType=cleanText(body.jobType,80);
-      const allowed=["device.health","device.policy.status","device.policy.apply_business","apps.inventory","app.launch","app.install","app.uninstall","dexter.self_update"];
+      const allowed=["device.health","device.policy.status","device.policy.apply_business","device.lock","device.wipe","device.internet.protect","device.internet.clear","device.launcher.release","device.apps.protect","device.config.snapshot","apps.inventory","app.launch","app.install","app.uninstall","dexter.self_update"];
       if(!allowed.includes(jobType))return json({error:"Unsupported phone job."},400);
       const {data:device}=await db.from("dexter_phone_devices").select("id").eq("id",target).eq("active",true).maybeSingle();
       if(!device)return json({error:"Phone not found."},404);
-      const confirm=["device.policy.apply_business","app.install","app.uninstall","dexter.self_update"].includes(jobType);
+      const confirm=["device.policy.apply_business","device.lock","device.wipe","device.internet.protect","device.internet.clear","device.launcher.release","device.apps.protect","app.install","app.uninstall","dexter.self_update"].includes(jobType);
       const {data,error}=await db.from("dexter_phone_jobs").insert({
         device_id:target,job_type:jobType,request:body.request||{},requires_confirmation:confirm,
         approved_by:keyName,approved_at:now(),status:"queued"
