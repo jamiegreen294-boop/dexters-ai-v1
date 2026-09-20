@@ -1,0 +1,6 @@
+{
+  "android.app.extra.PROVISIONING_DEVICE_ADMIN_COMPONENT_NAME": "uk.co.dextersspot.dexterai/.DexterDeviceAdminReceiver",
+  "android.app.extra.PROVISIONING_DEVICE_ADMIN_PACKAGE_DOWNLOAD_LOCATION": "https://jamiegreen294-boop.github.io/dexters-ai-v1/downloads/Dexter-Business-Phone-Release.apk",
+  "android.app.extra.PROVISIONING_DEVICE_ADMIN_PACKAGE_CHECKSUM": "vS5y9XEhWRvUYy1v-W2RgHMOTS0brhW7HvD7WrjeTNo",
+  "android.app.extra.PROVISIONING_DEVICE_ADMIN_MINIMUM_VERSION_CODE": 3
+}
