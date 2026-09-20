@@ -70,7 +70,7 @@ public class DeviceAgentService extends Service {
         JSONObject info=new JSONObject();
         info.put("manufacturer",Build.MANUFACTURER);info.put("model",Build.MODEL);
         info.put("osVersion",Build.VERSION.RELEASE+" (API "+Build.VERSION.SDK_INT+")");
-        info.put("appVersion",BuildConfig.VERSION_NAME);
+        info.put("appVersion",appVersion());
         JSONObject cap=new JSONObject();
         cap.put("deviceHealth",true);cap.put("appsInventory",true);cap.put("appLaunch",true);
         cap.put("apkInstall",true);cap.put("appUninstall",true);cap.put("silentInstall",false);
@@ -113,8 +113,13 @@ public class DeviceAgentService extends Service {
         File data=getFilesDir();
         j.put("storageFreeBytes",data.getFreeSpace());j.put("storageTotalBytes",data.getTotalSpace());
         j.put("canRequestPackageInstalls",getPackageManager().canRequestPackageInstalls());
-        j.put("appVersion",BuildConfig.VERSION_NAME);
+        j.put("appVersion",appVersion());
         return j;
+    }
+
+    private String appVersion() {
+        try { return getPackageManager().getPackageInfo(getPackageName(), 0).versionName; }
+        catch (Exception e) { return "unknown"; }
     }
 
     private JSONObject appInventory() throws Exception {
