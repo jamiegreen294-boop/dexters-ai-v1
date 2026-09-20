@@ -1,45 +1,28 @@
+const COMMAND_CENTRE = 'https://eikruaxxzzxmfjvsmwwo.supabase.co/functions/v1/ai-command-centre';
+
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { message } = req.body || {};
+  const token = req.headers['x-dexter-token'];
+  const { message, sessionId } = req.body || {};
+  if (!token) return res.status(401).json({ error: 'Dexter owner access code required' });
+  if (!message) return res.status(400).json({ error: 'Missing message' });
 
-  if (!message) {
-    return res.status(400).json({ error: 'Missing message' });
-  }
-
-  if (!process.env.OPENAI_API_KEY) {
-    return res.status(503).json({
-      reply: 'Dexter is ready, but the AI brain key still needs connecting.'
-    });
-  }
+  const sid = sessionId || crypto.randomUUID();
 
   try {
-    const response = await fetch('https://api.openai.com/v1/responses', {
+    const response = await fetch(COMMAND_CENTRE, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+        'x-dexter-token': String(token)
       },
-      body: JSON.stringify({
-        model: 'gpt-5-mini',
-        input: [
-          {
-            role: 'system',
-            content: 'You are Dexter, a helpful Scottish business assistant for Dexters. Be friendly, witty and useful.'
-          },
-          {
-            role: 'user',
-            content: message
-          }
-        ]
-      })
+      body: JSON.stringify({ action: 'chat', sessionId: sid, message })
     });
 
-    const data = await response.json();
-    res.json({ reply: data.output_text || 'Dexter could not get a response.' });
+    const data = await response.json().catch(() => ({ error: 'Bad Dexter command-centre response' }));
+    return res.status(response.status).json({ ...data, sessionId: sid });
   } catch (error) {
-    res.status(500).json({ error: 'AI connection failed' });
+    return res.status(502).json({ error: 'Dexter command centre unavailable' });
   }
 }
