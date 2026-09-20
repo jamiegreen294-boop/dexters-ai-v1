@@ -245,10 +245,16 @@ async function autonomousBrowser(page,request={}){
 function runProcess(command,args,cwd,timeout=120000){
   return new Promise((resolve,reject)=>{
     let executable=command;
-    let runArgs=args;
+    let runArgs=Array.isArray(args)?args.map(x=>String(x)):[];
     if(process.platform==="win32"&&["npm","npx"].includes(command)){
-      executable=process.env.ComSpec||"cmd.exe";
-      runArgs=["/d","/s","/c",command,...args];
+      executable=process.env.ComSpec||path.join(process.env.SystemRoot||"C:\\Windows","System32","cmd.exe");
+      const quoteCmdArg=v=>{
+        const s=String(v);
+        if(!/[\s"&|<>^]/.test(s))return s;
+        return '"'+s.replace(/(["^])/g,"^$1")+'"';
+      };
+      const commandLine=[command,...runArgs].map(quoteCmdArg).join(" ");
+      runArgs=["/d","/s","/c",commandLine];
     }
     if(process.platform==="win32"&&command==="ollama"){
       const candidates=[
@@ -259,12 +265,12 @@ function runProcess(command,args,cwd,timeout=120000){
       if(found)executable=found;
     }
     const child=spawn(executable,runArgs,{cwd,windowsHide:true,shell:false,env:{...process.env,CI:"1"}});
-    let stdout="",stderr="",killed=false;
-    const timer=setTimeout(()=>{killed=true;child.kill();},timeout);
-    child.stdout.on("data",d=>stdout+=d.toString());
-    child.stderr.on("data",d=>stderr+=d.toString());
-    child.on("error",reject);
-    child.on("close",code=>{clearTimeout(timer);resolve({code,killed,stdout:stdout.slice(-100000),stderr:stderr.slice(-100000)});});
+    let stdout="",stderr="",killed=false,settled=false;
+    const timer=setTimeout(()=>{killed=true;try{child.kill();}catch{}},timeout);
+    child.stdout?.on("data",d=>stdout+=d.toString());
+    child.stderr?.on("data",d=>stderr+=d.toString());
+    child.on("error",err=>{if(settled)return;settled=true;clearTimeout(timer);reject(err);});
+    child.on("close",code=>{if(settled)return;settled=true;clearTimeout(timer);resolve({code,killed,stdout:stdout.slice(-100000),stderr:stderr.slice(-100000)});});
   });
 }
 async function listTree(rel="",depth=3,maxEntries=500){
@@ -854,7 +860,7 @@ async function hardwareBridgeRead(){
 async function workspaceTool(tool,request={}){
   if(tool==="system.info")return await systemInfo();
   if(tool==="hardware.inspect")return await hardwareInspect();
-  if(tool==="hardware.printers.read")return await hardwarePrinters();
+  if(tool==="hardware.printers.read"||tool==="system.printers")return await hardwarePrinters();
   if(tool==="hardware.ports.read")return await hardwarePorts();
   if(tool==="hardware.spooler.read")return await hardwareSpooler();
   if(tool==="hardware.bridge.read")return await hardwareBridgeRead();
@@ -924,11 +930,18 @@ async function workspaceTool(tool,request={}){
   }
   if(tool==="code.check"){
     const cwd=safeWorkspacePath(request.path||"");
-    const kind=String(request.kind||"").toLowerCase();
+    const rawKind=String(request.kind||"").toLowerCase().trim();
+    const aliases={build:"npm-build","npm build":"npm-build",test:"npm-test","npm test":"npm-test",lint:"npm-lint","npm lint":"npm-lint",node:"node-check","node check":"node-check"};
+    const kind=aliases[rawKind]||rawKind;
     if(kind==="npm-test")return await runProcess("npm",["test","--","--runInBand"],cwd,180000);
     if(kind==="npm-build")return await runProcess("npm",["run","build"],cwd,180000);
-    if(kind==="node-check")return await runProcess("node",["--check",String(request.file||"")],cwd,30000);
-    throw new Error("Unsupported code check.");
+    if(kind==="npm-lint")return await runProcess("npm",["run","lint"],cwd,180000);
+    if(kind==="node-check"){
+      const file=String(request.file||"").trim();
+      if(!file)throw new Error("node-check requires a file.");
+      return await runProcess("node",["--check",file],cwd,30000);
+    }
+    throw new Error("Unsupported code check: "+rawKind+". Supported: node-check, npm-test, npm-build, npm-lint.");
   }
   throw new Error("Unsupported workspace tool: "+tool);
 }
