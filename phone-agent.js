@@ -10,7 +10,7 @@
     if(!document.getElementById("page-phone")){
       const p=document.createElement("section");p.id="page-phone";p.className="page";
       p.innerHTML='<div class="hero"><h3>Dexter Business Phone</h3><p>Pair and manage the dedicated Meizu from Dexter AI TEST.</p></div>'+
-      '<div class="workbox"><div class="row"><button id="pairThisPhone" class="primary">Pair this Meizu</button><button id="refreshPhones" class="secondary">Refresh phones</button><button id="unknownSources" class="secondary">Allow APK installs</button><span id="phoneState" class="status">Ready</span></div><p class="muted" id="localPhoneInfo"></p></div>'+
+      '<div class="workbox"><div class="row"><button id="pairThisPhone" class="primary">Pair this Meizu</button><button id="refreshPhones" class="secondary">Refresh phones</button><button id="managementStatus" class="secondary">Check managed status</button><button id="applyBusinessMode" class="secondary">Apply Dexters business mode</button><button id="unknownSources" class="secondary">Allow APK installs</button><span id="phoneState" class="status">Ready</span></div><p class="muted" id="localPhoneInfo"></p><div id="managedInfo" class="detailbox" style="margin-top:10px"><b>Managed-device setup</b><p>For full Device Owner control, install the Device Owner-capable Dexter APK, factory reset the dedicated Meizu, then enrol Dexter during Android setup. Once Android confirms Device Owner, this screen will show it as fully managed.</p></div></div>'+
       '<div id="phoneList" class="tasklist"></div>';
       document.querySelector(".content").appendChild(p);
     }
@@ -68,6 +68,16 @@
       }catch(e){state.textContent=e.message}
     };
     const refresh=document.getElementById("refreshPhones");if(refresh)refresh.onclick=renderPhone;
+    const ms=document.getElementById("managementStatus");if(ms)ms.onclick=()=>{
+      const st=document.getElementById("phoneState");
+      if(!nativePhone()){st.textContent="Open inside Dexter Business Phone";return}
+      try{const d=JSON.parse(window.DexterDevice.getManagementStatus());st.textContent=d.deviceOwner?"Fully managed Device Owner":"Not Device Owner yet";document.getElementById("managedInfo").innerHTML='<b>Managed-device status</b><pre>'+esc(JSON.stringify(d,null,2))+'</pre>';}catch(e){st.textContent=e.message}
+    };
+    const bm=document.getElementById("applyBusinessMode");if(bm)bm.onclick=()=>{
+      const st=document.getElementById("phoneState");
+      if(!nativePhone()){st.textContent="Open inside Dexter Business Phone";return}
+      try{const d=JSON.parse(window.DexterDevice.applyBusinessMode());st.textContent=d.error||"Dexters business mode applied";document.getElementById("managedInfo").innerHTML='<b>Dexters business mode</b><pre>'+esc(JSON.stringify(d,null,2))+'</pre>';}catch(e){st.textContent=e.message}
+    };
     const unknown=document.getElementById("unknownSources");if(unknown)unknown.onclick=()=>{if(nativePhone())window.DexterDevice.openUnknownSourcesSettings();else alert("Open inside the Android app.");};
   }
   ensurePhonePage();wire();

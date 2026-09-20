@@ -73,10 +73,10 @@ public class DeviceAgentService extends Service {
         info.put("appVersion",appVersion());
         JSONObject cap=new JSONObject();
         cap.put("deviceHealth",true);cap.put("appsInventory",true);cap.put("appLaunch",true);
-        cap.put("apkInstall",true);cap.put("appUninstall",true);cap.put("silentInstall",false);
+        cap.put("apkInstall",true);cap.put("appUninstall",true);cap.put("silentInstall",DexterDeviceAdminReceiver.isDeviceOwner(this));cap.put("deviceOwner",DexterDeviceAdminReceiver.isDeviceOwner(this));
         cap.put("canRequestPackageInstalls",getPackageManager().canRequestPackageInstalls());
         cap.put("wirelessDebugging",Build.VERSION.SDK_INT>=30);
-        info.put("capabilities",cap);
+        info.put("capabilities",cap);info.put("management",DeviceOwnerPolicy.status(this));
         post(new JSONObject().put("action","device_heartbeat").put("sessionId",UUID.randomUUID().toString()).put("info",info));
     }
 
@@ -97,6 +97,8 @@ public class DeviceAgentService extends Service {
     private JSONObject execute(String type, JSONObject req) throws Exception {
         switch(type){
             case "device.health": return deviceHealth();
+            case "device.policy.status": return DeviceOwnerPolicy.status(this);
+            case "device.policy.apply_business": return DeviceOwnerPolicy.applyBusinessMode(this);
             case "apps.inventory": return appInventory();
             case "app.launch": return launchApp(req.getString("packageName"));
             case "app.install":
@@ -113,7 +115,7 @@ public class DeviceAgentService extends Service {
         File data=getFilesDir();
         j.put("storageFreeBytes",data.getFreeSpace());j.put("storageTotalBytes",data.getTotalSpace());
         j.put("canRequestPackageInstalls",getPackageManager().canRequestPackageInstalls());
-        j.put("appVersion",appVersion());
+        j.put("appVersion",appVersion());j.put("management",DeviceOwnerPolicy.status(this));
         return j;
     }
 
