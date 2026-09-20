@@ -71,7 +71,7 @@
   function enhanceArtifacts(){
     document.querySelectorAll(".artifact-page-open").forEach(open=>{
       const actions=open.parentElement;if(!actions||actions.querySelector(".rich-export"))return;
-      ["pdf","zip"].forEach(fmt=>{
+      ["pdf","docx","xlsx","zip"].forEach(fmt=>{
         const b=document.createElement("button");b.className="secondary rich-export";b.textContent="Build "+fmt.toUpperCase()+" on Home PC";
         b.onclick=async()=>{b.disabled=true;try{
           const d=await api({action:"artifact_rich_export",artifactId:open.dataset.artifact,format:fmt});let tries=0;
