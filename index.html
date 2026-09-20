@@ -632,8 +632,10 @@ $("syncAndroidSigning").onclick=async function(){
   b.disabled=true;out.textContent="Queueing secure GitHub Actions sync on Dexter Home PC…";
   try{
     var d=await api({action:"github_actions_secret_sync"});
-    out.textContent="Queued securely. Home job: "+(d.job&&d.job.id?d.job.id:"created")+". Dexter will add/update all four GitHub Actions secrets without placing plaintext in the job.";
-    setTimeout(function(){loadDashboard();},5000);
+    out.textContent=d.synced
+      ?"Synced directly to GitHub Actions through Dexter's authenticated API connection. Home PC is not required."
+      :"GitHub Actions sync did not confirm completion.";
+    setTimeout(function(){loadDashboard();},2500);
   }catch(e){out.textContent="FAILED: "+e.message;}
   finally{b.disabled=false;}
 };
