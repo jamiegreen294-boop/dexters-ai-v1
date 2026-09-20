@@ -1,4 +1,4 @@
-const CACHE="dexter-ai-shell-v3";
+const CACHE="dexter-ai-shell-v4-work-artifacts";
 const SHELL=["./","./index.html","./manifest.json","./pwa.js","./icon-192.png","./icon-512.png"];
 self.addEventListener("install",event=>{
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL)).then(()=>self.skipWaiting()));
