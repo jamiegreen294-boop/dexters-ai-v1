@@ -42,8 +42,59 @@
     var wrap=el("workRequest")&&el("workRequest").parentElement; if(!wrap)return;
     var s=document.createElement("select");s.id="workProject";s.className="miniinput";s.style.marginBottom="8px";wrap.insertBefore(s,el("workRequest"));
   }
+  function ensureChatProject(){
+    if(el("chatProject"))return;
+    var top=document.querySelector(".top-actions");if(!top)return;
+    var s=document.createElement("select");s.id="chatProject";s.className="select";s.title="Chat workspace";
+    top.insertBefore(s,el("agentSelect"));
+  }
+  function ensureFileSearch(){
+    if(el("projectFileSearch"))return;
+    var page=el("page-files"),box=page&&page.querySelector(".workbox");if(!box)return;
+    var wrap=document.createElement("div");wrap.className="detailbox";wrap.style.marginTop="12px";
+    wrap.innerHTML='<b>Search project files</b><div class="row" style="margin-top:8px"><input id="projectFileSearch" class="miniinput" style="flex:1" placeholder="Search this project’s indexed files"><button id="searchProjectFiles" class="secondary">Search</button></div><div id="projectFileSearchResults" class="tasklist" style="margin-top:10px"></div>';
+    box.after(wrap);
+    el("searchProjectFiles").onclick=async function(){
+      var q=el("projectFileSearch").value.trim(),projectId=el("fileProject").value;if(!q||!projectId)return;
+      var out=el("projectFileSearchResults");out.innerHTML='<div class="task"><p>Searching…</p></div>';
+      try{
+        var d=await api({action:"project_file_search",projectId:projectId,query:q});
+        out.innerHTML="";
+        (d.results||[]).forEach(function(x){
+          var row=document.createElement("div");row.className="task";
+          row.innerHTML='<div class="tasktop"><b>'+html(x.file_name)+'</b><span class="status">rank '+Number(x.rank||0).toFixed(2)+'</span></div><div class="result">'+html(x.content||"")+'</div>';
+          out.appendChild(row);
+        });
+        if(!(d.results||[]).length)out.innerHTML='<div class="task"><p>No indexed matches found.</p></div>';
+      }catch(e){out.innerHTML='<div class="task"><p class="error">'+html(e.message)+'</p></div>'}
+    };
+  }
+  function ensureConnectorProbe(){
+    if(el("probeConnectors"))return;
+    var row=el("runOpsCheck")&&el("runOpsCheck").parentElement;if(!row)return;
+    var b=document.createElement("button");b.id="probeConnectors";b.className="secondary";b.textContent="Live probe connectors";
+    b.onclick=async function(){b.disabled=true;el("opsState").textContent="Probing…";try{var d=await api({action:"connectors_probe"});el("opsState").textContent=(d.results||[]).filter(function(x){return !x.ok}).length+" issue(s)";await loadDashboard()}catch(e){el("opsState").textContent=e.message}finally{b.disabled=false}};
+    row.insertBefore(b,el("opsState"));
+  }
+  function enhanceTasks(){
+    var cards=Array.from(el("taskList")?el("taskList").querySelectorAll(".task"):[]);
+    cards.forEach(function(card,idx){
+      var t=(dashboard.tasks||[])[idx];if(!t||card.querySelector(".task-retry,.task-cancel"))return;
+      var actions=card.querySelector(".approval-actions");if(!actions)return;
+      if(["failed","approved_preview_failed","cancelled"].includes(t.status)){
+        var retry=document.createElement("button");retry.className="secondary task-retry";retry.textContent="Retry task";
+        retry.onclick=async function(){retry.disabled=true;try{await api({action:"task_retry",taskId:t.id});await loadDashboard()}catch(e){alert(e.message)}finally{retry.disabled=false}};
+        actions.appendChild(retry);
+      }
+      if(["running","waiting_approval","running_preview","queued_home"].includes(t.status)){
+        var cancel=document.createElement("button");cancel.className="danger task-cancel";cancel.textContent="Cancel task";
+        cancel.onclick=async function(){cancel.disabled=true;try{await api({action:"task_cancel",taskId:t.id});await loadDashboard()}catch(e){alert(e.message)}finally{cancel.disabled=false}};
+        actions.appendChild(cancel);
+      }
+    });
+  }
   function renderProjects(){
-    ensureWorkProject(); projectOptions(el("workProject"),true); projectOptions(el("fileProject"),false);
+    ensureWorkProject(); ensureChatProject(); projectOptions(el("workProject"),true); projectOptions(el("chatProject"),true); projectOptions(el("fileProject"),false);
     var rows=dashboard.projects||[]; if(el("projectNav"))el("projectNav").textContent=rows.length;
     var list=el("projectList"); if(!list)return; list.innerHTML="";
     rows.forEach(function(p){
@@ -95,11 +146,22 @@
         try{var x=await api({action:"artifact_get",artifactId:edit.dataset.artifact});var next=prompt("Edit artifact content",x.artifact.content||"");if(next===null)return;await api({action:"artifact_update",artifactId:edit.dataset.artifact,content:next,name:x.artifact.name});await loadDashboard();alert("Artifact saved as a new version.");}catch(e){alert(e.message)}
       };
       b.parentElement.appendChild(edit);
+      ["md","txt","json"].forEach(function(fmt){
+        var ex=document.createElement("button");ex.className="secondary artifact-export";ex.textContent="Download "+fmt.toUpperCase();
+        ex.onclick=async function(){
+          try{
+            var d=await api({action:"artifact_export",artifactId:b.dataset.artifact,format:fmt});
+            var blob=new Blob([d.content||""],{type:d.mimeType||"text/plain"}),url=URL.createObjectURL(blob),a=document.createElement("a");
+            a.href=url;a.download=d.filename||("dexter-artifact."+fmt);document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(url)},1000);
+          }catch(e){alert(e.message)}
+        };
+        b.parentElement.appendChild(ex);
+      });
       var versions=(dashboard.artifactVersions||[]).filter(function(v){return v.artifact_id===b.dataset.artifact});
       if(versions.length){var badge=document.createElement("span");badge.className="status";badge.textContent=versions.length+" versions";b.parentElement.appendChild(badge)}
     });
   }
-  async function renderUpgrade(){renderProjects();renderFiles();renderMemoryProposals();renderOps();enhanceArtifacts()}
+  async function renderUpgrade(){ensureFileSearch();ensureConnectorProbe();renderProjects();renderFiles();renderMemoryProposals();renderOps();enhanceArtifacts();enhanceTasks()}
   var baseLoad=loadDashboard;
   loadDashboard=async function(){await baseLoad();await renderUpgrade()};
 
@@ -119,5 +181,13 @@
     try{var d=await api({action:"work",message:req,agent:el("agentSelect").value,projectId:el("workProject")?el("workProject").value:""});el("workState").textContent="Completed";el("workRequest").value="";await loadDashboard();if(d.reply)setPage("work")}catch(err){el("workState").textContent=err.message}finally{el("runWork").disabled=false}
   };
 
+  if(el("composer"))el("composer").onsubmit=async function(e){
+    e.preventDefault();var text=el("message").value.trim();if(!text||!token)return;el("message").value="";bubble(text,"user");el("send").disabled=true;var wait=bubble("Thinking…","assistant");
+    try{
+      var d=await api({action:"chat",message:text,agent:el("agentSelect").value,projectId:el("chatProject")?el("chatProject").value:""});
+      wait.textContent=d.reply;var meta=document.createElement("div");meta.className="meta";meta.textContent=(d.agent||"Dexter")+" · "+(d.model||"AI");wait.appendChild(meta);
+      if(d.imageJob&&d.imageJob.id)pollDexterImage(d.imageJob.id,wait).catch(function(err){wait.textContent=err.message;});
+    }catch(err){wait.textContent=err.message}finally{el("send").disabled=false;el("message").focus()}
+  };
   if(token)loadDashboard().catch(function(){});
 })();
