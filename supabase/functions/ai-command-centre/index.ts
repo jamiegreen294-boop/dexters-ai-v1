@@ -101,7 +101,7 @@ async function hybridProjectSearch(db:any,projectId:string,query:string,limit=12
   if(!projectId||!query)return [];
   const embs=await embedTexts([query]);
   if(embs[0]){
-    const {data,error}=await db.rpc("dexter_search_project_files_hybrid",{p_project_id:projectId,p_query:query,p_embedding:embs[0],p_limit:limit});
+    const {data,error}=await db.rpc("dexter_search_project_files_hybrid",{p_project_id:projectId,p_query:query,p_embedding:JSON.stringify(embs[0]),p_limit:limit});
     if(!error)return data||[];
   }
   const {data}=await db.rpc("dexter_search_project_files",{p_project_id:projectId,p_query:query,p_limit:limit});
@@ -120,6 +120,13 @@ async function knowledgeSearchQuery(query:string){
     }catch{}
   }
   return q;
+}
+async function projectAccessAllowed(db:any,projectId:string,subject:string,globalRole:string,write=false){
+  if(!projectId)return true;
+  if(globalRole==="owner")return true;
+  const {data}=await db.from("dexter_project_members").select("role,active").eq("project_id",projectId).eq("subject",subject).eq("active",true).maybeSingle();
+  if(!data)return false;
+  return write?["owner","manager","editor"].includes(String(data.role)):["owner","manager","editor","viewer"].includes(String(data.role));
 }
 async function loadContext(db:any,query="",role="owner",projectId=""){
   const safeQuery=cleanText(query,500);
@@ -718,6 +725,7 @@ Deno.serve(async(req)=>{
       const base64=String(body.base64||"");
       const textContent=typeof body.contentText==="string"?String(body.contentText):null;
       if(!projectId||!name)return json({error:"Project and file name are required."},400);
+      if(!(await projectAccessAllowed(db,projectId,keyName,role,true)))return json({error:"You do not have write access to this project."},403);
       const {data:project}=await db.from("dexter_projects").select("id").eq("id",projectId).maybeSingle();
       if(!project)return json({error:"Project not found."},404);
       let bytes:Uint8Array|null=null;
@@ -761,7 +769,7 @@ Deno.serve(async(req)=>{
             const batch=rows.slice(i,i+50);
             const vectors=await embedTexts(batch.map((x:any)=>x.content));
             for(let j=0;j<vectors.length;j++){
-              if(vectors[j])await db.from("dexter_project_file_chunks").update({embedding:vectors[j]}).eq("id",batch[j].id);
+              if(vectors[j])await db.from("dexter_project_file_chunks").update({embedding:JSON.stringify(vectors[j])}).eq("id",batch[j].id);
             }
           }
         }
@@ -826,7 +834,7 @@ Deno.serve(async(req)=>{
         const rows=inserted||[];
         for(let i=0;i<rows.length;i+=50){
           const batch=rows.slice(i,i+50),vectors=await embedTexts(batch.map((x:any)=>x.content));
-          for(let j=0;j<vectors.length;j++)if(vectors[j])await db.from("dexter_project_file_chunks").update({embedding:vectors[j]}).eq("id",batch[j].id);
+          for(let j=0;j<vectors.length;j++)if(vectors[j])await db.from("dexter_project_file_chunks").update({embedding:JSON.stringify(vectors[j])}).eq("id",batch[j].id);
         }
       }
       await db.from("dexter_project_files").update({content_text:text,extraction_status:"indexed",extracted_at:now(),indexed_at:now(),extraction_error:null,metadata:{extraction_method:job.result?.method||"home-pc"}}).eq("id",fileId);
@@ -859,6 +867,7 @@ Deno.serve(async(req)=>{
       if(!["owner","manager"].includes(role))return json({error:"Project file search requires owner/manager access."},403);
       const projectId=cleanText(body.projectId,80),query=cleanText(body.query,1000);
       if(!projectId||!query)return json({error:"Project and search query are required."},400);
+      if(!(await projectAccessAllowed(db,projectId,keyName,role,false)))return json({error:"You do not have access to this project."},403);
       const searchQuery=await knowledgeSearchQuery(query);
       const {data,error}=await db.rpc("dexter_search_project_files",{p_project_id:projectId,p_query:searchQuery,p_limit:Math.min(30,Math.max(1,Number(body.limit)||12))});
       if(error)throw error;
@@ -1667,7 +1676,9 @@ await db.from("ai_task_events").insert({task_id:task.id,event_type:"completed",m
         role,agent:"Dexter",model:"stable-diffusion.cpp-cpu",imageJob:job,liveWrites:false
       });
     }
-    const context=await loadContext(db,message,role,cleanText(body.projectId,80));
+    const chatProjectId=cleanText(body.projectId,80);
+    if(chatProjectId&&!(await projectAccessAllowed(db,chatProjectId,keyName,role,false)))return json({error:"You do not have access to this project."},403);
+    const context=await loadContext(db,message,role,chatProjectId);
     const agentKey=chooseAgent(message,cleanText(body.agent,60),context.agents);
     let chatToolContext:any=null;
     const chatHomeUrl=(Deno.env.get("DEXTER_HOME_HOST_URL")||"").replace(/\/$/,"");
