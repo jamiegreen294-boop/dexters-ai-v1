@@ -696,7 +696,9 @@ Deno.serve(async(req)=>{
       if(role!=="owner")return json({error:"Owner access required."},403);
       const name=cleanText(body.name,160),cron=cleanText(body.cronExpression,80),scheduledAction=cleanText(body.scheduledAction,80);
       if(!name||!cron||!scheduledAction)return json({error:"Name, schedule and action are required."},400);
-      const {data,error}=await db.from("dexter_scheduled_jobs").insert({name,project_id:cleanText(body.projectId,80)||null,action:scheduledAction,payload:body.payload||{},cron_expression:cron,created_by:keyName}).select("*").single();
+      const cadence=Math.max(60,Number(body.cadenceMinutes)||1440);
+      const payload={...(body.payload||{}),cadence_minutes:cadence};
+      const {data,error}=await db.from("dexter_scheduled_jobs").insert({name,project_id:cleanText(body.projectId,80)||null,action:scheduledAction,payload,cron_expression:cron,next_run_at:new Date(Date.now()+cadence*60000).toISOString(),created_by:keyName}).select("*").single();
       if(error)throw error; return json({job:data});
     }
     if(action==="schedule_toggle"){
