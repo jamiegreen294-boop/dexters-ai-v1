@@ -40,6 +40,12 @@ function dbClient(){
   return createClient(Deno.env.get("SUPABASE_URL")!,Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,{auth:{persistSession:false}});
 }
 async function authenticate(req:Request){
+  const scheduler=req.headers.get("x-dexter-scheduler-token")||"";
+  if(scheduler.length>=32){
+    const db=dbClient(),hash=await sha256(scheduler);
+    const {data:key}=await db.from("dexter_scheduler_keys").select("id").eq("token_hash",hash).eq("active",true).maybeSingle();
+    if(key)return {db,role:"scheduler",keyName:"Dexter internal scheduler"};
+  }
   const token=req.headers.get("x-dexter-token")||"";
   if(token.length<12)throw new Error("INVALID_ACCESS_CODE");
   const db=dbClient(),hash=await sha256(token);
