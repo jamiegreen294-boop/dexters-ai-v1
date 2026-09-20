@@ -40,6 +40,12 @@ function dbClient(){
   return createClient(Deno.env.get("SUPABASE_URL")!,Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,{auth:{persistSession:false}});
 }
 async function authenticate(req:Request){
+  const scheduler=req.headers.get("x-dexter-scheduler-token")||"";
+  if(scheduler.length>=32){
+    const db=dbClient(),hash=await sha256(scheduler);
+    const {data:key}=await db.from("dexter_scheduler_keys").select("id").eq("token_hash",hash).eq("active",true).maybeSingle();
+    if(key)return {db,role:"scheduler",keyName:"Dexter internal scheduler"};
+  }
   const token=req.headers.get("x-dexter-token")||"";
   if(token.length<12)throw new Error("INVALID_ACCESS_CODE");
   const db=dbClient(),hash=await sha256(token);
@@ -81,6 +87,32 @@ async function liveMenuForQuery(query:string){
   }catch{return null;}
   finally{clearTimeout(timer);}
 }
+async function embedTexts(texts:string[]){
+  const cleaned=(texts||[]).map(x=>cleanText(x,8000)).filter(Boolean);
+  if(!cleaned.length)return [];
+  const key=Deno.env.get("OPENAI_API_KEY")||"";
+  if(!key)return [];
+  try{
+    const r=await fetch("https://api.openai.com/v1/embeddings",{
+      method:"POST",
+      headers:{"Content-Type":"application/json","Authorization":"Bearer "+key},
+      body:JSON.stringify({model:"text-embedding-3-small",input:cleaned,dimensions:1536})
+    });
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok||!Array.isArray(d?.data))return [];
+    return d.data.sort((a:any,b:any)=>a.index-b.index).map((x:any)=>x.embedding);
+  }catch{return [];}
+}
+async function hybridProjectSearch(db:any,projectId:string,query:string,limit=12){
+  if(!projectId||!query)return [];
+  const embs=await embedTexts([query]);
+  if(embs[0]){
+    const {data,error}=await db.rpc("dexter_search_project_files_hybrid",{p_project_id:projectId,p_query:query,p_embedding:JSON.stringify(embs[0]),p_limit:limit});
+    if(!error)return data||[];
+  }
+  const {data}=await db.rpc("dexter_search_project_files",{p_project_id:projectId,p_query:query,p_limit:limit});
+  return data||[];
+}
 async function knowledgeSearchQuery(query:string){
   const q=cleanText(query,500);
   if(!q)return "";
@@ -95,13 +127,20 @@ async function knowledgeSearchQuery(query:string){
   }
   return q;
 }
+async function projectAccessAllowed(db:any,projectId:string,subject:string,globalRole:string,write=false){
+  if(!projectId)return true;
+  if(globalRole==="owner")return true;
+  const {data}=await db.from("dexter_project_members").select("role,active").eq("project_id",projectId).eq("subject",subject).eq("active",true).maybeSingle();
+  if(!data)return false;
+  return write?["owner","manager","editor"].includes(String(data.role)):["owner","manager","editor","viewer"].includes(String(data.role));
+}
 async function loadContext(db:any,query="",role="owner",projectId=""){
   const safeQuery=cleanText(query,500);
   const searchQuery=await knowledgeSearchQuery(safeQuery);
   const allowed=businessCategoriesForRole(role);
   const businessPromise=searchQuery ? db.rpc("dexter_search_business_knowledge",{p_query:searchQuery,p_limit:30}) : Promise.resolve({data:[]});
   const projectPromise=projectId ? db.from("dexter_projects").select("id,name,slug,description,status,system_scope,default_agent,metadata,updated_at").eq("id",projectId).maybeSingle() : Promise.resolve({data:null});
-  const fileSearchPromise=(projectId&&searchQuery) ? db.rpc("dexter_search_project_files",{p_project_id:projectId,p_query:searchQuery,p_limit:12}) : Promise.resolve({data:[]});
+  const fileSearchPromise=(projectId&&searchQuery) ? hybridProjectSearch(db,projectId,searchQuery,12).then(data=>({data})) : Promise.resolve({data:[]});
   const [{data:knowledge},{data:memory},{data:agents},{data:permissions},{data:learning},business,liveMenu,projectRow,fileSearch]=await Promise.all([
     db.from("dexter_ai_knowledge").select("category,title,content").eq("enabled",true).order("category").limit(80),
     db.from("dexter_approved_memory").select("category,content").eq("active",true).order("approved_at",{ascending:false}).limit(40),
@@ -489,8 +528,47 @@ Deno.serve(async(req)=>{
     const {db,role,keyName}=await authenticate(req);
     const body=await req.json().catch(()=>({}));
     const action=cleanText(body.action||"chat",30).toLowerCase();
-    const sessionId=validSession(body.sessionId);
+    if(role==="scheduler"&&action!=="scheduled_run_due")return json({error:"Scheduler token is restricted to scheduled jobs."},403);
+    const sessionId=validSession(body.sessionId)||(role==="scheduler"?crypto.randomUUID():"");
     if(!sessionId)return json({error:"Invalid session"},400);
+
+    if(action==="scheduled_run_due"){
+      const {data:jobs}=await db.from("dexter_scheduled_jobs").select("*").eq("enabled",true).lte("next_run_at",now()).order("next_run_at").limit(10);
+      const results:any[]=[];
+      for(const job of (jobs||[])){
+        const started=now();
+        try{
+          if(job.action==="operations_check"||job.action==="secret_health"){
+            const {error}=await db.rpc("dexter_run_advanced_health");if(error)throw error;
+          }else if(job.action==="connector_probe"){
+            try{await githubExecute(db,"repo.read",{repo:"jamiegreen294-boop/dexters-ai-v1"},false);await db.from("ai_connectors").update({status:"ready",last_checked_at:now(),last_error:null}).eq("connector_key","github");}catch(e){await db.from("ai_connectors").update({status:"error",last_checked_at:now(),last_error:String((e as Error)?.message||e).slice(0,500)}).eq("connector_key","github");}
+            try{await vercelExecute(db,"deployments.read",{projectId:"prj_jHa0ZVvB2Eu8eMqWBQkDgZFehuCA",limit:1},false);await db.from("ai_connectors").update({status:"ready",last_checked_at:now(),last_error:null}).eq("connector_key","vercel");}catch(e){await db.from("ai_connectors").update({status:"error",last_checked_at:now(),last_error:String((e as Error)?.message||e).slice(0,500)}).eq("connector_key","vercel");}
+            try{await supabaseExecute(db,"management.read",{method:"GET",path:"/v1/projects/eikruaxxzzxmfjvsmwwo"},false);await db.from("ai_connectors").update({status:"ready",last_checked_at:now(),last_error:null}).eq("connector_key","supabase");}catch(e){await db.from("ai_connectors").update({status:"error",last_checked_at:now(),last_error:String((e as Error)?.message||e).slice(0,500)}).eq("connector_key","supabase");}
+          }else if(job.action==="work"){
+            const message=cleanText(job.payload?.message,12000);if(!message)throw new Error("Scheduled Work job has no message.");
+            const projectId=cleanText(job.project_id||job.payload?.projectId,80);
+            const context=await loadContext(db,message,"owner",projectId);
+            const agentKey=chooseAgent(message,cleanText(job.payload?.agent,60),context.agents);
+            const ai=await callAI([{role:"system",content:basePrompt("owner",context,agentKey)},{role:"user",content:message}],Math.min(2500,Math.max(500,Number(job.payload?.max_output_tokens)||1400)));
+            const {data:task,error:te}=await db.from("ai_tasks").insert({title:cleanText(job.name,120),description:message,project_id:projectId||null,status:"completed",agent_key:agentKey,progress:100,result:ai.reply,requires_approval:false}).select("*").single();
+            if(te)throw te;
+            await db.from("dexter_work_artifacts").insert({task_id:task.id,project_id:projectId||null,name:"Scheduled result",artifact_type:"report",content:ai.reply,metadata:{scheduled_job_id:job.id,model:ai.model}});
+            results.push({job:job.name,task_id:task.id,model:ai.model});
+          }else throw new Error("Unsupported scheduled action: "+job.action);
+          const cadence=Math.max(60,Number(job.payload?.cadence_minutes)||((job.action==="operations_check")?60:1440));
+          await db.from("dexter_scheduled_jobs").update({last_run_at:started,last_status:"completed",last_error:null,next_run_at:new Date(Date.now()+cadence*60000).toISOString(),updated_at:now()}).eq("id",job.id);
+          await db.from("dexter_notifications").update({status:"dismissed"}).eq("notification_key","schedule:"+job.id).eq("status","unread");
+          results.push({job:job.name,status:"completed"});
+        }catch(e){
+          const error=String((e as Error)?.message||e).slice(0,1000);
+          await db.from("dexter_scheduled_jobs").update({last_run_at:started,last_status:"failed",last_error:error,next_run_at:new Date(Date.now()+60*60000).toISOString(),updated_at:now()}).eq("id",job.id);
+          const {data:existing}=await db.from("dexter_notifications").select("id").eq("notification_key","schedule:"+job.id).eq("status","unread").maybeSingle();
+          if(!existing)await db.from("dexter_notifications").insert({severity:"error",notification_key:"schedule:"+job.id,title:"Scheduled Dexter job failed",message:job.name+": "+error,source:"scheduler",metadata:{scheduled_job_id:job.id}});
+          results.push({job:job.name,status:"failed",error});
+        }
+      }
+      return json({ran:results.length,results,checkedAt:now()});
+    }
 
     if(action==="health"){
       const [{count:knowledgeCount},{count:businessKnowledgeCount},{count:taskCount},liveMenu,{data:homeAgents}]=await Promise.all([
@@ -584,21 +662,99 @@ Deno.serve(async(req)=>{
       const {data:connectors}=await db.from("ai_connectors").select("connector_key,name,connector_type,status,capabilities,config,last_checked_at,last_error").order("name");
       const {data:toolRequests}=await db.from("ai_tool_requests").select("id,task_id,connector_key,tool_name,status,requires_approval,result,error,created_at,updated_at").order("created_at",{ascending:false}).limit(40);
       const {data:artifacts}=await db.from("dexter_work_artifacts").select("id,task_id,project_id,name,artifact_type,metadata,created_at,updated_at").order("created_at",{ascending:false}).limit(100);
-      const [{data:projects},{data:projectFiles},{data:artifactVersions},{data:memoryProposals},{data:postmortems},{data:operationsHealth},{data:operationsChecks}]=await Promise.all([
+      const [{data:projects},{data:projectFiles},{data:artifactVersions},{data:memoryProposals},{data:postmortems},{data:operationsHealth},{data:operationsChecks},{data:notifications},{data:scheduledJobs},{data:projectMembers},{data:secretHealth},{data:evalRuns}]=await Promise.all([
         db.from("dexter_projects").select("*").order("name"),
         db.from("dexter_project_files").select("id,project_id,name,file_type,mime_type,size_bytes,version,source,metadata,extraction_status,indexed_at,extracted_at,extraction_error,created_at,updated_at").order("updated_at",{ascending:false}).limit(200),
         db.from("dexter_artifact_versions").select("id,artifact_id,version,name,created_by,created_at").order("created_at",{ascending:false}).limit(200),
         db.from("dexter_memory_proposals").select("*").order("created_at",{ascending:false}).limit(100),
         db.from("dexter_postmortems").select("*").order("created_at",{ascending:false}).limit(100),
         db.from("dexter_operations_health").select("*").order("checked_at",{ascending:false}).limit(100),
-        db.from("dexter_operations_checks").select("*").order("name")
+        db.from("dexter_operations_checks").select("*").order("name"),
+        db.from("dexter_notifications").select("*").order("created_at",{ascending:false}).limit(100),
+        db.from("dexter_scheduled_jobs").select("*").order("name"),
+        db.from("dexter_project_members").select("*").eq("active",true).order("created_at"),
+        db.from("dexter_secret_health").select("*").order("provider"),
+        db.from("dexter_eval_runs").select("*").order("created_at",{ascending:false}).limit(20)
       ]);
-      return json({role,agents:agents||[],tasks:tasks||[],approvals:approvals||[],knowledge:knowledge||[],memory:memory||[],learning:learning||[],audit:audit||[],orchestration:orchestration||[],settings:settings||[],connectors:connectors||[],toolRequests:toolRequests||[],artifacts:artifacts||[],projects:projects||[],projectFiles:projectFiles||[],artifactVersions:artifactVersions||[],memoryProposals:memoryProposals||[],postmortems:postmortems||[],operationsHealth:operationsHealth||[],operationsChecks:operationsChecks||[],homeAgents:homeAgents||[],homeJobs:homeJobs||[],environment:"test",liveWrites:false});
+      return json({role,agents:agents||[],tasks:tasks||[],approvals:approvals||[],knowledge:knowledge||[],memory:memory||[],learning:learning||[],audit:audit||[],orchestration:orchestration||[],settings:settings||[],connectors:connectors||[],toolRequests:toolRequests||[],artifacts:artifacts||[],projects:projects||[],projectFiles:projectFiles||[],artifactVersions:artifactVersions||[],memoryProposals:memoryProposals||[],postmortems:postmortems||[],operationsHealth:operationsHealth||[],operationsChecks:operationsChecks||[],notifications:notifications||[],scheduledJobs:scheduledJobs||[],projectMembers:projectMembers||[],secretHealth:secretHealth||[],evalRuns:evalRuns||[],homeAgents:homeAgents||[],homeJobs:homeJobs||[],environment:"test",liveWrites:false});
     }
 
     
     
     
+    if(action==="notifications"){
+      const {data}=await db.from("dexter_notifications").select("*").neq("status","dismissed").order("created_at",{ascending:false}).limit(100);
+      return json({notifications:data||[]});
+    }
+    if(action==="notification_review"){
+      if(role!=="owner")return json({error:"Owner access required."},403);
+      const id=cleanText(body.notificationId,80),status=["read","dismissed"].includes(body.status)?body.status:"read";
+      const {data,error}=await db.from("dexter_notifications").update({status,read_at:status==="read"?now():null}).eq("id",id).select("*").single();
+      if(error)throw error; return json({notification:data});
+    }
+    if(action==="schedule_create"){
+      if(role!=="owner")return json({error:"Owner access required."},403);
+      const name=cleanText(body.name,160),cron=cleanText(body.cronExpression,80),scheduledAction=cleanText(body.scheduledAction,80);
+      if(!name||!cron||!scheduledAction)return json({error:"Name, schedule and action are required."},400);
+      const cadence=Math.max(60,Number(body.cadenceMinutes)||1440);
+      const payload={...(body.payload||{}),cadence_minutes:cadence};
+      const {data,error}=await db.from("dexter_scheduled_jobs").insert({name,project_id:cleanText(body.projectId,80)||null,action:scheduledAction,payload,cron_expression:cron,next_run_at:new Date(Date.now()+cadence*60000).toISOString(),created_by:keyName}).select("*").single();
+      if(error)throw error; return json({job:data});
+    }
+    if(action==="schedule_toggle"){
+      if(role!=="owner")return json({error:"Owner access required."},403);
+      const {data,error}=await db.from("dexter_scheduled_jobs").update({enabled:Boolean(body.enabled),updated_at:now()}).eq("id",cleanText(body.jobId,80)).select("*").single();
+      if(error)throw error; return json({job:data});
+    }
+    if(action==="project_member_set"){
+      if(role!=="owner")return json({error:"Owner access required."},403);
+      const projectId=cleanText(body.projectId,80),subject=cleanText(body.subject,160),memberRole=cleanText(body.memberRole,40);
+      if(!projectId||!subject||!["owner","manager","editor","viewer"].includes(memberRole))return json({error:"Valid project, subject and role are required."},400);
+      const {data,error}=await db.from("dexter_project_members").upsert({project_id:projectId,subject,role:memberRole,capabilities:Array.isArray(body.capabilities)?body.capabilities:[],active:true,updated_at:now()},{onConflict:"project_id,subject"}).select("*").single();
+      if(error)throw error; return json({member:data});
+    }
+    if(action==="secret_health_check"){
+      if(role!=="owner")return json({error:"Owner access required."},403);
+      const {data:bindings}=await db.from("dexter_secret_bindings").select("provider,secret_name,created_at,last_used_at,updated_at,active");
+      const rows:any[]=[];
+      for(const b of (bindings||[])){
+        const basis=b.updated_at||b.created_at||now(),age=Math.max(0,Math.floor((Date.now()-new Date(basis).getTime())/86400000));
+        const status=!b.active?"inactive":age>180?"rotate":age>90?"review":"healthy";
+        rows.push({provider:b.provider,secret_name:b.secret_name,status,last_verified_at:now(),age_days:age,note:status==="healthy"?"Credential age is within policy window.":"Credential should be reviewed/rotated.",metadata:{last_used_at:b.last_used_at||null}});
+      }
+      if(rows.length)await db.from("dexter_secret_health").upsert(rows,{onConflict:"provider,secret_name"});
+      return json({secrets:rows});
+    }
+    if(action==="audit_export"){
+      if(role!=="owner")return json({error:"Owner access required."},403);
+      const {data}=await db.from("ai_audit_logs").select("*").order("created_at",{ascending:false}).limit(Math.min(5000,Math.max(100,Number(body.limit)||1000)));
+      const format=cleanText(body.format||"json",10);
+      if(format==="csv"){
+        const esc=(v:any)=>'"'+String(v??"").replace(/"/g,'""')+'"';
+        const lines=["created_at,actor,action,environment,details",...(data||[]).map((x:any)=>[x.created_at,x.actor,x.action,x.environment,JSON.stringify(x.details||{})].map(esc).join(","))];
+        return json({filename:"dexter-audit.csv",mimeType:"text/csv",content:lines.join("\n")});
+      }
+      return json({filename:"dexter-audit.json",mimeType:"application/json",content:JSON.stringify(data||[],null,2)});
+    }
+    if(action==="eval_run"){
+      if(role!=="owner")return json({error:"Owner access required."},403);
+      const {data:cases}=await db.from("dexter_eval_cases").select("*").eq("enabled",true).limit(30);
+      const {data:run}=await db.from("dexter_eval_runs").insert({status:"running"}).select("*").single();
+      const results:any[]=[]; let passed=0,failed=0,lastModel="";
+      for(const tc of (cases||[])){
+        try{
+          const ctx=await loadContext(db,tc.prompt,role,tc.project_id||"");
+          const agent=chooseAgent(tc.prompt,"",ctx.agents);
+          const ai=await callAI([{role:"system",content:basePrompt(role,ctx,agent)},{role:"user",content:tc.prompt}],500);
+          lastModel=ai.model||lastModel; const lower=String(ai.reply||"").toLowerCase();
+          const good=(tc.expected_contains||[]).every((x:string)=>lower.includes(String(x).toLowerCase())) && !(tc.forbidden_contains||[]).some((x:string)=>lower.includes(String(x).toLowerCase()));
+          good?passed++:failed++; results.push({case:tc.name,ok:good,reply:String(ai.reply||"").slice(0,1000)});
+        }catch(e){failed++;results.push({case:tc.name,ok:false,error:String((e as Error)?.message||e)});}
+      }
+      await db.from("dexter_eval_runs").update({status:failed?"partial":"pass",passed,failed,results,model:lastModel,completed_at:now()}).eq("id",run.id);
+      return json({passed,failed,results,model:lastModel});
+    }
+
     if(action==="project_create"){
       if(role!=="owner")return json({error:"Only owner access can create projects."},403);
       const name=cleanText(body.name,120),description=cleanText(body.description,2000);
@@ -616,6 +772,7 @@ Deno.serve(async(req)=>{
       const base64=String(body.base64||"");
       const textContent=typeof body.contentText==="string"?String(body.contentText):null;
       if(!projectId||!name)return json({error:"Project and file name are required."},400);
+      if(!(await projectAccessAllowed(db,projectId,keyName,role,true)))return json({error:"You do not have write access to this project."},403);
       const {data:project}=await db.from("dexter_projects").select("id").eq("id",projectId).maybeSingle();
       if(!project)return json({error:"Project not found."},404);
       let bytes:Uint8Array|null=null;
@@ -650,7 +807,19 @@ Deno.serve(async(req)=>{
           const content=storedText.slice(pos,pos+chunkSize).trim();
           if(content)chunks.push({file_id:data.id,project_id:projectId,chunk_index:chunks.length,content,token_estimate:Math.ceil(content.length/4),metadata:{file_name:name}});
         }
-        if(chunks.length){const {error:chunkError}=await db.from("dexter_project_file_chunks").insert(chunks);if(chunkError)throw chunkError;chunkCount=chunks.length;}
+        if(chunks.length){
+          const {data:inserted,error:chunkError}=await db.from("dexter_project_file_chunks").insert(chunks).select("id,chunk_index,content");
+          if(chunkError)throw chunkError;
+          chunkCount=chunks.length;
+          const rows=inserted||[];
+          for(let i=0;i<rows.length;i+=50){
+            const batch=rows.slice(i,i+50);
+            const vectors=await embedTexts(batch.map((x:any)=>x.content));
+            for(let j=0;j<vectors.length;j++){
+              if(vectors[j])await db.from("dexter_project_file_chunks").update({embedding:JSON.stringify(vectors[j])}).eq("id",batch[j].id);
+            }
+          }
+        }
       }
       await logAudit(db,"project.file_uploaded",keyName,{project_id:projectId,file_id:data.id,name,size_bytes:bytes.length,indexed:Boolean(storedText),chunks:chunkCount});
       return json({file:data,indexed:Boolean(storedText),chunks:chunkCount,needsExtraction:!storedText});
@@ -669,15 +838,87 @@ Deno.serve(async(req)=>{
       return json({file:data,signedUrl});
     }
 
+    if(action==="project_file_extract"){
+      if(role!=="owner")return json({error:"Owner access required."},403);
+      const fileId=cleanText(body.fileId,80);
+      const {data:file,error}=await db.from("dexter_project_files").select("*").eq("id",fileId).maybeSingle();
+      if(error||!file)return json({error:"Project file not found."},404);
+      if(!file.storage_path)return json({error:"This project file has no stored binary to extract."},400);
+      const {data:signed,error:signError}=await db.storage.from("dexter-ai-project-files").createSignedUrl(String(file.storage_path),1800);
+      if(signError||!signed?.signedUrl)throw signError||new Error("Could not create extraction URL.");
+      const {data:job,error:jobError}=await db.from("dexter_home_jobs").insert({
+        job_type:"workspace",tool_name:"document.extract",
+        request:{url:signed.signedUrl,name:file.name,file_id:file.id,project_id:file.project_id},
+        status:"queued"
+      }).select("*").single();
+      if(jobError)throw jobError;
+      await db.from("dexter_project_files").update({extraction_status:"queued",extraction_error:null}).eq("id",fileId);
+      await logAudit(db,"project.file_extraction_queued",keyName,{file_id:fileId,job_id:job.id});
+      return json({job,fileId});
+    }
+
+    if(action==="project_file_finalize_extraction"){
+      if(role!=="owner")return json({error:"Owner access required."},403);
+      const jobId=cleanText(body.jobId,80);
+      const {data:job,error}=await db.from("dexter_home_jobs").select("*").eq("id",jobId).maybeSingle();
+      if(error||!job)return json({error:"Extraction job not found."},404);
+      if(job.status==="failed"){
+        const fileId=cleanText(job.request?.file_id,80);
+        if(fileId)await db.from("dexter_project_files").update({extraction_status:"failed",extraction_error:cleanText(job.error,1000)}).eq("id",fileId);
+        return json({status:"failed",error:job.error},409);
+      }
+      if(job.status!=="completed")return json({status:job.status,job});
+      const fileId=cleanText(job.request?.file_id,80),projectId=cleanText(job.request?.project_id,80),text=cleanText(job.result?.text,1000000);
+      if(!fileId||!projectId||!text)return json({error:"Completed extraction returned no usable text."},422);
+      await db.from("dexter_project_file_chunks").delete().eq("file_id",fileId);
+      const chunks:any[]=[];const chunkSize=2800,overlap=300;
+      for(let pos=0;pos<text.length&&chunks.length<400;pos+=chunkSize-overlap){
+        const content=text.slice(pos,pos+chunkSize).trim();if(content)chunks.push({file_id:fileId,project_id:projectId,chunk_index:chunks.length,content,token_estimate:Math.ceil(content.length/4),metadata:{extraction_method:job.result?.method||"home-pc"}});
+      }
+      if(chunks.length){
+        const {data:inserted,error:chunkError}=await db.from("dexter_project_file_chunks").insert(chunks).select("id,content");
+        if(chunkError)throw chunkError;
+        const rows=inserted||[];
+        for(let i=0;i<rows.length;i+=50){
+          const batch=rows.slice(i,i+50),vectors=await embedTexts(batch.map((x:any)=>x.content));
+          for(let j=0;j<vectors.length;j++)if(vectors[j])await db.from("dexter_project_file_chunks").update({embedding:JSON.stringify(vectors[j])}).eq("id",batch[j].id);
+        }
+      }
+      await db.from("dexter_project_files").update({content_text:text,extraction_status:"indexed",extracted_at:now(),indexed_at:now(),extraction_error:null,metadata:{extraction_method:job.result?.method||"home-pc"}}).eq("id",fileId);
+      await logAudit(db,"project.file_extracted",keyName,{file_id:fileId,job_id:jobId,chunks:chunks.length});
+      return json({status:"indexed",fileId,chunks:chunks.length,method:job.result?.method||"home-pc"});
+    }
+
+    if(action==="artifact_rich_export"){
+      if(role!=="owner")return json({error:"Owner access required."},403);
+      const artifactId=cleanText(body.artifactId,80),format=cleanText(body.format||"pdf",12).toLowerCase();
+      if(!["pdf","docx","xlsx","zip"].includes(format))return json({error:"Rich export supports PDF, DOCX, XLSX and ZIP."},400);
+      const {data:artifact,error}=await db.from("dexter_work_artifacts").select("*").eq("id",artifactId).maybeSingle();
+      if(error||!artifact)return json({error:"Artifact not found."},404);
+      const {data:job,error:jobError}=await db.from("dexter_home_jobs").insert({
+        task_id:artifact.task_id,job_type:"workspace",tool_name:"artifact.export.rich",
+        request:{artifact_id:artifactId,format,name:artifact.name||"dexter-artifact",content:String(artifact.content||"")},
+        status:"queued"
+      }).select("*").single();
+      if(jobError)throw jobError;
+      return json({job,format});
+    }
+
+    if(action==="home_job_status"){
+      const {data,error}=await db.from("dexter_home_jobs").select("*").eq("id",cleanText(body.jobId,80)).maybeSingle();
+      if(error||!data)return json({error:"Home PC job not found."},404);
+      return json({job:data});
+    }
+
     if(action==="project_file_search"){
       if(!["owner","manager"].includes(role))return json({error:"Project file search requires owner/manager access."},403);
       const projectId=cleanText(body.projectId,80),query=cleanText(body.query,1000);
       if(!projectId||!query)return json({error:"Project and search query are required."},400);
+      if(!(await projectAccessAllowed(db,projectId,keyName,role,false)))return json({error:"You do not have access to this project."},403);
       const searchQuery=await knowledgeSearchQuery(query);
-      const {data,error}=await db.rpc("dexter_search_project_files",{p_project_id:projectId,p_query:searchQuery,p_limit:Math.min(30,Math.max(1,Number(body.limit)||12))});
-      if(error)throw error;
-      await logAudit(db,"project.files_searched",keyName,{project_id:projectId,query:searchQuery,matches:(data||[]).length});
-      return json({results:data||[],query:searchQuery});
+      const data=await hybridProjectSearch(db,projectId,searchQuery,Math.min(30,Math.max(1,Number(body.limit)||12)));
+      await logAudit(db,"project.files_searched",keyName,{project_id:projectId,query:searchQuery,matches:(data||[]).length,hybrid:true});
+      return json({results:data||[],query:searchQuery,hybrid:true});
     }
 
     if(action==="artifact_export"){
@@ -1481,7 +1722,9 @@ await db.from("ai_task_events").insert({task_id:task.id,event_type:"completed",m
         role,agent:"Dexter",model:"stable-diffusion.cpp-cpu",imageJob:job,liveWrites:false
       });
     }
-    const context=await loadContext(db,message,role,cleanText(body.projectId,80));
+    const chatProjectId=cleanText(body.projectId,80);
+    if(chatProjectId&&!(await projectAccessAllowed(db,chatProjectId,keyName,role,false)))return json({error:"You do not have access to this project."},403);
+    const context=await loadContext(db,message,role,chatProjectId);
     const agentKey=chooseAgent(message,cleanText(body.agent,60),context.agents);
     let chatToolContext:any=null;
     const chatHomeUrl=(Deno.env.get("DEXTER_HOME_HOST_URL")||"").replace(/\/$/,"");

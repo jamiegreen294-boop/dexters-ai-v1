@@ -40,6 +40,7 @@ for(const dir of [PROFILE,WORKSPACE,JOB_DIR,IMAGE_DIR,SDCPP_DIR,SDCPP_MODEL_DIR]
 
 let context;
 const pageSessions=new Map();
+const pageDiagnostics=new WeakMap();
 
 function json(res,status,body){
   const data=JSON.stringify(body);
@@ -96,6 +97,14 @@ async function getContext(){
   });
   return context;
 }
+function attachPageDiagnostics(page){
+  if(pageDiagnostics.has(page))return;
+  const state={console_errors:[],page_errors:[],failed_requests:[]};
+  pageDiagnostics.set(page,state);
+  page.on("console",msg=>{if(msg.type()==="error")state.console_errors.push(msg.text().slice(0,1000));});
+  page.on("pageerror",err=>state.page_errors.push(String(err?.message||err).slice(0,1000)));
+  page.on("requestfailed",req=>state.failed_requests.push({url:req.url().slice(0,1000),error:req.failure()?.errorText||"failed"}));
+}
 async function getPage(session="default"){
   let ctx=await getContext();
   if(pageSessions.has(session)){
@@ -105,6 +114,7 @@ async function getPage(session="default"){
   }
   try{
     const p=await ctx.newPage();
+    attachPageDiagnostics(p);
     pageSessions.set(session,p);
     return p;
   }catch(err){
@@ -112,6 +122,7 @@ async function getPage(session="default"){
     await resetBrowserContext();
     ctx=await getContext();
     const p=await ctx.newPage();
+    attachPageDiagnostics(p);
     pageSessions.set(session,p);
     return p;
   }
@@ -132,7 +143,16 @@ async function snapshot(page){
     })});
   });
   const text=(await page.locator("body").innerText().catch(()=>"" )).slice(0,16000);
-  return {url:page.url(),title:await page.title(),text,elements};
+  const diagnostics=pageDiagnostics.get(page)||{console_errors:[],page_errors:[],failed_requests:[]};
+  const accessibility=await page.evaluate(()=>{
+    const missingAlt=Array.from(document.querySelectorAll("img")).filter(x=>!x.getAttribute("alt")).length;
+    const unnamedButtons=Array.from(document.querySelectorAll("button,[role=button]")).filter(x=>!((x.textContent||"").trim()||x.getAttribute("aria-label")||x.getAttribute("title"))).length;
+    const unlabeled=Array.from(document.querySelectorAll("input,textarea,select")).filter(x=>{
+      const id=x.id;return !(x.getAttribute("aria-label")||x.getAttribute("aria-labelledby")||(id&&document.querySelector('label[for="'+CSS.escape(id)+'"]')));
+    }).length;
+    return {missing_alt:missingAlt,unnamed_buttons:unnamedButtons,unlabeled_controls:unlabeled,total_issues:missingAlt+unnamedButtons+unlabeled};
+  }).catch(()=>({missing_alt:0,unnamed_buttons:0,unlabeled_controls:0,total_issues:0}));
+  return {url:page.url(),title:await page.title(),text,elements,diagnostics,accessibility};
 }
 async function byRef(page,ref){
   const value=String(ref||"");
@@ -503,18 +523,27 @@ async function automaticCodeChecks(repoPath){
   }catch(e){results.push({name:"package-check",result:{code:1,stderr:String(e?.message||e)}});}
   return results;
 }
-async function verifyCodingPreview(url){
+async function verifyCodingPreview(url,baselinePath=""){
   if(!url)return null;
   try{
-    const ctx=await getContext(),page=await ctx.newPage();
-    await page.goto(safeUrl(url),{waitUntil:"domcontentloaded",timeout:45000});
+    const ctx=await getContext(),page=await ctx.newPage();attachPageDiagnostics(page);
+    await page.goto(safeUrl(url),{waitUntil:"networkidle",timeout:45000}).catch(async()=>page.goto(safeUrl(url),{waitUntil:"domcontentloaded",timeout:45000}));
     await page.waitForTimeout(800);
-    const file=path.join(IMAGE_DIR,"code-preview-"+Date.now()+".png");
-    await page.screenshot({path:file,fullPage:true});
-    const out={url:page.url(),title:await page.title(),screenshot_path:file};
-    await page.close();
-    return out;
-  }catch(e){return {error:String(e?.message||e),url:String(url)};}
+    const shot=await page.screenshot({fullPage:true});
+    const file=path.join(IMAGE_DIR,"code-preview-"+Date.now()+".png");fs.writeFileSync(file,shot);
+    const currentHash=crypto.createHash("sha256").update(shot).digest("hex");
+    let baseline=null;
+    if(baselinePath){
+      try{
+        const base=fs.readFileSync(safeWorkspacePath(baselinePath));
+        baseline={path:baselinePath,sha256:crypto.createHash("sha256").update(base).digest("hex"),changed:!base.equals(shot)};
+      }catch(e){baseline={path:baselinePath,error:String(e?.message||e)};}
+    }
+    const snap=await snapshot(page);
+    const failed=snap.diagnostics.console_errors.length>0||snap.diagnostics.page_errors.length>0||snap.diagnostics.failed_requests.length>0;
+    const out={url:page.url(),title:await page.title(),screenshot_path:file,screenshot_sha256:currentHash,visual_comparison:baseline,diagnostics:snap.diagnostics,accessibility:snap.accessibility,verification_passed:!failed};
+    await page.close();return out;
+  }catch(e){return {error:String(e?.message||e),url:String(url),verification_passed:false};}
 }
 
 async function codingAgent(request={}){
@@ -588,7 +617,7 @@ async function codingAgent(request={}){
       const finalStatus=await workspaceTool("git.status",{path:repoPath}).catch(()=>null);
       const diff=await workspaceTool("git.diff",{path:repoPath,file:"."}).catch(()=>null);
       const automatic_checks=await automaticCodeChecks(repoPath);
-      const preview=await verifyCodingPreview(request.preview_url||request.previewUrl||"");
+      const preview=await verifyCodingPreview(request.preview_url||request.previewUrl||"",request.baseline_screenshot_path||request.baselineScreenshotPath||"");
       return {
         status:"completed",
         result:String(plan.result||"Fast coding pass completed"),
@@ -650,7 +679,7 @@ async function codingAgent(request={}){
       const diff=await workspaceTool("git.diff",{path:repoPath,file:"."}).catch(()=>null);
       const finalStatus=await workspaceTool("git.status",{path:repoPath}).catch(()=>null);
       const automatic_checks=await automaticCodeChecks(repoPath);
-      const preview=await verifyCodingPreview(request.preview_url||request.previewUrl||"");
+      const preview=await verifyCodingPreview(request.preview_url||request.previewUrl||"",request.baseline_screenshot_path||request.baselineScreenshotPath||"");
       return {status:"completed",result:String(decision.result||decision.reason||"Completed"),repo_path:repoPath,test_branch:testBranch,history,automatic_checks,preview,git_status:finalStatus,git_diff:diff};
     }else if(decision.action==="blocked")return {status:"blocked",reason:String(decision.reason||"Blocked"),repo_path:repoPath,history};
     else throw new Error("Unsupported coding-agent action: "+decision.action);
@@ -906,6 +935,98 @@ async function hardwareBridgeRead(){
   return parseHardwareJson(await runHardwarePowerShell(ps,30000));
 }
 
+
+async function documentExtract(request={}){
+  const url=String(request.url||"").trim();
+  const name=String(request.name||"document").replace(/[^A-Za-z0-9._-]/g,"_");
+  if(!url)throw new Error("Document URL is required.");
+  const ext=path.extname(name).toLowerCase();
+  const tempDir=path.join(WORKSPACE,"document-extract");fs.mkdirSync(tempDir,{recursive:true});
+  const file=path.join(tempDir,Date.now()+"-"+name);
+  const rr=await fetch(url);if(!rr.ok)throw new Error("Document download failed HTTP "+rr.status);
+  fs.writeFileSync(file,Buffer.from(await rr.arrayBuffer()));
+  if([".txt",".md",".csv",".json",".html",".xml",".js",".ts",".css",".sql",".yml",".yaml"].includes(ext)){
+    return {text:fs.readFileSync(file,"utf8").slice(0,1000000),method:"utf8"};
+  }
+  const py=[
+    "import sys,zipfile,re,html,os",
+    "p=sys.argv[1]; ext=os.path.splitext(p)[1].lower()",
+    "def clean(x): return re.sub(r'\\\\s+',' ',html.unescape(re.sub(r'<[^>]+>',' ',x))).strip()",
+    "out=''",
+    "if ext=='.docx':",
+    " z=zipfile.ZipFile(p); out=clean(z.read('word/document.xml').decode('utf-8','ignore'))",
+    "elif ext=='.xlsx':",
+    " z=zipfile.ZipFile(p); parts=[]; shared=[]",
+    " if 'xl/sharedStrings.xml' in z.namelist(): shared=re.findall(r'<t[^>]*>(.*?)</t>',z.read('xl/sharedStrings.xml').decode('utf-8','ignore'),re.S)",
+    " for n in sorted(x for x in z.namelist() if x.startswith('xl/worksheets/sheet') and x.endswith('.xml')):",
+    "  x=z.read(n).decode('utf-8','ignore'); vals=[]",
+    "  for t,b in re.findall(r'<c[^>]*?(?:t=\\\"(.*?)\\\")?[^>]*>(.*?)</c>',x,re.S):",
+    "   m=re.search(r'<v>(.*?)</v>',b,re.S); v=m.group(1) if m else clean(b)",
+    "   if t=='s' and v.isdigit() and int(v)<len(shared): v=shared[int(v)]",
+    "   vals.append(clean(v))",
+    "  parts.append(n+'\\\\n'+' | '.join(vals))",
+    " out='\\\\n\\\\n'.join(parts)",
+    "elif ext=='.pdf':",
+    " from pypdf import PdfReader",
+    " out='\\\\n'.join((pg.extract_text() or '') for pg in PdfReader(p).pages)",
+    "else: sys.exit(4)",
+    "print(out[:1000000])"
+  ].join("\n");
+  const pr=await runProcess("python",["-c",py,file],WORKSPACE,120000).catch(e=>({code:1,stdout:"",stderr:String(e?.message||e)}));
+  if(pr.code===0)return {text:String(pr.stdout||"").slice(0,1000000),method:"python"};
+  if(ext===".pdf"){
+    const outFile=file+".txt";
+    const pd=await runProcess("pdftotext",[file,outFile],WORKSPACE,120000).catch(()=>null);
+    if(pd&&pd.code===0&&fs.existsSync(outFile))return {text:fs.readFileSync(outFile,"utf8").slice(0,1000000),method:"pdftotext"};
+  }
+  throw new Error("Document extraction failed: "+String(pr.stderr||"unsupported format").slice(0,1000));
+}
+function minimalPdf(text){
+  const safe=String(text||"").replace(/[()\\]/g,m=>"\\"+m).replace(/[^\x20-\x7E\n]/g,"?");
+  const lines=safe.split(/\r?\n/).slice(0,120).map(x=>x.slice(0,100));
+  const stream="BT /F1 10 Tf 50 790 Td 12 TL "+lines.map((l,i)=>(i?"T* ":"")+"("+l+") Tj").join(" ")+" ET";
+  const objs=["<< /Type /Catalog /Pages 2 0 R >>","<< /Type /Pages /Kids [3 0 R] /Count 1 >>","<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 842] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>","<< /Length "+Buffer.byteLength(stream)+" >>\nstream\n"+stream+"\nendstream","<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"];
+  let out="%PDF-1.4\n",offs=[0];objs.forEach((o,i)=>{offs.push(Buffer.byteLength(out));out+=(i+1)+" 0 obj\n"+o+"\nendobj\n";});
+  const x=Buffer.byteLength(out);out+="xref\n0 "+(objs.length+1)+"\n0000000000 65535 f \n"+offs.slice(1).map(n=>String(n).padStart(10,"0")+" 00000 n ").join("\n")+"\ntrailer << /Size "+(objs.length+1)+" /Root 1 0 R >>\nstartxref\n"+x+"\n%%EOF";
+  return Buffer.from(out,"binary");
+}
+async function richArtifactExport(request={}){
+  const format=String(request.format||"pdf").toLowerCase();
+  const name=String(request.name||"dexter-artifact").replace(/[^A-Za-z0-9._-]/g,"-");
+  const content=String(request.content||"");
+  const dir=path.join(WORKSPACE,"exports");fs.mkdirSync(dir,{recursive:true});
+  const xmlEsc=v=>String(v||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  if(format==="pdf"){const file=path.join(dir,name+".pdf");fs.writeFileSync(file,minimalPdf(content));return {path:path.relative(WORKSPACE,file),format,size:fs.statSync(file).size};}
+  if(format==="zip"){
+    const src=path.join(dir,name+".txt"),zip=path.join(dir,name+".zip");fs.writeFileSync(src,content,"utf8");
+    await runHardwarePowerShell("Compress-Archive -Path "+JSON.stringify(src)+" -DestinationPath "+JSON.stringify(zip)+" -Force",60000);
+    return {path:path.relative(WORKSPACE,zip),format,size:fs.statSync(zip).size};
+  }
+  if(format==="docx"){
+    const work=path.join(dir,name+"-docx-"+Date.now());fs.mkdirSync(path.join(work,"_rels"),{recursive:true});fs.mkdirSync(path.join(work,"word"),{recursive:true});
+    fs.writeFileSync(path.join(work,"[Content_Types].xml"),'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>');
+    fs.writeFileSync(path.join(work,"_rels",".rels"),'<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>');
+    const body=content.split(/\r?\n/).map(x=>'<w:p><w:r><w:t xml:space="preserve">'+xmlEsc(x)+'</w:t></w:r></w:p>').join("");
+    fs.writeFileSync(path.join(work,"word","document.xml"),'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>'+body+'</w:body></w:document>');
+    const tmp=path.join(dir,name+".docx.zip"),out=path.join(dir,name+".docx");
+    await runHardwarePowerShell("Compress-Archive -Path "+JSON.stringify(path.join(work,"*"))+" -DestinationPath "+JSON.stringify(tmp)+" -Force",60000);
+    fs.renameSync(tmp,out);return {path:path.relative(WORKSPACE,out),format,size:fs.statSync(out).size};
+  }
+  if(format==="xlsx"){
+    const work=path.join(dir,name+"-xlsx-"+Date.now());fs.mkdirSync(path.join(work,"_rels"),{recursive:true});fs.mkdirSync(path.join(work,"xl","worksheets"),{recursive:true});fs.mkdirSync(path.join(work,"xl","_rels"),{recursive:true});
+    fs.writeFileSync(path.join(work,"[Content_Types].xml"),'<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>');
+    fs.writeFileSync(path.join(work,"_rels",".rels"),'<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>');
+    fs.writeFileSync(path.join(work,"xl","workbook.xml"),'<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Dexter" sheetId="1" r:id="rId1"/></sheets></workbook>');
+    fs.writeFileSync(path.join(work,"xl","_rels","workbook.xml.rels"),'<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>');
+    const rows=content.split(/\r?\n/).slice(0,5000).map((x,i)=>'<row r="'+(i+1)+'"><c r="A'+(i+1)+'" t="inlineStr"><is><t>'+xmlEsc(x)+'</t></is></c></row>').join("");
+    fs.writeFileSync(path.join(work,"xl","worksheets","sheet1.xml"),'<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>'+rows+'</sheetData></worksheet>');
+    const tmp=path.join(dir,name+".xlsx.zip"),out=path.join(dir,name+".xlsx");
+    await runHardwarePowerShell("Compress-Archive -Path "+JSON.stringify(path.join(work,"*"))+" -DestinationPath "+JSON.stringify(tmp)+" -Force",60000);
+    fs.renameSync(tmp,out);return {path:path.relative(WORKSPACE,out),format,size:fs.statSync(out).size};
+  }
+  throw new Error("Rich export supports PDF, DOCX, XLSX and ZIP on the Home PC.");
+}
+
 async function workspaceTool(tool,request={}){
   if(tool==="system.info")return await systemInfo();
   if(tool==="hardware.inspect")return await hardwareInspect();
@@ -931,6 +1052,8 @@ async function workspaceTool(tool,request={}){
   }
   if(tool==="workspace.tree")return {path:String(request.path||""),entries:await listTree(String(request.path||""),Number(request.depth||3),Number(request.max_entries||500))};
   if(tool==="web.research")return await internetResearch(request);
+  if(tool==="document.extract")return await documentExtract(request);
+  if(tool==="artifact.export.rich")return await richArtifactExport(request);
   if(tool==="code.agent")return await codingAgent(request);
   if(tool==="code.direct")return await directCodingPlan(request);
   if(tool==="workspace.read"){
@@ -988,7 +1111,7 @@ async function workspaceTool(tool,request={}){
     if(kind==="node-check"){
       const file=String(request.file||"").trim();
       if(!file)throw new Error("node-check requires a file.");
-      return await runProcess("node",["--check",file],cwd,30000);
+      return await runProcess(process.execPath,["--check",file],cwd,30000);
     }
     throw new Error("Unsupported code check: "+rawKind+". Supported: node-check, npm-test, npm-build, npm-lint.");
   }
