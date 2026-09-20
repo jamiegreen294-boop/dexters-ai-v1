@@ -87,6 +87,8 @@ public class DexterHomeActivity extends Activity {
         addTile(grid,"Camera","CAM",v->startActivity(new Intent("android.media.action.IMAGE_CAPTURE")));
         addTile(grid,"Calculator","123",v->launchPackageOrLabel(new String[]{"com.google.android.calculator","com.android.calculator2"},"Calculator"));
         addTile(grid,"Website","WEB",v->openWeb("https://dextersspot.co.uk"));
+        addTile(grid,"Business Apps","APP",v->startActivity(new Intent(this,BusinessAppsActivity.class)));
+        addTile(grid,"Quick Start","i",v->startActivity(new Intent(this,QuickStartActivity.class)));
         addTile(grid,"Settings","⚙",v->openAdmin());
 
         TextView section = new TextView(this);
