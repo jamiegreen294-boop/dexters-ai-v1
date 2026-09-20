@@ -95,24 +95,27 @@ async function knowledgeSearchQuery(query:string){
   }
   return q;
 }
-async function loadContext(db:any,query="",role="owner"){
+async function loadContext(db:any,query="",role="owner",projectId=""){
   const safeQuery=cleanText(query,500);
   const searchQuery=await knowledgeSearchQuery(safeQuery);
   const allowed=businessCategoriesForRole(role);
-  const businessPromise=searchQuery
-    ? db.rpc("dexter_search_business_knowledge",{p_query:searchQuery,p_limit:30})
-    : Promise.resolve({data:[]});
-  const [{data:knowledge},{data:memory},{data:agents},{data:permissions},{data:learning},business,liveMenu]=await Promise.all([
+  const businessPromise=searchQuery ? db.rpc("dexter_search_business_knowledge",{p_query:searchQuery,p_limit:30}) : Promise.resolve({data:[]});
+  const projectPromise=projectId ? db.from("dexter_projects").select("id,name,slug,description,status,system_scope,default_agent,metadata,updated_at").eq("id",projectId).maybeSingle() : Promise.resolve({data:null});
+  const fileSearchPromise=(projectId&&searchQuery) ? db.rpc("dexter_search_project_files",{p_project_id:projectId,p_query:searchQuery,p_limit:12}) : Promise.resolve({data:[]});
+  const [{data:knowledge},{data:memory},{data:agents},{data:permissions},{data:learning},business,liveMenu,projectRow,fileSearch]=await Promise.all([
     db.from("dexter_ai_knowledge").select("category,title,content").eq("enabled",true).order("category").limit(80),
     db.from("dexter_approved_memory").select("category,content").eq("active",true).order("approved_at",{ascending:false}).limit(40),
     db.from("ai_agents").select("agent_key,name,description").order("name"),
     db.from("ai_tool_permissions").select("agent_key,permission").order("agent_key"),
     db.from("dexter_learning_notes").select("topic,category,lesson,sources,confidence,verified,created_at").eq("active",true).eq("verified",true).order("created_at",{ascending:false}).limit(40),
-    businessPromise,
-    liveMenuForQuery(safeQuery)
+    businessPromise,liveMenuForQuery(safeQuery),projectPromise,fileSearchPromise
   ]);
   const businessKnowledge=(business?.data||[]).filter((x:any)=>allowed.includes(String(x.category||"")));
-  return {knowledge:knowledge||[],businessKnowledge,memory:memory||[],learning:learning||[],agents:agents||[],permissions:permissions||[],liveMenu};
+  return {
+    knowledge:knowledge||[],businessKnowledge,memory:memory||[],learning:learning||[],agents:agents||[],permissions:permissions||[],liveMenu,
+    project:projectRow?.data||null,
+    projectFiles:(fileSearch?.data||[]).map((x:any)=>({file_id:x.file_id,file_name:x.file_name,chunk_index:x.chunk_index,content:cleanText(x.content,6000),rank:Number(x.rank||0),updated_at:x.updated_at}))
+  };
 }
 function roleRules(role:string){
   if(role==="owner")return "Owner role: may view all test knowledge and create test work tasks. No live write is ever implied.";
@@ -383,7 +386,19 @@ function basePrompt(role:string,context:any,agentKey:string){
     JSON.stringify(context.memory).slice(0,16000),
     "",
     "VERIFIED INTERNET-LEARNED KNOWLEDGE",
-    JSON.stringify(context.learning||[]).slice(0,30000)
+    JSON.stringify(context.learning||[]).slice(0,30000),
+    "",
+    "SELECTED PROJECT / WORKSPACE",
+    JSON.stringify(context.project||null).slice(0,12000),
+    "",
+    "PROJECT FILE EVIDENCE (search-ranked; cite file_name when used)",
+    JSON.stringify(context.projectFiles||[]).slice(0,40000),
+    "",
+    "PROJECT EVIDENCE RULES",
+    "- Prefer project-file evidence for project-specific historical/design/implementation details.",
+    "- Cite the project file name when a material claim comes from it.",
+    "- Project metadata may define test/live boundaries; never override live_writes=false.",
+    "- If relevant project files are absent, say so rather than inventing project facts."
   ].join("\n");
 }
 async function logAudit(db:any,action:string,actor:string,details:any={}){
