@@ -6,7 +6,6 @@ import android.content.pm.*;
 import android.net.Uri;
 import android.os.*;
 import android.provider.Settings;
-import androidx.annotation.Nullable;
 import org.json.*;
 import java.io.*;
 import java.net.*;
