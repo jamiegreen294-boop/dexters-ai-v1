@@ -1051,7 +1051,9 @@ async function workspaceTool(tool,request={}){
     return {path:path.relative(WORKSPACE,dir),entries:fs.readdirSync(dir,{withFileTypes:true}).map(x=>({name:x.name,type:x.isDirectory()?"directory":"file"})).slice(0,500)};
   }
   if(tool==="workspace.tree")return {path:String(request.path||""),entries:await listTree(String(request.path||""),Number(request.depth||3),Number(request.max_entries||500))};
-  if(tool==="web.research")return await internetResearch(request);\n  if(tool==="document.extract")return await documentExtract(request);\n  if(tool==="artifact.export.rich")return await richArtifactExport(request);
+  if(tool==="web.research")return await internetResearch(request);
+  if(tool==="document.extract")return await documentExtract(request);
+  if(tool==="artifact.export.rich")return await richArtifactExport(request);
   if(tool==="code.agent")return await codingAgent(request);
   if(tool==="code.direct")return await directCodingPlan(request);
   if(tool==="workspace.read"){
