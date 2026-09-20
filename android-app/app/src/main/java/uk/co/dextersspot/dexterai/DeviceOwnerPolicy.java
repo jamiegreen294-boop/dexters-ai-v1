@@ -3,6 +3,8 @@ package uk.co.dextersspot.dexterai;
 import android.app.admin.DevicePolicyManager;
 import android.content.ComponentName;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.os.Build;
 import android.os.UserManager;
 import org.json.JSONObject;
@@ -31,6 +33,7 @@ public final class DeviceOwnerPolicy {
         try { d.addUserRestriction(a, UserManager.DISALLOW_ADD_USER); } catch(Exception ignored) {}
         try { d.addUserRestriction(a, UserManager.DISALLOW_SAFE_BOOT); } catch(Exception ignored) {}
         try { d.setAutoTimeRequired(a, true); } catch(Exception ignored) {}
+        try { d.setDeviceOwnerLockScreenInfo(a, "Dexters Business Phone · Managed by Dexter AI"); } catch(Exception ignored) {}
     }
 
     public static JSONObject status(Context c) throws Exception {
@@ -53,6 +56,12 @@ public final class DeviceOwnerPolicy {
         d.addUserRestriction(a, UserManager.DISALLOW_FACTORY_RESET);
         d.addUserRestriction(a, UserManager.DISALLOW_CONFIG_DATE_TIME);
         d.setUninstallBlocked(a, c.getPackageName(), true);
+        try {
+            IntentFilter home = new IntentFilter(Intent.ACTION_MAIN);
+            home.addCategory(Intent.CATEGORY_HOME);
+            home.addCategory(Intent.CATEGORY_DEFAULT);
+            d.addPersistentPreferredActivity(a, home, new ComponentName(c, DexterHomeActivity.class));
+        } catch(Exception ignored) {}
         JSONObject j=status(c);
         j.put("businessMode", true);
         return j;
