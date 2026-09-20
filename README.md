@@ -22,3 +22,13 @@ Work mode creates and completes tasks inside `Dexters-AI-Test` only. Any future 
 ## Branch
 
 Do not merge this branch to `main` or connect live write tools until the owner explicitly approves the completed test build.
+
+
+## Canonical source branch
+
+`build/real-dexter-ai` is the single source of truth for the Dexter AI TEST application.
+
+- `gh-pages` is a generated/public test mirror only.
+- Feature work must start from the canonical branch.
+- Home PC self-update pulls from the canonical branch.
+- Live Dexters applications remain separate and are not deployment targets for this repository.
