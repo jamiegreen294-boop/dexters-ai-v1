@@ -783,6 +783,78 @@ Deno.serve(async(req)=>{
       return json({file:data,signedUrl});
     }
 
+    if(action==="project_file_extract"){
+      if(role!=="owner")return json({error:"Owner access required."},403);
+      const fileId=cleanText(body.fileId,80);
+      const {data:file,error}=await db.from("dexter_project_files").select("*").eq("id",fileId).maybeSingle();
+      if(error||!file)return json({error:"Project file not found."},404);
+      if(!file.storage_path)return json({error:"This project file has no stored binary to extract."},400);
+      const {data:signed,error:signError}=await db.storage.from("dexter-ai-project-files").createSignedUrl(String(file.storage_path),1800);
+      if(signError||!signed?.signedUrl)throw signError||new Error("Could not create extraction URL.");
+      const {data:job,error:jobError}=await db.from("dexter_home_jobs").insert({
+        job_type:"workspace",tool_name:"document.extract",
+        request:{url:signed.signedUrl,name:file.name,file_id:file.id,project_id:file.project_id},
+        status:"queued"
+      }).select("*").single();
+      if(jobError)throw jobError;
+      await db.from("dexter_project_files").update({extraction_status:"queued",extraction_error:null}).eq("id",fileId);
+      await logAudit(db,"project.file_extraction_queued",keyName,{file_id:fileId,job_id:job.id});
+      return json({job,fileId});
+    }
+
+    if(action==="project_file_finalize_extraction"){
+      if(role!=="owner")return json({error:"Owner access required."},403);
+      const jobId=cleanText(body.jobId,80);
+      const {data:job,error}=await db.from("dexter_home_jobs").select("*").eq("id",jobId).maybeSingle();
+      if(error||!job)return json({error:"Extraction job not found."},404);
+      if(job.status==="failed"){
+        const fileId=cleanText(job.request?.file_id,80);
+        if(fileId)await db.from("dexter_project_files").update({extraction_status:"failed",extraction_error:cleanText(job.error,1000)}).eq("id",fileId);
+        return json({status:"failed",error:job.error},409);
+      }
+      if(job.status!=="completed")return json({status:job.status,job});
+      const fileId=cleanText(job.request?.file_id,80),projectId=cleanText(job.request?.project_id,80),text=cleanText(job.result?.text,1000000);
+      if(!fileId||!projectId||!text)return json({error:"Completed extraction returned no usable text."},422);
+      await db.from("dexter_project_file_chunks").delete().eq("file_id",fileId);
+      const chunks:any[]=[];const chunkSize=2800,overlap=300;
+      for(let pos=0;pos<text.length&&chunks.length<400;pos+=chunkSize-overlap){
+        const content=text.slice(pos,pos+chunkSize).trim();if(content)chunks.push({file_id:fileId,project_id:projectId,chunk_index:chunks.length,content,token_estimate:Math.ceil(content.length/4),metadata:{extraction_method:job.result?.method||"home-pc"}});
+      }
+      if(chunks.length){
+        const {data:inserted,error:chunkError}=await db.from("dexter_project_file_chunks").insert(chunks).select("id,content");
+        if(chunkError)throw chunkError;
+        const rows=inserted||[];
+        for(let i=0;i<rows.length;i+=50){
+          const batch=rows.slice(i,i+50),vectors=await embedTexts(batch.map((x:any)=>x.content));
+          for(let j=0;j<vectors.length;j++)if(vectors[j])await db.from("dexter_project_file_chunks").update({embedding:vectors[j]}).eq("id",batch[j].id);
+        }
+      }
+      await db.from("dexter_project_files").update({content_text:text,extraction_status:"indexed",extracted_at:now(),indexed_at:now(),extraction_error:null,metadata:{extraction_method:job.result?.method||"home-pc"}}).eq("id",fileId);
+      await logAudit(db,"project.file_extracted",keyName,{file_id:fileId,job_id:jobId,chunks:chunks.length});
+      return json({status:"indexed",fileId,chunks:chunks.length,method:job.result?.method||"home-pc"});
+    }
+
+    if(action==="artifact_rich_export"){
+      if(role!=="owner")return json({error:"Owner access required."},403);
+      const artifactId=cleanText(body.artifactId,80),format=cleanText(body.format||"pdf",12).toLowerCase();
+      if(!["pdf","zip"].includes(format))return json({error:"Rich export currently supports PDF and ZIP."},400);
+      const {data:artifact,error}=await db.from("dexter_work_artifacts").select("*").eq("id",artifactId).maybeSingle();
+      if(error||!artifact)return json({error:"Artifact not found."},404);
+      const {data:job,error:jobError}=await db.from("dexter_home_jobs").insert({
+        task_id:artifact.task_id,job_type:"workspace",tool_name:"artifact.export.rich",
+        request:{artifact_id:artifactId,format,name:artifact.name||"dexter-artifact",content:String(artifact.content||"")},
+        status:"queued"
+      }).select("*").single();
+      if(jobError)throw jobError;
+      return json({job,format});
+    }
+
+    if(action==="home_job_status"){
+      const {data,error}=await db.from("dexter_home_jobs").select("*").eq("id",cleanText(body.jobId,80)).maybeSingle();
+      if(error||!data)return json({error:"Home PC job not found."},404);
+      return json({job:data});
+    }
+
     if(action==="project_file_search"){
       if(!["owner","manager"].includes(role))return json({error:"Project file search requires owner/manager access."},403);
       const projectId=cleanText(body.projectId,80),query=cleanText(body.query,1000);
