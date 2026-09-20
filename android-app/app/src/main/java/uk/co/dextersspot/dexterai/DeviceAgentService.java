@@ -169,7 +169,7 @@ public class DeviceAgentService extends Service {
         return new JSONObject().put("installSessionId",sid).put("confirmationMayBeRequired",true);
     }
 
-    private JSONObject requestUninstall(String pkg) {
+    private JSONObject requestUninstall(String pkg) throws Exception {
         Intent i=new Intent(Intent.ACTION_DELETE,Uri.parse("package:"+pkg));
         i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);startActivity(i);
         return new JSONObject().put("uninstallRequested",pkg).put("confirmationRequired",true);
