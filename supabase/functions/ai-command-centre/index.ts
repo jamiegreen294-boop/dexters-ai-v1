@@ -1310,6 +1310,45 @@ Deno.serve(async(req)=>{
       return json({authorize_url:url,state,redirect_url:redirect});
     }
 
+    if(action==="github_actions_secret_sync"){
+      if(role!=="owner")return json({error:"Owner access required."},403);
+      const repoName=cleanText(body.repo||"jamiegreen294-boop/dexters-ai-v1",220);
+      if(repoName!=="jamiegreen294-boop/dexters-ai-v1")return json({error:"Dexter secure GitHub secret sync is restricted to its own test repository."},403);
+      const allowed=[
+        "DEXTER_ANDROID_KEYSTORE_B64",
+        "DEXTER_ANDROID_KEYSTORE_PASSWORD",
+        "DEXTER_ANDROID_KEY_ALIAS",
+        "DEXTER_ANDROID_KEY_PASSWORD"
+      ];
+      const names=(Array.isArray(body.secretNames)&&body.secretNames.length?body.secretNames:allowed)
+        .map((v:any)=>cleanText(v,100)).filter((v:string)=>allowed.includes(v));
+      if(names.length!==4||new Set(names).size!==4)return json({error:"All four Dexter Android signing secrets are required."},400);
+      const {data:bindings,error:bErr}=await db.from("dexter_secret_bindings").select("*")
+        .eq("provider","android-signing").in("secret_name",names).eq("active",true);
+      if(bErr)throw bErr;
+      if((bindings||[]).length!==4)return json({error:"Dexter Android signing secrets are not fully stored in Vault yet."},409);
+      const handoffs:any={};
+      for(const name of names){
+        const binding=(bindings||[]).find((b:any)=>String(b.secret_name)===name);
+        const targets=Array.isArray(binding?.allowed_targets)?binding.allowed_targets:[];
+        if(!targets.includes("dexter-home-agent"))return json({error:"Signing secret is not permitted for the secure home-agent handoff: "+name},409);
+        const {data:h,error:hErr}=await db.from("dexter_secret_handoffs").insert({
+          binding_id:binding.id,target:"github-actions",purpose:"Set GitHub Actions secret "+name+" for "+repoName,
+          status:"pending",actor:keyName
+        }).select("id").single();
+        if(hErr)throw hErr;
+        handoffs[name]=h.id;
+      }
+      const {data:agent}=await db.from("dexter_home_agents").select("id,last_seen_at").eq("active",true).order("last_seen_at",{ascending:false}).limit(1).maybeSingle();
+      const {data:job,error:jErr}=await db.from("dexter_home_jobs").insert({
+        job_type:"browser",tool_name:"browser.github_actions_secrets",status:"queued",
+        request:{repo:repoName,secret_handoffs:handoffs,approval_granted:true,...(agent?.id?{target_agent_id:agent.id}:{})}
+      }).select("id,status,created_at").single();
+      if(jErr)throw jErr;
+      await logAudit(db,"github.actions_secrets.queued",keyName,{repo:repoName,secret_names:names,home_job_id:job.id});
+      return json({queued:true,job,secret_names:names,plaintext_stored_in_job:false});
+    }
+
     if(action==="tool_request"){
       if(!["owner","manager"].includes(role))return json({error:"Tool requests require owner/manager test access."},403);
       const connectorKey=cleanText(body.connector,60),toolName=cleanText(body.tool,120),request=body.request||{};
