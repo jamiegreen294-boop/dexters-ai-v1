@@ -39,7 +39,7 @@ public class DeviceAgentService extends Service {
     }
 
     @Override public void onDestroy() { running = false; super.onDestroy(); }
-    @Nullable @Override public android.os.IBinder onBind(Intent intent) { return null; }
+    @Override public android.os.IBinder onBind(Intent intent) { return null; }
 
     private void loop() {
         while (running) {
@@ -121,7 +121,7 @@ public class DeviceAgentService extends Service {
     private JSONObject appInventory() throws Exception {
         JSONArray a=new JSONArray();
         PackageManager pm=getPackageManager();
-        List<ApplicationInfo> apps=pm.getInstalledApplications(PackageManager.ApplicationInfoFlags.of(0));
+        List<ApplicationInfo> apps=pm.getInstalledApplications(0);
         for(ApplicationInfo ai:apps){
             JSONObject j=new JSONObject();
             j.put("packageName",ai.packageName);
