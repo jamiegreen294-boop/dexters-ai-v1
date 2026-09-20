@@ -560,7 +560,7 @@ Deno.serve(async(req)=>{
     if(action==="dashboard"){
       const [{data:agents},{data:tasks},{data:approvals},{data:knowledge},{data:memory},{data:learning}]=await Promise.all([
         db.from("ai_agents").select("agent_key,name,description").order("name"),
-        db.from("ai_tasks").select("id,title,status,agent_key,project_id,progress,result,error,requires_approval,created_at,updated_at").order("created_at",{ascending:false}).limit(20),
+        db.from("ai_tasks").select("id,title,status,agent_key,project_id,parent_task_id,retry_count,cancel_requested_at,cancelled_at,progress,result,error,requires_approval,created_at,updated_at").order("created_at",{ascending:false}).limit(20),
         db.from("ai_approvals").select("id,task_id,status,requested_action,created_at,updated_at").order("created_at",{ascending:false}).limit(20),
         db.from("dexter_ai_knowledge").select("category,title,content").eq("enabled",true).order("category").limit(100),
         db.from("dexter_approved_memory").select("id,category,content,approved_at").eq("active",true).order("approved_at",{ascending:false}).limit(50),
@@ -576,7 +576,7 @@ Deno.serve(async(req)=>{
       const {data:artifacts}=await db.from("dexter_work_artifacts").select("id,task_id,project_id,name,artifact_type,metadata,created_at,updated_at").order("created_at",{ascending:false}).limit(100);
       const [{data:projects},{data:projectFiles},{data:artifactVersions},{data:memoryProposals},{data:postmortems},{data:operationsHealth},{data:operationsChecks}]=await Promise.all([
         db.from("dexter_projects").select("*").order("name"),
-        db.from("dexter_project_files").select("id,project_id,name,file_type,mime_type,size_bytes,version,source,metadata,created_at,updated_at").order("updated_at",{ascending:false}).limit(200),
+        db.from("dexter_project_files").select("id,project_id,name,file_type,mime_type,size_bytes,version,source,metadata,extraction_status,indexed_at,extracted_at,extraction_error,created_at,updated_at").order("updated_at",{ascending:false}).limit(200),
         db.from("dexter_artifact_versions").select("id,artifact_id,version,name,created_by,created_at").order("created_at",{ascending:false}).limit(200),
         db.from("dexter_memory_proposals").select("*").order("created_at",{ascending:false}).limit(100),
         db.from("dexter_postmortems").select("*").order("created_at",{ascending:false}).limit(100),
@@ -1143,7 +1143,7 @@ if(action==="task_detail"){
 
       if(!task)return json({error:"Approval task was not found."},404);
       const request=cleanText(task.description||approval.requested_action,12000);
-      const context=await loadContext(db,request,role);
+      const context=await loadContext(db,request,role,cleanText(task.project_id,80));
       const agentKey=cleanText(task.agent_key||chooseAgent(request,"",context.agents),80);
       await db.from("ai_tasks").update({status:"running_preview",progress:25,updated_at:now()}).eq("id",task.id);
       await db.from("ai_orchestration_tasks").update({stage:"running_preview",progress:25,updated_at:now()}).eq("task_id",task.id);
@@ -1198,7 +1198,22 @@ if(action==="task_detail"){
       return json({memory:data});
     }
 
-if(action==="task_cancel"){
+if(action==="home_job_retry"){
+      if(role!=="owner")return json({error:"Only owner access can retry Home PC jobs."},403);
+      const jobId=cleanText(body.jobId,80);
+      const {data:old,error}=await db.from("dexter_home_jobs").select("*").eq("id",jobId).maybeSingle();
+      if(error||!old)return json({error:"Home PC job not found."},404);
+      if(old.status!=="failed")return json({error:"Only failed Home PC jobs can be retried."},409);
+      const {data:job,error:insertError}=await db.from("dexter_home_jobs").insert({
+        task_id:old.task_id,tool_request_id:old.tool_request_id,job_type:old.job_type,tool_name:old.tool_name,
+        request:{...(old.request||{}),retry_of:old.id},status:"queued"
+      }).select("*").single();
+      if(insertError)throw insertError;
+      await logAudit(db,"home_job.retried",keyName,{old_job_id:old.id,new_job_id:job.id});
+      return json({original:old,newJob:job});
+    }
+
+    if(action==="task_cancel"){
       if(role!=="owner")return json({error:"Only owner access can cancel Dexter tasks."},403);
       const taskId=cleanText(body.taskId,80);
       const {data:task,error}=await db.from("ai_tasks").select("*").eq("id",taskId).maybeSingle();
@@ -1231,9 +1246,9 @@ if(action==="task_cancel"){
 
     if(action==="work"){
       if(!["owner","manager"].includes(role))return json({error:"Work mode is restricted to owner/manager test access."},403);
-      const request=cleanText(body.message,12000);
+      const request=cleanText(body.message,12000);\n      const projectId=cleanText(body.projectId,80);
       if(!request)return json({error:"Work request is required"},400);
-      const context=await loadContext(db,request,role);
+      const context=await loadContext(db,request,role,projectId);
       const plan=await planWork(context,role,request,cleanText(body.agent,60));
       const agentKey=plan.primary_agent;
       const title=(cleanText(body.title||plan.summary||request.split(/\n/)[0],120)||"Dexter work task").slice(0,120);
@@ -1381,7 +1396,7 @@ await db.from("ai_task_events").insert({task_id:task.id,event_type:"completed",m
           const proposal=extractJson(memoryExtract.reply);
           if(proposal?.remember&&cleanText(proposal.content,4000)){
             await db.from("dexter_memory_proposals").insert({
-              project_id:cleanText(body.projectId,80)||null,task_id:task.id,
+              project_id:projectId||null,task_id:task.id,
               category:cleanText(proposal.category||"general",80),
               content:cleanText(proposal.content,4000),
               reason:cleanText(proposal.reason||"Derived from completed Dexter work.",1000),
@@ -1397,7 +1412,7 @@ await db.from("ai_task_events").insert({task_id:task.id,event_type:"completed",m
         await db.from("ai_agent_tasks").update({status:"failed",output:{error},updated_at:now()}).eq("task_id",task.id).eq("agent_key",agentKey);
         await db.from("ai_task_events").insert({task_id:task.id,event_type:"failed",message:error.slice(0,500)});
         await db.from("dexter_postmortems").insert({
-          project_id:cleanText(body.projectId,80)||null,task_id:task.id,
+          project_id:projectId||null,task_id:task.id,
           title:"Failed work task: "+title,
           incident:request,
           root_cause:error,
@@ -1451,7 +1466,7 @@ await db.from("ai_task_events").insert({task_id:task.id,event_type:"completed",m
         role,agent:"Dexter",model:"stable-diffusion.cpp-cpu",imageJob:job,liveWrites:false
       });
     }
-    const context=await loadContext(db,message,role);
+    const context=await loadContext(db,message,role,cleanText(body.projectId,80));
     const agentKey=chooseAgent(message,cleanText(body.agent,60),context.agents);
     let chatToolContext:any=null;
     const chatHomeUrl=(Deno.env.get("DEXTER_HOME_HOST_URL")||"").replace(/\/$/,"");
