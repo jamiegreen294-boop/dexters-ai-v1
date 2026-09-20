@@ -1,0 +1,22 @@
+name: Validate Dexter Test Upgrade
+
+on:
+  pull_request:
+    branches:
+      - build/real-dexter-ai
+
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate Home PC worker
+        run: node --check home-host/server.mjs
+      - name: Validate advanced UI when present
+        run: |
+          if [ -f advanced.js ]; then node --check advanced.js; fi
+      - name: Validate upgrade UI
+        run: node --check upgrade.js
