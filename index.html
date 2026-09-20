@@ -229,9 +229,19 @@ body.theme-hogmanay .topbar{background:#10131fe8}
 <div class="detailbox">
 <b>Android release signing</b>
 <p class="muted">Paste the complete Dexter signing text below. Dexter sends it directly to the backend and stores the four values in Supabase Vault. No Android file picker is used.</p>
-<textarea id="androidSigningPaste" placeholder="Paste the complete Dexter GitHub Actions signing text here…" style="width:100%;min-height:150px;margin-top:10px;background:#0e0d0c;color:#fff;border:1px solid #3b3530;border-radius:13px;padding:12px;box-sizing:border-box"></textarea>
+<textarea id="androidSigningPaste" placeholder="Paste the long Dexter keystore text here…" style="width:100%;min-height:150px;margin-top:10px;background:#0e0d0c;color:#fff;border:1px solid #3b3530;border-radius:13px;padding:12px;box-sizing:border-box"></textarea>
+<div class="grid" style="margin-top:10px;max-width:none">
+  <div>
+    <label class="muted" for="androidSigningAlias">Key alias</label>
+    <input id="androidSigningAlias" value="dexterbusinessphone" style="width:100%;box-sizing:border-box;background:#0e0d0c;color:#fff;border:1px solid #3b3530;border-radius:12px;padding:11px" />
+  </div>
+  <div>
+    <label class="muted" for="androidSigningPassword">Signing password</label>
+    <input id="androidSigningPassword" type="password" autocomplete="off" placeholder="Paste the short signing password" style="width:100%;box-sizing:border-box;background:#0e0d0c;color:#fff;border:1px solid #3b3530;border-radius:12px;padding:11px" />
+  </div>
+</div>
 <div class="approval-actions" style="margin-top:10px">
-<button id="loadAndroidSigningPaste" class="secondary">Use pasted signing text</button>
+<button id="loadAndroidSigningPaste" class="secondary">Use pasted signing values</button>
 <button id="storeAndroidSigning" class="primary">Store signing secrets in Vault</button>
 <button id="syncAndroidSigning" class="secondary">Sync to GitHub Actions</button>
 </div>
@@ -337,20 +347,33 @@ async function pollDexterImage(jobId,container){
   container.textContent="The Home PC is still generating the image. Check again shortly.";
 }
 function parseAndroidSigningFile(text){
-  var names=[
-    "DEXTER_ANDROID_KEYSTORE_B64",
-    "DEXTER_ANDROID_KEYSTORE_PASSWORD",
-    "DEXTER_ANDROID_KEY_ALIAS",
-    "DEXTER_ANDROID_KEY_PASSWORD"
-  ];
-  var out={};
-  names.forEach(function(name){
-    var re=new RegExp("Secret name: "+name+"\\nSecret value:\\n([\\s\\S]*?)(?=\\n\\nSecret name:|$)");
-    var m=String(text||"").match(re);
-    if(m)out[name]=m[1].trim();
-  });
-  if(names.some(function(name){return !out[name]}))throw new Error("This is not the complete Dexter Android signing file.");
-  return out;
+  var raw=String(text||"").trim();
+  var alias=($("androidSigningAlias")&&$("androidSigningAlias").value.trim())||"dexterbusinessphone";
+  var password=($("androidSigningPassword")&&$("androidSigningPassword").value)||"";
+  if(raw.indexOf("Secret name:")>=0){
+    var names=[
+      "DEXTER_ANDROID_KEYSTORE_B64",
+      "DEXTER_ANDROID_KEYSTORE_PASSWORD",
+      "DEXTER_ANDROID_KEY_ALIAS",
+      "DEXTER_ANDROID_KEY_PASSWORD"
+    ];
+    var out={};
+    names.forEach(function(name){
+      var re=new RegExp("Secret name: "+name+"\\nSecret value:\\n([\\s\\S]*?)(?=\\n\\nSecret name:|$)");
+      var m=raw.match(re);
+      if(m)out[name]=m[1].trim();
+    });
+    if(names.every(function(name){return !!out[name]}))return out;
+  }
+  var compact=raw.replace(/\s+/g,"");
+  if(!/^[A-Za-z0-9+/=]+$/.test(compact)||compact.length<1000)throw new Error("Paste the long Dexter keystore text in the large box.");
+  if(!password)throw new Error("Paste the short signing password into the password box.");
+  return {
+    DEXTER_ANDROID_KEYSTORE_B64:compact,
+    DEXTER_ANDROID_KEYSTORE_PASSWORD:password,
+    DEXTER_ANDROID_KEY_ALIAS:alias,
+    DEXTER_ANDROID_KEY_PASSWORD:password
+  };
 }
 function escapeHtml(s){return String(s||"").replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]});}
 function setPage(name){
@@ -583,7 +606,7 @@ $("loadAndroidSigningPaste").onclick=function(){
   if(!text){out.textContent="Paste the complete Dexter signing text first.";return;}
   try{
     pendingAndroidSigningSecrets=parseAndroidSigningFile(text);
-    out.textContent="Pasted signing text loaded: 4 values ready to store securely.";
+    out.textContent="Signing values loaded: keystore, alias and password are ready to store securely.";
   }catch(e){out.textContent="FAILED: "+e.message;}
 };
 $("storeAndroidSigning").onclick=async function(){
@@ -595,11 +618,11 @@ $("storeAndroidSigning").onclick=async function(){
       catch(e){out.textContent="FAILED: "+e.message;return;}
     }
   }
-  if(!pendingAndroidSigningSecrets){out.textContent="Paste the complete signing text first.";return;}
+  if(!pendingAndroidSigningSecrets){out.textContent="Paste the long keystore text and the short signing password first.";return;}
   b.disabled=true;out.textContent="Storing signing values securely in Dexter Vault…";
   try{
     var d=await api({action:"android_signing_secrets_store",secrets:pendingAndroidSigningSecrets});
-    pendingAndroidSigningSecrets=null;$("androidSigningPaste").value="";
+    pendingAndroidSigningSecrets=null;$("androidSigningPaste").value="";$("androidSigningPassword").value="";
     out.textContent="Stored securely in Dexter Vault. Plaintext was cleared from this page and not retained in normal job records.";
   }catch(e){out.textContent="FAILED: "+e.message;}
   finally{b.disabled=false;}
