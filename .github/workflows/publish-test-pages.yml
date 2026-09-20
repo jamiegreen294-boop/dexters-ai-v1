@@ -1,0 +1,50 @@
+name: Publish Dexter AI Test Pages
+
+on:
+  push:
+    branches:
+      - build/real-dexter-ai
+    paths:
+      - index.html
+      - upgrade.js
+      - pwa.js
+      - sw.js
+      - manifest.webmanifest
+      - app-icon.svg
+      - github-connect.html
+      - vercel-connect.html
+      - supabase-connect.html
+      - .github/workflows/publish-test-pages.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: build/real-dexter-ai
+          fetch-depth: 0
+      - name: Prepare static test site
+        run: |
+          rm -rf /tmp/dexter-site
+          mkdir -p /tmp/dexter-site
+          cp index.html upgrade.js pwa.js sw.js manifest.webmanifest app-icon.svg github-connect.html vercel-connect.html supabase-connect.html .nojekyll /tmp/dexter-site/
+      - name: Update gh-pages mirror
+        run: |
+          git config user.name "Dexter AI Test Publisher"
+          git config user.email "actions@users.noreply.github.com"
+          git fetch origin gh-pages
+          git checkout gh-pages
+          cp -f /tmp/dexter-site/* .
+          touch .nojekyll
+          git add index.html upgrade.js pwa.js sw.js manifest.webmanifest app-icon.svg github-connect.html vercel-connect.html supabase-connect.html .nojekyll
+          if git diff --cached --quiet; then
+            echo "No test page changes to publish."
+          else
+            git commit -m "Publish canonical Dexter AI test build"
+            git push origin gh-pages
+          fi
