@@ -14,6 +14,15 @@
       '<div id="phoneList" class="tasklist"></div>';
       document.querySelector(".content").appendChild(p);
     }
+    const existingPage=document.getElementById("page-phone");
+    if(existingPage&&!document.getElementById("pairLocalAdb")){
+      const host=existingPage.querySelector(".workbox")||existingPage;
+      const bridge=document.createElement("div");
+      bridge.className="detailbox";
+      bridge.style.marginTop="10px";
+      bridge.innerHTML='<b>Dexter Local Admin Bridge</b><p class="muted">Pairs Dexter directly to this phone\'s Wireless Debugging service. The six-digit code stays on this phone and is not sent to Dexter\'s cloud backend.</p><button id="openWirelessDebugging" class="secondary" type="button">Wireless debugging</button><input id="adbPairAddress" class="miniinput" style="margin-top:8px" placeholder="Pairing address, e.g. 192.168.0.139:46381"><input id="adbPairCode" class="miniinput" style="margin-top:8px" inputmode="numeric" placeholder="6-digit pairing code"><input id="adbConnectAddress" class="miniinput" style="margin-top:8px" placeholder="ADB address, e.g. 192.168.0.139:45027"><div class="approval-actions"><button id="pairLocalAdb" class="secondary">Pair Dexter locally</button><button id="runLocalDiagnostics" class="secondary">Run Device Owner diagnostics</button></div><pre id="localAdbResult" style="white-space:pre-wrap;word-break:break-word"></pre>';
+      host.appendChild(bridge);
+    }
     const prior=setPage;
     setPage=function(name){
       if(name==="phone"){
