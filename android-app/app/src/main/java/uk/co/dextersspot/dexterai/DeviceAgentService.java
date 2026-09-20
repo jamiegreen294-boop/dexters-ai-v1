@@ -96,7 +96,9 @@ public class DeviceAgentService extends Service {
 
     private JSONObject execute(String type, JSONObject req) throws Exception {
         switch(type){
-            case "device.health": return deviceHealth();\n            case "device.policy.status": return DeviceOwnerPolicy.status(this);\n            case "device.policy.apply_business": return DeviceOwnerPolicy.applyBusinessMode(this);
+            case "device.health": return deviceHealth();
+            case "device.policy.status": return DeviceOwnerPolicy.status(this);
+            case "device.policy.apply_business": return DeviceOwnerPolicy.applyBusinessMode(this);
             case "apps.inventory": return appInventory();
             case "app.launch": return launchApp(req.getString("packageName"));
             case "app.install":
