@@ -13,13 +13,12 @@ public class DexterDeviceAdminReceiver extends DeviceAdminReceiver {
 
     @Override
     public void onEnabled(Context context, Intent intent) {
-        DeviceAgentService.start(context);
+        // Defer service startup until Android Setup Wizard has completed.
     }
 
     @Override
     public void onProfileProvisioningComplete(Context context, Intent intent) {
         DeviceOwnerPolicy.applySafeDefaults(context);
-        DeviceAgentService.start(context);
     }
 
     @Override
