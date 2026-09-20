@@ -546,6 +546,16 @@ Deno.serve(async(req)=>{
         const {count,error}=await db.from("dexter_work_artifacts").select("*",{count:"exact",head:true});
         add("work_artifacts",!error,{records:count||0});
       }catch(e){add("work_artifacts",false,{error:String((e as Error)?.message||e)});}
+      try{
+        const {count:projectCount,error:pe}=await db.from("dexter_projects").select("*",{count:"exact",head:true});
+        const {count:chunkCount,error:ce}=await db.from("dexter_project_file_chunks").select("*",{count:"exact",head:true});
+        add("project_workspace_layer",!pe&&!ce,{projects:projectCount||0,indexed_chunks:chunkCount||0});
+      }catch(e){add("project_workspace_layer",false,{error:String((e as Error)?.message||e)});}
+      try{
+        const {data:agent}=await db.from("dexter_home_agents").select("last_seen_at,active").eq("active",true).order("last_seen_at",{ascending:false}).limit(1).maybeSingle();
+        const online=Boolean(agent?.last_seen_at&&(Date.now()-new Date(agent.last_seen_at).getTime())<120000);
+        add("home_pc_recent_heartbeat",online,{last_seen_at:agent?.last_seen_at||null});
+      }catch(e){add("home_pc_recent_heartbeat",false,{error:String((e as Error)?.message||e)});}
       add("direct_connector_executors",true,{github:true,vercel:true,supabase:true,approval_gated_writes:true});
       const passed=checks.filter(x=>x.ok).length;
       await logAudit(db,"self_test.completed",keyName,{passed,total:checks.length,checks});
@@ -753,16 +763,20 @@ Deno.serve(async(req)=>{
       const freshAfter=new Date(Date.now()-120000).toISOString();
       const dayAgo=new Date(Date.now()-86400000).toISOString();
       const staleBefore=new Date(Date.now()-30*86400000).toISOString();
-      const [{data:onlineAgents},{data:failedJobs},{data:connectorRows},{data:staleLearning},{data:activeTasks}]=await Promise.all([
+      const [{data:onlineAgents},{data:recentJobs},{data:connectorRows},{data:staleLearning},{data:activeTasks}]=await Promise.all([
         db.from("dexter_home_agents").select("id,name,last_seen_at").eq("active",true).gte("last_seen_at",freshAfter),
-        db.from("dexter_home_jobs").select("id,error,tool_name,created_at").eq("status","failed").gte("created_at",dayAgo).limit(50),
+        db.from("dexter_home_jobs").select("id,error,tool_name,status,created_at").gte("created_at",dayAgo).order("created_at",{ascending:false}).limit(200),
         db.from("ai_connectors").select("connector_key,name,status,last_checked_at,last_error"),
         db.from("dexter_learning_notes").select("id,topic,updated_at").eq("active",true).lt("updated_at",staleBefore).limit(100),
         db.from("ai_tasks").select("id,status,error,updated_at").in("status",["running","queued_home","failed","waiting_approval"]).limit(100)
       ]);
+      const latestByTool=new Map<string,any>();
+      for(const job of (recentJobs||[])){const key=String(job.tool_name||"unknown");if(!latestByTool.has(key))latestByTool.set(key,job);}
+      const failedJobs=Array.from(latestByTool.values()).filter((j:any)=>j.status==="failed");
+      const recoveredTools=Array.from(latestByTool.values()).filter((j:any)=>j.status==="completed").map((j:any)=>j.tool_name);
       const rows=[
         {system_key:"home-pc",system_name:"Dexter Home PC",status:(onlineAgents||[]).length?"healthy":"offline",summary:(onlineAgents||[]).length?"Home PC online":"Home PC has not checked in during the last 2 minutes",details:{agents:onlineAgents||[]}},
-        {system_key:"failed-jobs",system_name:"Home PC jobs",status:(failedJobs||[]).length?"warning":"healthy",summary:(failedJobs||[]).length+" failed job(s) in the last 24 hours",details:{failed:failedJobs||[]}},
+        {system_key:"failed-jobs",system_name:"Home PC jobs",status:(failedJobs||[]).length?"warning":"healthy",summary:(failedJobs||[]).length+" unresolved tool failure(s) in the last 24 hours",details:{unresolved:failedJobs||[],recovered_tools:recoveredTools}},
         {system_key:"connectors",system_name:"Connectors",status:(connectorRows||[]).some((x:any)=>x.status==="error")?"warning":"healthy",summary:(connectorRows||[]).filter((x:any)=>x.status==="ready").length+" connector(s) ready",details:{connectors:connectorRows||[]}},
         {system_key:"knowledge",system_name:"Knowledge freshness",status:(staleLearning||[]).length?"warning":"healthy",summary:(staleLearning||[]).length+" learned item(s) older than 30 days",details:{stale:staleLearning||[]}},
         {system_key:"tasks",system_name:"Work queue",status:(activeTasks||[]).some((x:any)=>x.status==="failed")?"warning":"healthy",summary:(activeTasks||[]).length+" active/attention task(s)",details:{tasks:activeTasks||[]}}
