@@ -11,6 +11,13 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.math.BigInteger;
+import javax.security.auth.x500.X500Principal;
+import org.bouncycastle.asn1.x500.X500Name;
+import org.bouncycastle.cert.X509v3CertificateBuilder;
+import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
+import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
+import org.bouncycastle.operator.ContentSigner;
+import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
@@ -25,21 +32,6 @@ import java.util.Random;
 
 import io.github.muntashirakon.adb.AbsAdbConnectionManager;
 import io.github.muntashirakon.adb.AdbStream;
-import sun.security.x509.AlgorithmId;
-import sun.security.x509.CertificateAlgorithmId;
-import sun.security.x509.CertificateExtensions;
-import sun.security.x509.CertificateIssuerName;
-import sun.security.x509.CertificateSerialNumber;
-import sun.security.x509.CertificateSubjectName;
-import sun.security.x509.CertificateValidity;
-import sun.security.x509.CertificateVersion;
-import sun.security.x509.CertificateX509Key;
-import sun.security.x509.KeyIdentifier;
-import sun.security.x509.PrivateKeyUsageExtension;
-import sun.security.x509.SubjectKeyIdentifierExtension;
-import sun.security.x509.X500Name;
-import sun.security.x509.X509CertImpl;
-import sun.security.x509.X509CertInfo;
 
 public final class DexterLocalAdb extends AbsAdbConnectionManager {
     private static final String PREFS = "dexter_local_adb_keys";
@@ -88,33 +80,17 @@ public final class DexterLocalAdb extends AbsAdbConnectionManager {
         PublicKey publicKey = pair.getPublic();
 
         String subject = "CN=Dexter Business Phone";
-        String algorithmName = "SHA512withRSA";
+        String algorithmName = "SHA256withRSA";
         long now = System.currentTimeMillis();
         Date notBefore = new Date(now - 60000L);
         Date notAfter = new Date(now + (3650L * 86400000L));
 
-        CertificateExtensions extensions = new CertificateExtensions();
-        extensions.set("SubjectKeyIdentifier",
-            new SubjectKeyIdentifierExtension(new KeyIdentifier(publicKey).getIdentifier()));
-        extensions.set("PrivateKeyUsage",
-            new PrivateKeyUsageExtension(notBefore, notAfter));
-
-        X500Name x500Name = new X500Name(subject);
-        X509CertInfo info = new X509CertInfo();
-        info.set("version", new CertificateVersion(2));
-        info.set("serialNumber",
-            new CertificateSerialNumber(new Random().nextInt() & Integer.MAX_VALUE));
-        info.set("algorithmID",
-            new CertificateAlgorithmId(AlgorithmId.get(algorithmName)));
-        info.set("subject", new CertificateSubjectName(x500Name));
-        info.set("key", new CertificateX509Key(publicKey));
-        info.set("validity", new CertificateValidity(notBefore, notAfter));
-        info.set("issuer", new CertificateIssuerName(x500Name));
-        info.set("extensions", extensions);
-
-        X509CertImpl cert = new X509CertImpl(info);
-        cert.sign(privateKey, algorithmName);
-        certificate = cert;
+        X500Name name = new X500Name(subject);
+        BigInteger serial = new BigInteger(64, new SecureRandom()).abs();
+        X509v3CertificateBuilder builder = new JcaX509v3CertificateBuilder(
+            name, serial, notBefore, notAfter, name, publicKey);
+        ContentSigner signer = new JcaContentSignerBuilder(algorithmName).build(privateKey);
+        certificate = new JcaX509CertificateConverter().getCertificate(builder.build(signer));
 
         p.edit()
             .putString(KEY_PRIVATE, Base64.encodeToString(privateKey.getEncoded(), Base64.NO_WRAP))
