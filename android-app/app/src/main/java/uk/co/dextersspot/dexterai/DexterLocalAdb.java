@@ -5,8 +5,6 @@ import android.os.Build;
 import android.security.keystore.KeyGenParameterSpec;
 import android.security.keystore.KeyProperties;
 
-import androidx.annotation.NonNull;
-
 import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
@@ -74,19 +72,16 @@ public final class DexterLocalAdb extends AbsAdbConnectionManager {
         }
     }
 
-    @NonNull
     @Override
     protected PrivateKey getPrivateKey() {
         return privateKey;
     }
 
-    @NonNull
     @Override
     protected Certificate getCertificate() {
         return certificate;
     }
 
-    @NonNull
     @Override
     protected String getDeviceName() {
         return "Dexter Business Phone";
