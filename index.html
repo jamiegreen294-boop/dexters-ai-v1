@@ -226,6 +226,16 @@ body.theme-hogmanay .topbar{background:#10131fe8}
 <div class="approval-actions"><button id="createPairCode" class="primary">Create pairing code</button></div>
 <pre id="pairCodeResult">Not paired from this device yet.</pre>
 </div>
+<div class="detailbox">
+<b>Android release signing</b>
+<p class="muted">Import Dexter's private signing file once. The values are sent directly to Dexter's backend and stored in Supabase Vault. They are not shown again or written into normal job records.</p>
+<div class="approval-actions">
+<input id="androidSigningFile" type="file" accept=".txt,text/plain" class="secondary" />
+<button id="storeAndroidSigning" class="primary">Store signing secrets in Vault</button>
+<button id="syncAndroidSigning" class="secondary">Sync to GitHub Actions</button>
+</div>
+<pre id="androidSigningState">Not configured on this device.</pre>
+</div>
 <div class="detailbox"><b>Home PC job health</b><p class="muted">Recent local AI, coding, browser and hardware jobs. Failed test jobs can be retried after the underlying problem is fixed.</p><div id="homeJobList" class="agent-list"></div></div>
 <div class="detailbox"><b>Full Dexter readiness test</b><p class="muted">Checks AI, live read-only menu, business knowledge, memory, agents and connector registry. It does not make live changes.</p><div class="approval-actions"><button id="runSelfTest" class="primary">Run Full Dexter Test</button></div><pre id="selfTestResult">Not run yet.</pre></div>
 <div class="notice">Environment: TEST. Live writes are disabled. Git pushes, deployments and consequential browser actions remain locked until live mode is explicitly enabled after testing.</div>
@@ -241,6 +251,7 @@ var token=sessionStorage.dexterToken||"";
 var sessionId=localStorage.dexterSession||crypto.randomUUID();
 var dashboard={agents:[],tasks:[],knowledge:[],learning:[],memory:[],approvals:[],audit:[],orchestration:[],settings:[],connectors:[],toolRequests:[],artifacts:[],homeAgents:[],homeJobs:[]};
 var currentPage="chat";
+var pendingAndroidSigningSecrets=null;
 
 function easterSundayUTC(year){
   var a=year%19,b=Math.floor(year/100),c=year%100,d=Math.floor(b/4),e=b%4;
@@ -323,6 +334,22 @@ async function pollDexterImage(jobId,container){
     container.textContent="Generating image locally… "+Math.max(0,tries*3)+"s";
   }
   container.textContent="The Home PC is still generating the image. Check again shortly.";
+}
+function parseAndroidSigningFile(text){
+  var names=[
+    "DEXTER_ANDROID_KEYSTORE_B64",
+    "DEXTER_ANDROID_KEYSTORE_PASSWORD",
+    "DEXTER_ANDROID_KEY_ALIAS",
+    "DEXTER_ANDROID_KEY_PASSWORD"
+  ];
+  var out={};
+  names.forEach(function(name){
+    var re=new RegExp("Secret name: "+name+"\\nSecret value:\\n([\\s\\S]*?)(?=\\n\\nSecret name:|$)");
+    var m=String(text||"").match(re);
+    if(m)out[name]=m[1].trim();
+  });
+  if(names.some(function(name){return !out[name]}))throw new Error("This is not the complete Dexter Android signing file.");
+  return out;
 }
 function escapeHtml(s){return String(s||"").replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]});}
 function setPage(name){
@@ -545,6 +572,36 @@ $("createPairCode").onclick=async function(){
   try{
     var d=await api({action:"home_pair_code"});
     out.textContent="PAIRING CODE: "+d.code+"\nExpires: "+d.expires_at+"\n\nOn the home PC run home-host\\PAIR-HOME-PC.ps1 and enter this code.";
+  }catch(e){out.textContent="FAILED: "+e.message;}
+  finally{b.disabled=false;}
+};
+$("androidSigningFile").onchange=async function(){
+  var file=this.files&&this.files[0],out=$("androidSigningState");
+  pendingAndroidSigningSecrets=null;
+  if(!file){out.textContent="No signing file selected.";return;}
+  try{
+    pendingAndroidSigningSecrets=parseAndroidSigningFile(await file.text());
+    out.textContent="Signing file loaded locally: 4 values ready to store securely.";
+  }catch(e){out.textContent="FAILED: "+e.message;}
+};
+$("storeAndroidSigning").onclick=async function(){
+  var b=$("storeAndroidSigning"),out=$("androidSigningState");
+  if(!pendingAndroidSigningSecrets){out.textContent="Choose the Dexter GitHub Actions secrets file first.";return;}
+  b.disabled=true;out.textContent="Storing signing values securely in Dexter Vault…";
+  try{
+    var d=await api({action:"android_signing_secrets_store",secrets:pendingAndroidSigningSecrets});
+    pendingAndroidSigningSecrets=null;$("androidSigningFile").value="";
+    out.textContent="Stored securely in Dexter Vault. Plaintext was not retained in normal job records.";
+  }catch(e){out.textContent="FAILED: "+e.message;}
+  finally{b.disabled=false;}
+};
+$("syncAndroidSigning").onclick=async function(){
+  var b=$("syncAndroidSigning"),out=$("androidSigningState");
+  b.disabled=true;out.textContent="Queueing secure GitHub Actions sync on Dexter Home PC…";
+  try{
+    var d=await api({action:"github_actions_secret_sync"});
+    out.textContent="Queued securely. Home job: "+(d.job&&d.job.id?d.job.id:"created")+". Dexter will add/update all four GitHub Actions secrets without placing plaintext in the job.";
+    setTimeout(function(){loadDashboard();},5000);
   }catch(e){out.textContent="FAILED: "+e.message;}
   finally{b.disabled=false;}
 };
