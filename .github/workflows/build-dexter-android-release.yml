@@ -1,0 +1,62 @@
+name: Build Dexter Android Release APK
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android-app
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Check release signing secrets
+        env:
+          KEYSTORE_B64: ${{ secrets.DEXTER_ANDROID_KEYSTORE_B64 }}
+          STORE_PASSWORD: ${{ secrets.DEXTER_ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.DEXTER_ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.DEXTER_ANDROID_KEY_PASSWORD }}
+        run: |
+          test -n "$KEYSTORE_B64"
+          test -n "$STORE_PASSWORD"
+          test -n "$KEY_ALIAS"
+          test -n "$KEY_PASSWORD"
+
+      - name: Restore release keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.DEXTER_ANDROID_KEYSTORE_B64 }}
+        run: |
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > dexter-business-phone-release.jks
+          chmod 600 dexter-business-phone-release.jks
+
+      - name: Build signed release APK
+        env:
+          DEXTER_ANDROID_KEYSTORE_PATH: dexter-business-phone-release.jks
+          DEXTER_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.DEXTER_ANDROID_KEYSTORE_PASSWORD }}
+          DEXTER_ANDROID_KEY_ALIAS: ${{ secrets.DEXTER_ANDROID_KEY_ALIAS }}
+          DEXTER_ANDROID_KEY_PASSWORD: ${{ secrets.DEXTER_ANDROID_KEY_PASSWORD }}
+        run: gradle :app:assembleRelease --stacktrace
+
+      - name: Upload signed release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Dexter-Business-Phone-Release
+          path: android-app/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
