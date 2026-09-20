@@ -1,1 +1,49 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0b0c10"><title>Dexter AI · GitHub</title><style>body{margin:0;background:#090b10;color:#fff;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;padding:24px}.card{max-width:620px;margin:10vh auto;background:#171a22;border:1px solid #ffffff18;border-radius:20px;padding:22px;box-shadow:0 18px 50px #0008}h1{margin-top:0}.muted{color:#a5adbd}.pill{display:inline-block;padding:7px 10px;border-radius:999px;background:#222733;border:1px solid #ffffff14}.btn{display:inline-block;margin-top:14px;padding:11px 14px;border-radius:12px;background:linear-gradient(135deg,#ffb36d,#ff702d);color:#1a110b;text-decoration:none;font-weight:900}</style></head><body><div class="card"><div class="pill">Dexter AI Test</div><h1>GitHub connection</h1><p id="msg" class="muted">Checking connection result…</p><a class="btn" href="./">Back to Dexter AI</a></div><script>const p=new URLSearchParams(location.search),s=p.get('status')||'open';const map={connected:'✅ GitHub connected to Dexter AI Test.',open:'GitHub connector is ready to be configured.',missing:'Required connection details were missing.',owner_invalid:'Owner access code was not accepted.',token_invalid:'The GitHub token was not accepted.',repo_denied:'The token cannot access the Dexter AI repo.',team_denied:'The token cannot access the Vercel team.',project_denied:'The token cannot access the Dexter AI test project.',error:'The connector setup failed. Check Dexter AI Activity for the recorded error.'};document.getElementById('msg').textContent=map[s]||('Status: '+s);</script></body></html>
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Connect Dexter to GitHub</title>
+<style>
+body{font-family:system-ui;background:#0b0b0b;color:#fff;max-width:760px;margin:35px auto;padding:20px}
+.card{background:#151515;border:1px solid #333;border-radius:18px;padding:24px;margin-bottom:18px}
+input,button,a.btn{width:100%;box-sizing:border-box;padding:14px;margin:7px 0;border-radius:10px;border:1px solid #333;background:#171717;color:#fff;text-decoration:none;display:block}
+button,a.btn{background:#ef8b22;color:#111;font-weight:800;border:0;text-align:center}
+small,.muted{color:#aaa}.ok{border-color:#2d5;background:#102016}.err{border-color:#d55;background:#241010}
+code{background:#222;padding:2px 6px;border-radius:6px}
+</style>
+</head>
+<body>
+<div id="result"></div>
+<div class="card">
+<h1>Connect Dexter to GitHub</h1>
+<p>Dexter will store the GitHub token encrypted in Supabase Vault. Your GitHub password is never entered here.</p>
+<a class="btn" href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">1. Create GitHub fine-grained token</a>
+<p><b>GitHub token setup:</b></p>
+<p class="muted">Token name: <b>Dexter AI</b><br>
+Resource owner: <b>jamiegreen294-boop</b><br>
+Repository access: choose the Dexters repositories you want Dexter to manage (or All repositories if you want Dexter available across all of them).<br>
+Repository permissions: <b>Contents — Read and write</b>, <b>Pull requests — Read and write</b>, <b>Actions — Read and write</b>. Metadata remains read-only automatically.</p>
+<p>After GitHub creates the token, copy it once and paste it below. Do not send it in ChatGPT.</p>
+<form method="post" action="https://eikruaxxzzxmfjvsmwwo.supabase.co/functions/v1/dexter-github-connect">
+<label>Dexter owner access code</label>
+<input name="owner_code" type="password" autocomplete="off" required>
+<label>GitHub fine-grained token</label>
+<input name="github_token" type="password" autocomplete="off" required>
+<button type="submit">2. Securely connect GitHub</button>
+</form>
+<small>Dexter verifies access to <code>jamiegreen294-boop/dexters-ai-v1</code>. GitHub writes remain owner-approval gated.</small>
+</div>
+<script>
+const p=new URLSearchParams(location.search),s=p.get('status'),login=p.get('login')||'';
+const r=document.getElementById('result');
+const msg={
+connected:'GitHub connected ✓ Dexter verified the account'+(login?' '+login:'')+' and the dexters-ai-v1 repository.',
+token_invalid:'The GitHub token was not accepted. Create a new fine-grained token and try again.',
+repo_denied:'The token works, but it cannot access dexters-ai-v1. Add that repository to the token access.',
+owner_invalid:'The Dexter owner access code was not accepted.',
+missing:'Both fields are required.',
+error:'The connector hit an error. Nothing was stored as ready; try again.'
+};
+if(s&&msg[s])r.innerHTML='<div class="card '+(s==='connected'?'ok':'err')+'"><h2>'+msg[s]+'</h2></div>';
+</script>
+</body></html>
