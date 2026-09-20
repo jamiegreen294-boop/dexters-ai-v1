@@ -41,6 +41,9 @@ public final class DeviceOwnerPolicy {
             try { d.addUserRestriction(a, UserManager.DISALLOW_INSTALL_UNKNOWN_SOURCES_GLOBALLY); } catch(Exception ignored) {}
         }
         try { d.setAutoTimeRequired(a, true); } catch(Exception ignored) {}
+        try { d.setPasswordQuality(a, DevicePolicyManager.PASSWORD_QUALITY_NUMERIC_COMPLEX); } catch(Exception ignored) {}
+        try { d.setPasswordMinimumLength(a, 6); } catch(Exception ignored) {}
+        try { d.setMaximumTimeToLock(a, 120000L); } catch(Exception ignored) {}
     }
 
     public static JSONObject status(Context c) throws Exception {
@@ -54,6 +57,9 @@ public final class DeviceOwnerPolicy {
         j.put("securityPatch", Build.VERSION.SECURITY_PATCH);
         j.put("sdk", Build.VERSION.SDK_INT);
         j.put("build", Build.DISPLAY);
+        j.put("maxIdleLockMs", 120000);
+        j.put("minimumPinLength", 6);
+        j.put("recoveryRoute", "Dexter Home > Dexter Admin (device credential protected)");
         return j;
     }
 
