@@ -148,6 +148,25 @@ public final class DeviceOwnerPolicy {
         return new JSONObject().put("uninstallProtected",done);
     }
 
+    public static JSONObject restoreStandardConfiguration(Context c) throws Exception {
+        JSONObject business=applyBusinessMode(c);
+        JSONObject internet;
+        try { internet=setInternetProtection(c,"security.cloudflare-dns.com"); }
+        catch(Exception e){ internet=new JSONObject().put("error",e.getMessage()); }
+        JSONArray packages=new JSONArray();
+        packages.put(c.getPackageName());
+        packages.put("com.google.android.gm");
+        packages.put("com.whatsapp.w4b");
+        packages.put("com.android.chrome");
+        packages.put("com.google.android.apps.maps");
+        JSONObject protectedApps=protectApps(c,packages);
+        return new JSONObject()
+            .put("restored",true)
+            .put("businessMode",business)
+            .put("internet",internet)
+            .put("apps",protectedApps);
+    }
+
     public static JSONObject configurationSnapshot(Context c) throws Exception {
         JSONObject j=status(c);
         j.put("packageName",c.getPackageName());
