@@ -39,7 +39,8 @@ if(!TOKEN||TOKEN.length<24){
 for(const dir of [PROFILE,WORKSPACE,JOB_DIR,IMAGE_DIR,SDCPP_DIR,SDCPP_MODEL_DIR])fs.mkdirSync(dir,{recursive:true});
 
 let context;
-const pageSessions=new Map();\nconst pageDiagnostics=new WeakMap();
+const pageSessions=new Map();
+const pageDiagnostics=new WeakMap();
 
 function json(res,status,body){
   const data=JSON.stringify(body);
@@ -113,6 +114,7 @@ async function getPage(session="default"){
   }
   try{
     const p=await ctx.newPage();
+    attachPageDiagnostics(p);
     pageSessions.set(session,p);
     return p;
   }catch(err){
@@ -120,6 +122,7 @@ async function getPage(session="default"){
     await resetBrowserContext();
     ctx=await getContext();
     const p=await ctx.newPage();
+    attachPageDiagnostics(p);
     pageSessions.set(session,p);
     return p;
   }
