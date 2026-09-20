@@ -528,8 +528,47 @@ Deno.serve(async(req)=>{
     const {db,role,keyName}=await authenticate(req);
     const body=await req.json().catch(()=>({}));
     const action=cleanText(body.action||"chat",30).toLowerCase();
-    const sessionId=validSession(body.sessionId);
+    if(role==="scheduler"&&action!=="scheduled_run_due")return json({error:"Scheduler token is restricted to scheduled jobs."},403);
+    const sessionId=validSession(body.sessionId)||(role==="scheduler"?crypto.randomUUID():"");
     if(!sessionId)return json({error:"Invalid session"},400);
+
+    if(action==="scheduled_run_due"){
+      const {data:jobs}=await db.from("dexter_scheduled_jobs").select("*").eq("enabled",true).lte("next_run_at",now()).order("next_run_at").limit(10);
+      const results:any[]=[];
+      for(const job of (jobs||[])){
+        const started=now();
+        try{
+          if(job.action==="operations_check"||job.action==="secret_health"){
+            const {error}=await db.rpc("dexter_run_advanced_health");if(error)throw error;
+          }else if(job.action==="connector_probe"){
+            try{await githubExecute(db,"repo.read",{repo:"jamiegreen294-boop/dexters-ai-v1"},false);await db.from("ai_connectors").update({status:"ready",last_checked_at:now(),last_error:null}).eq("connector_key","github");}catch(e){await db.from("ai_connectors").update({status:"error",last_checked_at:now(),last_error:String((e as Error)?.message||e).slice(0,500)}).eq("connector_key","github");}
+            try{await vercelExecute(db,"deployments.read",{projectId:"prj_jHa0ZVvB2Eu8eMqWBQkDgZFehuCA",limit:1},false);await db.from("ai_connectors").update({status:"ready",last_checked_at:now(),last_error:null}).eq("connector_key","vercel");}catch(e){await db.from("ai_connectors").update({status:"error",last_checked_at:now(),last_error:String((e as Error)?.message||e).slice(0,500)}).eq("connector_key","vercel");}
+            try{await supabaseExecute(db,"management.read",{method:"GET",path:"/v1/projects/eikruaxxzzxmfjvsmwwo"},false);await db.from("ai_connectors").update({status:"ready",last_checked_at:now(),last_error:null}).eq("connector_key","supabase");}catch(e){await db.from("ai_connectors").update({status:"error",last_checked_at:now(),last_error:String((e as Error)?.message||e).slice(0,500)}).eq("connector_key","supabase");}
+          }else if(job.action==="work"){
+            const message=cleanText(job.payload?.message,12000);if(!message)throw new Error("Scheduled Work job has no message.");
+            const projectId=cleanText(job.project_id||job.payload?.projectId,80);
+            const context=await loadContext(db,message,"owner",projectId);
+            const agentKey=chooseAgent(message,cleanText(job.payload?.agent,60),context.agents);
+            const ai=await callAI([{role:"system",content:basePrompt("owner",context,agentKey)},{role:"user",content:message}],Math.min(2500,Math.max(500,Number(job.payload?.max_output_tokens)||1400)));
+            const {data:task,error:te}=await db.from("ai_tasks").insert({title:cleanText(job.name,120),description:message,project_id:projectId||null,status:"completed",agent_key:agentKey,progress:100,result:ai.reply,requires_approval:false}).select("*").single();
+            if(te)throw te;
+            await db.from("dexter_work_artifacts").insert({task_id:task.id,project_id:projectId||null,name:"Scheduled result",artifact_type:"report",content:ai.reply,metadata:{scheduled_job_id:job.id,model:ai.model}});
+            results.push({job:job.name,task_id:task.id,model:ai.model});
+          }else throw new Error("Unsupported scheduled action: "+job.action);
+          const cadence=Math.max(60,Number(job.payload?.cadence_minutes)||((job.action==="operations_check")?60:1440));
+          await db.from("dexter_scheduled_jobs").update({last_run_at:started,last_status:"completed",last_error:null,next_run_at:new Date(Date.now()+cadence*60000).toISOString(),updated_at:now()}).eq("id",job.id);
+          await db.from("dexter_notifications").update({status:"dismissed"}).eq("notification_key","schedule:"+job.id).eq("status","unread");
+          results.push({job:job.name,status:"completed"});
+        }catch(e){
+          const error=String((e as Error)?.message||e).slice(0,1000);
+          await db.from("dexter_scheduled_jobs").update({last_run_at:started,last_status:"failed",last_error:error,next_run_at:new Date(Date.now()+60*60000).toISOString(),updated_at:now()}).eq("id",job.id);
+          const {data:existing}=await db.from("dexter_notifications").select("id").eq("notification_key","schedule:"+job.id).eq("status","unread").maybeSingle();
+          if(!existing)await db.from("dexter_notifications").insert({severity:"error",notification_key:"schedule:"+job.id,title:"Scheduled Dexter job failed",message:job.name+": "+error,source:"scheduler",metadata:{scheduled_job_id:job.id}});
+          results.push({job:job.name,status:"failed",error});
+        }
+      }
+      return json({ran:results.length,results,checkedAt:now()});
+    }
 
     if(action==="health"){
       const [{count:knowledgeCount},{count:businessKnowledgeCount},{count:taskCount},liveMenu,{data:homeAgents}]=await Promise.all([
