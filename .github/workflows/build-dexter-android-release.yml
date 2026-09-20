@@ -10,7 +10,7 @@ on:
       - '.github/workflows/build-dexter-android-release.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   release:
@@ -66,3 +66,22 @@ jobs:
           name: Dexter-Business-Phone-Release
           path: android-app/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
+
+
+      - name: Publish exact release APK to gh-pages
+        working-directory: .
+        run: |
+          cp android-app/app/build/outputs/apk/release/app-release.apk /tmp/Dexter-Business-Phone-Release.apk
+          git config user.name "Dexter Android Release Publisher"
+          git config user.email "actions@users.noreply.github.com"
+          git fetch origin gh-pages
+          git checkout gh-pages
+          mkdir -p downloads
+          cp /tmp/Dexter-Business-Phone-Release.apk downloads/Dexter-Business-Phone-Release.apk
+          git add downloads/Dexter-Business-Phone-Release.apk
+          if git diff --cached --quiet; then
+            echo "Published APK already matches."
+          else
+            git commit -m "Publish exact Dexter Business Phone release APK"
+            git push origin gh-pages
+          fi
