@@ -150,10 +150,25 @@ public final class DexterLocalAdb extends AbsAdbConnectionManager {
     public synchronized JSONObject runOwnerDiagnostics(String host, int adbPort) {
         JSONObject out = new JSONObject();
         try {
-            if (!connect(host, adbPort)) {
-                return out.put("connected", false).put("error", "ADB connection failed");
+            boolean connected = false;
+            String method = "direct";
+            try { connected = connect(host, adbPort); } catch (Exception ignored) {}
+            if (!connected) {
+                method = "tls-discovery";
+                try { connected = connectTls(context, 8000L); } catch (Exception ignored) {}
+            }
+            if (!connected) {
+                method = "auto-discovery";
+                try { connected = autoConnect(context, 8000L); } catch (Exception ignored) {}
+            }
+            if (!connected) {
+                return out.put("connected", false)
+                    .put("error", "ADB connection failed after direct + TLS/mDNS discovery")
+                    .put("attemptedHost", host)
+                    .put("attemptedPort", adbPort);
             }
             out.put("connected", true);
+            out.put("connectionMethod", method);
             out.put("dpmOwners", shell("dpm list-owners"));
             out.put("devicePolicy", shell("dumpsys device_policy"));
             out.put("package", shell("dumpsys package uk.co.dextersspot.dexterai"));
