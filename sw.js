@@ -1,4 +1,4 @@
-const CACHE="dexter-ai-test-v5";
+const CACHE="dexter-ai-test-v6";
 const SHELL=["./","./index.html","./manifest.webmanifest","./app-icon.svg","./upgrade.js","./advanced.js"];
 self.addEventListener("install",event=>{
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL)).then(()=>self.skipWaiting()));
@@ -11,9 +11,18 @@ self.addEventListener("fetch",event=>{
   if(req.method!=="GET")return;
   const url=new URL(req.url);
   if(url.origin!==location.origin)return;
+  const isNav=req.mode==="navigate"||url.pathname.endsWith("/")||url.pathname.endsWith("/index.html");
+  if(isNav){
+    event.respondWith(fetch(req,{cache:"no-store"}).then(res=>{
+      const copy=res.clone();
+      caches.open(CACHE).then(cache=>cache.put("./index.html",copy)).catch(()=>{});
+      return res;
+    }).catch(()=>caches.match("./index.html")));
+    return;
+  }
   event.respondWith(fetch(req).then(res=>{
     const copy=res.clone();
     caches.open(CACHE).then(cache=>cache.put(req,copy)).catch(()=>{});
     return res;
-  }).catch(()=>caches.match(req).then(r=>r||caches.match("./index.html"))));
+  }).catch(()=>caches.match(req)));
 });
