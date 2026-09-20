@@ -845,7 +845,7 @@ Deno.serve(async(req)=>{
     if(action==="artifact_rich_export"){
       if(role!=="owner")return json({error:"Owner access required."},403);
       const artifactId=cleanText(body.artifactId,80),format=cleanText(body.format||"pdf",12).toLowerCase();
-      if(!["pdf","zip"].includes(format))return json({error:"Rich export currently supports PDF and ZIP."},400);
+      if(!["pdf","docx","xlsx","zip"].includes(format))return json({error:"Rich export supports PDF, DOCX, XLSX and ZIP."},400);
       const {data:artifact,error}=await db.from("dexter_work_artifacts").select("*").eq("id",artifactId).maybeSingle();
       if(error||!artifact)return json({error:"Artifact not found."},404);
       const {data:job,error:jobError}=await db.from("dexter_home_jobs").insert({
