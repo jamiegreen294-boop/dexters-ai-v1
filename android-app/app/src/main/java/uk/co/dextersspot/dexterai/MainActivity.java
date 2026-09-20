@@ -82,7 +82,7 @@ public class MainActivity extends Activity {
                 j.put("manufacturer", Build.MANUFACTURER);
                 j.put("model", Build.MODEL);
                 j.put("osVersion", Build.VERSION.RELEASE + " (API " + Build.VERSION.SDK_INT + ")");
-                j.put("appVersion", BuildConfig.VERSION_NAME);
+                j.put("appVersion", appVersion(context));
                 JSONObject c = new JSONObject();
                 c.put("deviceHealth", true);
                 c.put("appsInventory", true);
@@ -94,6 +94,11 @@ public class MainActivity extends Activity {
                 j.put("capabilities", c);
                 return j.toString();
             } catch (Exception e) { return "{}"; }
+        }
+
+        private String appVersion(Context c) {
+            try { return c.getPackageManager().getPackageInfo(c.getPackageName(), 0).versionName; }
+            catch (Exception e) { return "unknown"; }
         }
 
         @JavascriptInterface public boolean saveDeviceToken(String token) {
