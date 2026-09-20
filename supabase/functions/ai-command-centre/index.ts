@@ -46,13 +46,22 @@ async function authenticate(req:Request){
     const {data:key}=await db.from("dexter_scheduler_keys").select("id").eq("token_hash",hash).eq("active",true).maybeSingle();
     if(key)return {db,role:"scheduler",keyName:"Dexter internal scheduler"};
   }
+  const deviceToken=req.headers.get("x-dexter-device-token")||"";
+  if(deviceToken.length>=32){
+    const db=dbClient(),hash=await sha256(deviceToken);
+    const {data:device,error}=await db.from("dexter_phone_devices").select("id,device_id,name,status,active").eq("token_hash",hash).eq("active",true).maybeSingle();
+    if(!error&&device){
+      await db.from("dexter_phone_devices").update({status:"online",last_seen_at:now(),updated_at:now()}).eq("id",device.id);
+      return {db,role:"device",keyName:String(device.name||"Dexter phone"),deviceId:String(device.id)};
+    }
+  }
   const token=req.headers.get("x-dexter-token")||"";
   if(token.length<12)throw new Error("INVALID_ACCESS_CODE");
   const db=dbClient(),hash=await sha256(token);
   const {data:key,error}=await db.from("dexter_access_keys").select("id,role,name").eq("token_hash",hash).eq("active",true).maybeSingle();
   if(error||!key)throw new Error("INVALID_ACCESS_CODE");
   await db.from("dexter_access_keys").update({last_used_at:now()}).eq("id",key.id);
-  return {db,role:String(key.role||"owner"),keyName:String(key.name||"Dexter user")};
+  return {db,role:String(key.role||"owner"),keyName:String(key.name||"Dexter user"),deviceId:null};
 }
 function validSession(value:unknown){
   const s=String(value||"");
@@ -525,12 +534,77 @@ Deno.serve(async(req)=>{
   if(req.method==="OPTIONS")return new Response(null,{status:204,headers:cors});
   if(req.method!=="POST")return json({error:"POST required"},405);
   try{
-    const {db,role,keyName}=await authenticate(req);
+    const {db,role,keyName,deviceId}=await authenticate(req);
     const body=await req.json().catch(()=>({}));
     const action=cleanText(body.action||"chat",30).toLowerCase();
     if(role==="scheduler"&&action!=="scheduled_run_due")return json({error:"Scheduler token is restricted to scheduled jobs."},403);
+    if(role==="device"&&!["device_heartbeat","device_jobs_poll","device_job_complete"].includes(action))return json({error:"Device token is restricted to phone-agent actions."},403);
     const sessionId=validSession(body.sessionId)||(role==="scheduler"?crypto.randomUUID():"");
     if(!sessionId)return json({error:"Invalid session"},400);
+
+    if(action==="device_heartbeat"){
+      if(role!=="device"||!deviceId)return json({error:"Device authentication required."},403);
+      const info=body.info&&typeof body.info==="object"?body.info:{};
+      const {data,error}=await db.from("dexter_phone_devices").update({
+        manufacturer:cleanText(info.manufacturer,120)||null,model:cleanText(info.model,120)||null,
+        os_version:cleanText(info.osVersion,80)||null,app_version:cleanText(info.appVersion,80)||null,
+        capabilities:info.capabilities||{},status:"online",last_seen_at:now(),updated_at:now()
+      }).eq("id",deviceId).select("id,device_id,name,status,last_seen_at").single();
+      if(error)throw error; return json({device:data});
+    }
+    if(action==="device_jobs_poll"){
+      if(role!=="device"||!deviceId)return json({error:"Device authentication required."},403);
+      const {data:jobs,error}=await db.from("dexter_phone_jobs").select("*").eq("device_id",deviceId).eq("status","queued").order("created_at").limit(5);
+      if(error)throw error;
+      if((jobs||[]).length){
+        const ids=jobs.map((j:any)=>j.id);
+        await db.from("dexter_phone_jobs").update({status:"running",claimed_at:now(),updated_at:now()}).in("id",ids).eq("status","queued");
+      }
+      return json({jobs:jobs||[]});
+    }
+    if(action==="device_job_complete"){
+      if(role!=="device"||!deviceId)return json({error:"Device authentication required."},403);
+      const jobId=cleanText(body.jobId,80),status=body.status==="completed"?"completed":"failed";
+      const {data,error}=await db.from("dexter_phone_jobs").update({
+        status,completed_at:now(),updated_at:now(),result:body.result||null,error:status==="failed"?cleanText(body.error,1000):null
+      }).eq("id",jobId).eq("device_id",deviceId).eq("status","running").select("*").maybeSingle();
+      if(error)throw error; return json({job:data});
+    }
+    if(action==="device_enroll"){
+      if(role!=="owner")return json({error:"Owner access required."},403);
+      const raw=randomUrlToken(36),hash=await sha256(raw),externalId=cleanText(body.deviceId,160)||crypto.randomUUID();
+      const info=body.info&&typeof body.info==="object"?body.info:{};
+      const {data,error}=await db.from("dexter_phone_devices").upsert({
+        device_id:externalId,name:cleanText(body.name||"Dexter Business Phone",120),
+        token_hash:hash,manufacturer:cleanText(info.manufacturer,120)||null,model:cleanText(info.model,120)||null,
+        os_version:cleanText(info.osVersion,80)||null,app_version:cleanText(info.appVersion,80)||null,
+        capabilities:info.capabilities||{},status:"paired",active:true,paired_at:now(),updated_at:now()
+      },{onConflict:"device_id"}).select("*").single();
+      if(error)throw error;
+      await logAudit(db,"phone.enrolled",keyName,{device_id:data.id,name:data.name});
+      return json({device:{id:data.id,deviceId:data.device_id,name:data.name},deviceToken:raw});
+    }
+    if(action==="device_list"){
+      if(role!=="owner")return json({error:"Owner access required."},403);
+      const {data,error}=await db.from("dexter_phone_devices").select("id,device_id,name,manufacturer,model,os_version,app_version,status,capabilities,last_seen_at,paired_at,active").order("last_seen_at",{ascending:false});
+      if(error)throw error; return json({devices:data||[]});
+    }
+    if(action==="device_job_create"){
+      if(role!=="owner")return json({error:"Owner access required."},403);
+      const target=cleanText(body.deviceId,80),jobType=cleanText(body.jobType,80);
+      const allowed=["device.health","apps.inventory","app.launch","app.install","app.uninstall","dexter.self_update"];
+      if(!allowed.includes(jobType))return json({error:"Unsupported phone job."},400);
+      const {data:device}=await db.from("dexter_phone_devices").select("id").eq("id",target).eq("active",true).maybeSingle();
+      if(!device)return json({error:"Phone not found."},404);
+      const confirm=["app.install","app.uninstall","dexter.self_update"].includes(jobType);
+      const {data,error}=await db.from("dexter_phone_jobs").insert({
+        device_id:target,job_type:jobType,request:body.request||{},requires_confirmation:confirm,
+        approved_by:keyName,approved_at:now(),status:"queued"
+      }).select("*").single();
+      if(error)throw error;
+      await logAudit(db,"phone.job_created",keyName,{device_id:target,job_id:data.id,job_type:jobType});
+      return json({job:data});
+    }
 
     if(action==="scheduled_run_due"){
       const {data:jobs}=await db.from("dexter_scheduled_jobs").select("*").eq("enabled",true).lte("next_run_at",now()).order("next_run_at").limit(10);
