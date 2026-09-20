@@ -7,6 +7,8 @@ on:
     paths:
       - index.html
       - upgrade.js
+      - advanced.js
+      - phone-agent.js
       - pwa.js
       - sw.js
       - manifest.webmanifest
