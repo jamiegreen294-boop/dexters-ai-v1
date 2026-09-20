@@ -476,6 +476,47 @@ async function codingLearningContext(goal){
   }
 }
 
+
+async function createSafeCodingBranch(root){
+  try{
+    const inside=await runProcess("git",["rev-parse","--is-inside-work-tree"],root,30000);
+    if(inside.code!==0)return null;
+    const current=await runProcess("git",["branch","--show-current"],root,30000);
+    const currentName=String(current.stdout||"").trim();
+    if(currentName.startsWith("dexter-test-"))return currentName;
+    const stamp=new Date().toISOString().replace(/[-:TZ.]/g,"").slice(0,14);
+    const name="dexter-test-"+stamp;
+    const made=await runProcess("git",["checkout","-b",name],root,30000);
+    return made.code===0?name:currentName||null;
+  }catch{return null;}
+}
+async function automaticCodeChecks(repoPath){
+  const root=safeWorkspacePath(repoPath),pkg=path.join(root,"package.json"),results=[];
+  if(!fs.existsSync(pkg))return results;
+  try{
+    const data=JSON.parse(fs.readFileSync(pkg,"utf8")),scripts=data?.scripts||{};
+    for(const name of ["lint","test","build"]){
+      if(!scripts[name])continue;
+      const result=await runProcess("npm",["run",name],root,180000).catch(e=>({code:1,stdout:"",stderr:String(e?.message||e)}));
+      results.push({name,result});
+    }
+  }catch(e){results.push({name:"package-check",result:{code:1,stderr:String(e?.message||e)}});}
+  return results;
+}
+async function verifyCodingPreview(url){
+  if(!url)return null;
+  try{
+    const ctx=await getContext(),page=await ctx.newPage();
+    await page.goto(safeUrl(url),{waitUntil:"domcontentloaded",timeout:45000});
+    await page.waitForTimeout(800);
+    const file=path.join(IMAGE_DIR,"code-preview-"+Date.now()+".png");
+    await page.screenshot({path:file,fullPage:true});
+    const out={url:page.url(),title:await page.title(),screenshot_path:file};
+    await page.close();
+    return out;
+  }catch(e){return {error:String(e?.message||e),url:String(url)};}
+}
+
 async function codingAgent(request={}){
   const goal=String(request.goal||request.instruction||"").trim();
   if(!goal)throw new Error("Coding goal is required.");
@@ -496,6 +537,7 @@ async function codingAgent(request={}){
   }
   const root=safeWorkspacePath(repoPath);
   if(!fs.existsSync(root))throw new Error("Workspace/repository path does not exist.");
+  const testBranch=await createSafeCodingBranch(root);
   function repoRelative(rel=""){
     const full=path.resolve(root,String(rel||""));
     if(full!==root&&!full.startsWith(root+path.sep))throw new Error("Coding-agent path escapes its project workspace.");
@@ -545,14 +587,19 @@ async function codingAgent(request={}){
       }
       const finalStatus=await workspaceTool("git.status",{path:repoPath}).catch(()=>null);
       const diff=await workspaceTool("git.diff",{path:repoPath,file:"."}).catch(()=>null);
+      const automatic_checks=await automaticCodeChecks(repoPath);
+      const preview=await verifyCodingPreview(request.preview_url||request.previewUrl||"");
       return {
         status:"completed",
         result:String(plan.result||"Fast coding pass completed"),
         repo_path:repoPath,
+        test_branch:testBranch,
         fast_path:true,
         files_written:written,
         verification,
         checks,
+        automatic_checks,
+        preview,
         git_status:finalStatus,
         git_diff:diff
       };
@@ -602,7 +649,9 @@ async function codingAgent(request={}){
     else if(decision.action==="done"){
       const diff=await workspaceTool("git.diff",{path:repoPath,file:"."}).catch(()=>null);
       const finalStatus=await workspaceTool("git.status",{path:repoPath}).catch(()=>null);
-      return {status:"completed",result:String(decision.result||decision.reason||"Completed"),repo_path:repoPath,history,git_status:finalStatus,git_diff:diff};
+      const automatic_checks=await automaticCodeChecks(repoPath);
+      const preview=await verifyCodingPreview(request.preview_url||request.previewUrl||"");
+      return {status:"completed",result:String(decision.result||decision.reason||"Completed"),repo_path:repoPath,test_branch:testBranch,history,automatic_checks,preview,git_status:finalStatus,git_diff:diff};
     }else if(decision.action==="blocked")return {status:"blocked",reason:String(decision.reason||"Blocked"),repo_path:repoPath,history};
     else throw new Error("Unsupported coding-agent action: "+decision.action);
     history.push({step,decision:{...decision,content:decision.content?"[file content written]":undefined},result:JSON.stringify(result).slice(0,12000)});
