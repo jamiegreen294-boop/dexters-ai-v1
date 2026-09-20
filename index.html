@@ -127,6 +127,19 @@ body.theme-hogmanay .topbar{background:#10131fe8}
   </div>
   <p class="muted" id="localPhoneInfo"></p>
   <div id="managedInfo" class="detailbox" style="margin-top:10px"><b>Managed-device setup</b><p>Pair this Meizu first. Full Device Owner status is applied during managed-device provisioning.</p></div>
+  <div class="detailbox" style="margin-top:10px">
+    <b>Dexter Local Admin Bridge</b>
+    <p class="muted">Pairs Dexter directly to this phone's Wireless Debugging service.</p>
+    <button id="openWirelessDebugging" class="secondary" type="button">Wireless debugging</button>
+    <input id="adbPairAddress" class="miniinput" style="margin-top:8px" placeholder="Pairing address, e.g. 192.168.0.139:46381">
+    <input id="adbPairCode" class="miniinput" style="margin-top:8px" inputmode="numeric" placeholder="6-digit pairing code">
+    <input id="adbConnectAddress" class="miniinput" style="margin-top:8px" placeholder="ADB address, e.g. 192.168.0.139:45027">
+    <div class="approval-actions">
+      <button id="pairLocalAdb" class="secondary">Pair Dexter locally</button>
+      <button id="runLocalDiagnostics" class="secondary">Run Device Owner diagnostics</button>
+    </div>
+    <pre id="localAdbResult" style="white-space:pre-wrap;word-break:break-word"></pre>
+  </div>
 </div>
 <div id="phoneList"></div>
 </section>
@@ -690,6 +703,6 @@ if(token){
 <script src="./pwa.js"></script>
 <script src="./upgrade.js"></script>
 <script src="./advanced.js"></script>
-<script src="./phone-agent.js?v=6-local-admin-bridge"></script>
+<script src="./phone-agent.js?v=7-local-admin-bridge"></script>
 </body>
 </html>
