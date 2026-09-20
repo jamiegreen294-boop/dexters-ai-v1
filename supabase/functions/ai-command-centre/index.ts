@@ -548,6 +548,9 @@ Deno.serve(async(req)=>{
       const {data,error}=await db.from("dexter_phone_devices").update({
         manufacturer:cleanText(info.manufacturer,120)||null,model:cleanText(info.model,120)||null,
         os_version:cleanText(info.osVersion,80)||null,app_version:cleanText(info.appVersion,80)||null,
+        security_patch:cleanText(info.securityPatch,40)||null,
+        battery_optimisation_ignored:Boolean(info.batteryOptimisationIgnored),
+        management:info.management&&typeof info.management==="object"?info.management:{},
         capabilities:info.capabilities||{},status:"online",last_seen_at:now(),updated_at:now()
       }).eq("id",deviceId).select("id,device_id,name,status,last_seen_at").single();
       if(error)throw error; return json({device:data});
@@ -586,17 +589,27 @@ Deno.serve(async(req)=>{
     }
     if(action==="device_list"){
       if(role!=="owner")return json({error:"Owner access required."},403);
-      const {data,error}=await db.from("dexter_phone_devices").select("id,device_id,name,manufacturer,model,os_version,app_version,status,capabilities,last_seen_at,paired_at,active").order("last_seen_at",{ascending:false});
+      const {data,error}=await db.from("dexter_phone_devices").select("id,device_id,name,manufacturer,model,os_version,app_version,status,capabilities,last_seen_at,paired_at,active,security_patch,battery_optimisation_ignored,management,compliance_status,compliance_checked_at").order("last_seen_at",{ascending:false});
       if(error)throw error; return json({devices:data||[]});
+    }
+    if(action==="device_compliance"){
+      if(role!=="owner")return json({error:"Owner access required."},403);
+      await db.rpc("dexter_refresh_phone_compliance");
+      const target=cleanText(body.deviceId,80);
+      let q=db.from("dexter_phone_compliance_alerts").select("*").eq("active",true).order("severity",{ascending:true}).order("last_seen_at",{ascending:false});
+      if(target)q=q.eq("device_id",target);
+      const {data,error}=await q;
+      if(error)throw error;
+      return json({alerts:data||[]});
     }
     if(action==="device_job_create"){
       if(role!=="owner")return json({error:"Owner access required."},403);
       const target=cleanText(body.deviceId,80),jobType=cleanText(body.jobType,80);
-      const allowed=["device.health","device.policy.status","device.policy.apply_business","device.lock","device.wipe","device.internet.protect","device.internet.clear","device.launcher.release","device.apps.protect","device.config.snapshot","apps.inventory","app.launch","app.install","app.uninstall","dexter.self_update"];
+      const allowed=["device.health","device.policy.status","device.policy.apply_business","device.lock","device.wipe","device.internet.protect","device.internet.clear","device.launcher.release","device.apps.protect","device.config.snapshot","device.config.restore","apps.inventory","app.launch","app.install","app.uninstall","dexter.self_update"];
       if(!allowed.includes(jobType))return json({error:"Unsupported phone job."},400);
       const {data:device}=await db.from("dexter_phone_devices").select("id").eq("id",target).eq("active",true).maybeSingle();
       if(!device)return json({error:"Phone not found."},404);
-      const confirm=["device.policy.apply_business","device.lock","device.wipe","device.internet.protect","device.internet.clear","device.launcher.release","device.apps.protect","app.install","app.uninstall","dexter.self_update"].includes(jobType);
+      const confirm=["device.policy.apply_business","device.lock","device.wipe","device.internet.protect","device.internet.clear","device.launcher.release","device.apps.protect","device.config.restore","app.install","app.uninstall","dexter.self_update"].includes(jobType);
       const {data,error}=await db.from("dexter_phone_jobs").insert({
         device_id:target,job_type:jobType,request:body.request||{},requires_confirmation:confirm,
         approved_by:keyName,approved_at:now(),status:"queued"
