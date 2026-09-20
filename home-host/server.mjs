@@ -1027,8 +1027,110 @@ async function richArtifactExport(request={}){
   throw new Error("Rich export supports PDF, DOCX, XLSX and ZIP on the Home PC.");
 }
 
+
+function findAdb(){
+  const explicit=String(process.env.DEXTER_ADB||"").trim();
+  const candidates=[
+    explicit,
+    path.join(process.env.LOCALAPPDATA||"","Android","Sdk","platform-tools","adb.exe"),
+    path.join(process.env.USERPROFILE||"","AppData","Local","Android","Sdk","platform-tools","adb.exe"),
+    path.join(WORKSPACE,"android-tools","adb.exe")
+  ].filter(Boolean);
+  return candidates.find(p=>fs.existsSync(p))||"adb";
+}
+async function adbRun(args,timeout=60000){
+  const result=await runProcess(findAdb(),args,WORKSPACE,timeout);
+  if(result.code!==0)throw new Error(String(result.stderr||result.stdout||"ADB command failed").slice(0,3000));
+  return result;
+}
+function parseAdbDevices(stdout){
+  return String(stdout||"").split(/\r?\n/).slice(1).map(x=>x.trim()).filter(Boolean).map(line=>{
+    const parts=line.split(/\s+/),serial=parts.shift()||"",state=parts.shift()||"unknown",meta={};
+    for(const p of parts){const i=p.indexOf(":");if(i>0)meta[p.slice(0,i)]=p.slice(i+1);}
+    return {serial,state,model:meta.model||null,product:meta.product||null,device:meta.device||null,transport_id:meta.transport_id||null};
+  });
+}
+async function androidDeviceInfo(serial){
+  const target=serial?["-s",String(serial)]:[];
+  const [model,brand,version,battery,storage]=await Promise.all([
+    adbRun([...target,"shell","getprop","ro.product.model"]).then(x=>x.stdout.trim()).catch(()=>null),
+    adbRun([...target,"shell","getprop","ro.product.brand"]).then(x=>x.stdout.trim()).catch(()=>null),
+    adbRun([...target,"shell","getprop","ro.build.version.release"]).then(x=>x.stdout.trim()).catch(()=>null),
+    adbRun([...target,"shell","dumpsys","battery"]).then(x=>x.stdout.slice(0,12000)).catch(()=>null),
+    adbRun([...target,"shell","df","-h","/data"]).then(x=>x.stdout.slice(0,4000)).catch(()=>null)
+  ]);
+  return {serial:serial||null,model,brand,android_version:version,battery,storage};
+}
+async function androidInstallApproved(request={}){
+  requireApprovedLive({...request,approved_live:true},"Android app installation");
+  const serial=String(request.serial||"").trim();
+  const url=String(request.url||"").trim();
+  if(!/^https:\/\//i.test(url))throw new Error("Approved APK URL must use HTTPS.");
+  const expectedSha=String(request.sha256||"").trim().toLowerCase();
+  const safeName=(String(request.name||"dexter-app").replace(/[^A-Za-z0-9._-]+/g,"-").slice(0,80)||"dexter-app")+".apk";
+  const dir=path.join(WORKSPACE,"android-apks");fs.mkdirSync(dir,{recursive:true});
+  const dest=path.join(dir,Date.now()+"-"+safeName);
+  await downloadFile(url,dest);
+  const actual=String(await sha256File(dest)).toLowerCase();
+  if(expectedSha&&actual!==expectedSha)throw new Error("APK checksum mismatch; install blocked.");
+  const args=[];if(serial)args.push("-s",serial);args.push("install","-r","-d",dest);
+  const result=await adbRun(args,180000);
+  return {ok:true,serial:serial||null,name:safeName,sha256:actual,output:result.stdout.slice(-4000)};
+}
+async function androidTool(tool,request={}){
+  if(tool==="android.devices"){
+    const r=await adbRun(["devices","-l"],30000);
+    return {devices:parseAdbDevices(r.stdout),adb:findAdb()};
+  }
+  if(tool==="android.connect"){
+    const address=String(request.address||"").trim();
+    if(!/^[A-Za-z0-9_.:-]+:\d{2,5}$/.test(address))throw new Error("Android wireless-debug address must be host:port.");
+    const r=await adbRun(["connect",address],30000);
+    return {address,output:r.stdout.trim()};
+  }
+  if(tool==="android.pair"){
+    const address=String(request.address||"").trim(),code=String(request.code||"").trim();
+    if(!/^[A-Za-z0-9_.:-]+:\d{2,5}$/.test(address))throw new Error("Pairing address must be host:port.");
+    if(!/^\d{6}$/.test(code))throw new Error("Wireless debugging pairing code must be 6 digits.");
+    const r=await adbRun(["pair",address,code],30000);
+    return {address,paired:/success/i.test(r.stdout+r.stderr),output:(r.stdout+r.stderr).trim().slice(0,2000)};
+  }
+  if(tool==="android.info")return await androidDeviceInfo(String(request.serial||"").trim());
+  if(tool==="android.packages"){
+    const args=[];if(request.serial)args.push("-s",String(request.serial));args.push("shell","pm","list","packages","-3");
+    const r=await adbRun(args,30000);
+    return {packages:r.stdout.split(/\r?\n/).map(x=>x.replace(/^package:/,"").trim()).filter(Boolean).sort()};
+  }
+  if(tool==="android.launch"){
+    const pkg=String(request.package||"").trim();
+    if(!/^[A-Za-z0-9_.]+$/.test(pkg))throw new Error("Invalid Android package name.");
+    const args=[];if(request.serial)args.push("-s",String(request.serial));args.push("shell","monkey","-p",pkg,"-c","android.intent.category.LAUNCHER","1");
+    const r=await adbRun(args,30000);return {package:pkg,output:r.stdout.slice(-3000)};
+  }
+  if(tool==="android.install")return await androidInstallApproved(request);
+  if(tool==="android.apply_business_profile"){
+    const serial=String(request.serial||"").trim(),target=serial?["-s",serial]:[];
+    const results=[];
+    const safeCommands=[
+      ["shell","settings","put","system","screen_off_timeout","300000"],
+      ["shell","settings","put","global","stay_on_while_plugged_in","3"],
+      ["shell","settings","put","system","accelerometer_rotation","1"]
+    ];
+    for(const cmd of safeCommands){try{const r=await adbRun([...target,...cmd],20000);results.push({command:cmd.join(" "),ok:true,output:r.stdout.trim()});}catch(e){results.push({command:cmd.join(" "),ok:false,error:String(e?.message||e)})}}
+    return {serial:serial||null,profile:"Dexter Business Phone",calls_untouched:true,results};
+  }
+  if(tool==="android.uninstall"){
+    requireApprovedLive({...request,approved_live:true},"Android app uninstall");
+    const pkg=String(request.package||"").trim();if(!/^[A-Za-z0-9_.]+$/.test(pkg))throw new Error("Invalid Android package name.");
+    const args=[];if(request.serial)args.push("-s",String(request.serial));args.push("uninstall",pkg);
+    const r=await adbRun(args,60000);return {package:pkg,output:r.stdout.trim()};
+  }
+  throw new Error("Unsupported Android device tool: "+tool);
+}
+
 async function workspaceTool(tool,request={}){
   if(tool==="system.info")return await systemInfo();
+  if(String(tool).startsWith("android."))return await androidTool(tool,request);
   if(tool==="hardware.inspect")return await hardwareInspect();
   if(tool==="hardware.printers.read"||tool==="system.printers")return await hardwarePrinters();
   if(tool==="hardware.ports.read")return await hardwarePorts();
