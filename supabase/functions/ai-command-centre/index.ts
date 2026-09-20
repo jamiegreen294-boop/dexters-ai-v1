@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import sodium from "npm:libsodium-wrappers@0.7.15";
 
 const cors = {
   "Content-Type": "application/json",
@@ -464,6 +465,45 @@ async function providerToken(db:any,provider:string,secretName="api_token"){
 function githubHeaders(token:string){
   return {"Authorization":"Bearer "+token,"Accept":"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28","User-Agent":"Dexter-AI"};
 }
+async function githubSetRepoActionsSecrets(db:any,repo:string,secrets:Record<string,string>){
+  if(repo!=="jamiegreen294-boop/dexters-ai-v1")throw new Error("Dexter TEST may only manage Actions secrets for its own dexters-ai-v1 repository.");
+  const allowed=new Set([
+    "DEXTER_ANDROID_KEYSTORE_B64",
+    "DEXTER_ANDROID_KEYSTORE_PASSWORD",
+    "DEXTER_ANDROID_KEY_ALIAS",
+    "DEXTER_ANDROID_KEY_PASSWORD"
+  ]);
+  const names=Object.keys(secrets||{});
+  if(names.length!==4||names.some(n=>!allowed.has(n)))throw new Error("Only the four approved Dexter Android signing secrets may be synced.");
+  const {token}=await providerToken(db,"github");
+  const headers:any={...githubHeaders(token),"Content-Type":"application/json"};
+  const api="https://api.github.com";
+  const keyRes=await fetch(api+"/repos/"+repo+"/actions/secrets/public-key",{headers});
+  const keyData=await keyRes.json().catch(()=>({}));
+  if(!keyRes.ok)throw new Error(keyData?.message||("GitHub public-key request failed "+keyRes.status));
+  const keyId=String(keyData?.key_id||""),publicKey=String(keyData?.key||"");
+  if(!keyId||!publicKey)throw new Error("GitHub did not return an Actions secrets public key.");
+  await sodium.ready;
+  const keyBytes=sodium.from_base64(publicKey,sodium.base64_variants.ORIGINAL);
+  const synced:any[]=[];
+  for(const name of names){
+    const value=String(secrets[name]||"");
+    if(!value)throw new Error("Missing secret value for "+name);
+    const encrypted=sodium.crypto_box_seal(sodium.from_string(value),keyBytes);
+    const encryptedValue=sodium.to_base64(encrypted,sodium.base64_variants.ORIGINAL);
+    const r=await fetch(api+"/repos/"+repo+"/actions/secrets/"+encodeURIComponent(name),{
+      method:"PUT",headers,
+      body:JSON.stringify({encrypted_value:encryptedValue,key_id:keyId})
+    });
+    if(!(r.status===201||r.status===204)){
+      const d=await r.json().catch(()=>({}));
+      throw new Error(d?.message||("GitHub Actions secret update failed for "+name+" ("+r.status+")"));
+    }
+    synced.push({name,status:r.status===201?"created":"updated"});
+  }
+  return {repo,synced};
+}
+
 async function githubExecute(db:any,tool:string,request:any,approved:boolean){
   const {token}=await providerToken(db,"github");
   const headers:any=githubHeaders(token);
@@ -1341,39 +1381,32 @@ Deno.serve(async(req)=>{
       if(role!=="owner")return json({error:"Owner access required."},403);
       const repoName=cleanText(body.repo||"jamiegreen294-boop/dexters-ai-v1",220);
       if(repoName!=="jamiegreen294-boop/dexters-ai-v1")return json({error:"Dexter secure GitHub secret sync is restricted to its own test repository."},403);
-      const allowed=[
+      const names=[
         "DEXTER_ANDROID_KEYSTORE_B64",
         "DEXTER_ANDROID_KEYSTORE_PASSWORD",
         "DEXTER_ANDROID_KEY_ALIAS",
         "DEXTER_ANDROID_KEY_PASSWORD"
       ];
-      const names=(Array.isArray(body.secretNames)&&body.secretNames.length?body.secretNames:allowed)
-        .map((v:any)=>cleanText(v,100)).filter((v:string)=>allowed.includes(v));
-      if(names.length!==4||new Set(names).size!==4)return json({error:"All four Dexter Android signing secrets are required."},400);
       const {data:bindings,error:bErr}=await db.from("dexter_secret_bindings").select("*")
         .eq("provider","android-signing").in("secret_name",names).eq("active",true);
       if(bErr)throw bErr;
       if((bindings||[]).length!==4)return json({error:"Dexter Android signing secrets are not fully stored in Vault yet."},409);
-      const handoffs:any={};
+      const secureValues:any={};
       for(const name of names){
         const binding=(bindings||[]).find((b:any)=>String(b.secret_name)===name);
         const targets=Array.isArray(binding?.allowed_targets)?binding.allowed_targets:[];
-        if(!targets.includes("dexter-home-agent"))return json({error:"Signing secret is not permitted for the secure home-agent handoff: "+name},409);
-        const {data:h,error:hErr}=await db.from("dexter_secret_handoffs").insert({
-          binding_id:binding.id,target:"github-actions",purpose:"Set GitHub Actions secret "+name+" for "+repoName,
-          status:"pending",actor:keyName
-        }).select("id").single();
-        if(hErr)throw hErr;
-        handoffs[name]=h.id;
+        if(!targets.includes("ai-command-centre"))return json({error:"Signing secret is not permitted for direct GitHub sync: "+name},409);
+        secureValues[name]=await vaultGet(db,String(binding.vault_secret_id));
+        await db.from("dexter_secret_bindings").update({last_used_at:now(),updated_at:now()}).eq("id",binding.id);
       }
-      const {data:agent}=await db.from("dexter_home_agents").select("id,last_seen_at").eq("active",true).order("last_seen_at",{ascending:false}).limit(1).maybeSingle();
-      const {data:job,error:jErr}=await db.from("dexter_home_jobs").insert({
-        job_type:"browser",tool_name:"browser.github_actions_secrets",status:"queued",
-        request:{repo:repoName,secret_handoffs:handoffs,approval_granted:true,...(agent?.id?{target_agent_id:agent.id}:{})}
-      }).select("id,status,created_at").single();
-      if(jErr)throw jErr;
-      await logAudit(db,"github.actions_secrets.queued",keyName,{repo:repoName,secret_names:names,home_job_id:job.id});
-      return json({queued:true,job,secret_names:names,plaintext_stored_in_job:false});
+      const result=await githubSetRepoActionsSecrets(db,repoName,secureValues);
+      await logAudit(db,"github.actions_secrets.synced",keyName,{
+        repo:repoName,secret_names:names,statuses:result.synced
+      });
+      return json({
+        synced:true,repo:repoName,secret_names:names,
+        results:result.synced,method:"github-api",home_pc_required:false,plaintext_stored_in_job:false
+      });
     }
 
     if(action==="tool_request"){
