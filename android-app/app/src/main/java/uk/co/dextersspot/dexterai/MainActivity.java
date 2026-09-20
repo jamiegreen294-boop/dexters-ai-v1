@@ -89,9 +89,9 @@ public class MainActivity extends Activity {
                 c.put("appLaunch", true);
                 c.put("apkInstall", true);
                 c.put("appUninstall", true);
-                c.put("silentInstall", false);
+                c.put("silentInstall", DexterDeviceAdminReceiver.isDeviceOwner(context));\n                c.put("deviceOwner", DexterDeviceAdminReceiver.isDeviceOwner(context));
                 c.put("wirelessDebugging", Build.VERSION.SDK_INT >= 30);
-                j.put("capabilities", c);
+                j.put("capabilities", c);\n                j.put("management", DeviceOwnerPolicy.status(context));
                 return j.toString();
             } catch (Exception e) { return "{}"; }
         }
@@ -111,6 +111,16 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface public boolean isPaired() {
             return DeviceAgentService.hasToken(context);
+        }
+
+        @JavascriptInterface public String getManagementStatus() {
+            try { return DeviceOwnerPolicy.status(context).toString(); }
+            catch (Exception e) { return "{\"deviceOwner\":false}"; }
+        }
+
+        @JavascriptInterface public String applyBusinessMode() {
+            try { return DeviceOwnerPolicy.applyBusinessMode(context).toString(); }
+            catch (Exception e) { return "{\"error\":\""+e.getMessage().replace("\"","'")+"\"}"; }
         }
 
         @JavascriptInterface public void openUnknownSourcesSettings() {
