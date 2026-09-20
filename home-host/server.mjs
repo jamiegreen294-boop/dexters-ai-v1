@@ -1083,7 +1083,7 @@ async function workspaceTool(tool,request={}){
     if(kind==="node-check"){
       const file=String(request.file||"").trim();
       if(!file)throw new Error("node-check requires a file.");
-      return await runProcess("node",["--check",file],cwd,30000);
+      return await runProcess(process.execPath,["--check",file],cwd,30000);
     }
     throw new Error("Unsupported code check: "+rawKind+". Supported: node-check, npm-test, npm-build, npm-lint.");
   }
