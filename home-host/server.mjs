@@ -932,6 +932,75 @@ async function hardwareBridgeRead(){
   return parseHardwareJson(await runHardwarePowerShell(ps,30000));
 }
 
+
+async function documentExtract(request={}){
+  const url=String(request.url||"").trim();
+  const name=String(request.name||"document").replace(/[^A-Za-z0-9._-]/g,"_");
+  if(!url)throw new Error("Document URL is required.");
+  const ext=path.extname(name).toLowerCase();
+  const tempDir=path.join(WORKSPACE,"document-extract");fs.mkdirSync(tempDir,{recursive:true});
+  const file=path.join(tempDir,Date.now()+"-"+name);
+  const rr=await fetch(url);if(!rr.ok)throw new Error("Document download failed HTTP "+rr.status);
+  fs.writeFileSync(file,Buffer.from(await rr.arrayBuffer()));
+  if([".txt",".md",".csv",".json",".html",".xml",".js",".ts",".css",".sql",".yml",".yaml"].includes(ext)){
+    return {text:fs.readFileSync(file,"utf8").slice(0,1000000),method:"utf8"};
+  }
+  const py=[
+    "import sys,zipfile,re,html,os",
+    "p=sys.argv[1]; ext=os.path.splitext(p)[1].lower()",
+    "def clean(x): return re.sub(r'\\\\s+',' ',html.unescape(re.sub(r'<[^>]+>',' ',x))).strip()",
+    "out=''",
+    "if ext=='.docx':",
+    " z=zipfile.ZipFile(p); out=clean(z.read('word/document.xml').decode('utf-8','ignore'))",
+    "elif ext=='.xlsx':",
+    " z=zipfile.ZipFile(p); parts=[]; shared=[]",
+    " if 'xl/sharedStrings.xml' in z.namelist(): shared=re.findall(r'<t[^>]*>(.*?)</t>',z.read('xl/sharedStrings.xml').decode('utf-8','ignore'),re.S)",
+    " for n in sorted(x for x in z.namelist() if x.startswith('xl/worksheets/sheet') and x.endswith('.xml')):",
+    "  x=z.read(n).decode('utf-8','ignore'); vals=[]",
+    "  for t,b in re.findall(r'<c[^>]*?(?:t=\\\"(.*?)\\\")?[^>]*>(.*?)</c>',x,re.S):",
+    "   m=re.search(r'<v>(.*?)</v>',b,re.S); v=m.group(1) if m else clean(b)",
+    "   if t=='s' and v.isdigit() and int(v)<len(shared): v=shared[int(v)]",
+    "   vals.append(clean(v))",
+    "  parts.append(n+'\\\\n'+' | '.join(vals))",
+    " out='\\\\n\\\\n'.join(parts)",
+    "elif ext=='.pdf':",
+    " from pypdf import PdfReader",
+    " out='\\\\n'.join((pg.extract_text() or '') for pg in PdfReader(p).pages)",
+    "else: sys.exit(4)",
+    "print(out[:1000000])"
+  ].join("\n");
+  const pr=await runProcess("python",["-c",py,file],WORKSPACE,120000).catch(e=>({code:1,stdout:"",stderr:String(e?.message||e)}));
+  if(pr.code===0)return {text:String(pr.stdout||"").slice(0,1000000),method:"python"};
+  if(ext===".pdf"){
+    const outFile=file+".txt";
+    const pd=await runProcess("pdftotext",[file,outFile],WORKSPACE,120000).catch(()=>null);
+    if(pd&&pd.code===0&&fs.existsSync(outFile))return {text:fs.readFileSync(outFile,"utf8").slice(0,1000000),method:"pdftotext"};
+  }
+  throw new Error("Document extraction failed: "+String(pr.stderr||"unsupported format").slice(0,1000));
+}
+function minimalPdf(text){
+  const safe=String(text||"").replace(/[()\\]/g,m=>"\\"+m).replace(/[^\x20-\x7E\n]/g,"?");
+  const lines=safe.split(/\r?\n/).slice(0,120).map(x=>x.slice(0,100));
+  const stream="BT /F1 10 Tf 50 790 Td 12 TL "+lines.map((l,i)=>(i?"T* ":"")+"("+l+") Tj").join(" ")+" ET";
+  const objs=["<< /Type /Catalog /Pages 2 0 R >>","<< /Type /Pages /Kids [3 0 R] /Count 1 >>","<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 842] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>","<< /Length "+Buffer.byteLength(stream)+" >>\nstream\n"+stream+"\nendstream","<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"];
+  let out="%PDF-1.4\n",offs=[0];objs.forEach((o,i)=>{offs.push(Buffer.byteLength(out));out+=(i+1)+" 0 obj\n"+o+"\nendobj\n";});
+  const x=Buffer.byteLength(out);out+="xref\n0 "+(objs.length+1)+"\n0000000000 65535 f \n"+offs.slice(1).map(n=>String(n).padStart(10,"0")+" 00000 n ").join("\n")+"\ntrailer << /Size "+(objs.length+1)+" /Root 1 0 R >>\nstartxref\n"+x+"\n%%EOF";
+  return Buffer.from(out,"binary");
+}
+async function richArtifactExport(request={}){
+  const format=String(request.format||"pdf").toLowerCase();
+  const name=String(request.name||"dexter-artifact").replace(/[^A-Za-z0-9._-]/g,"-");
+  const content=String(request.content||"");
+  const dir=path.join(WORKSPACE,"exports");fs.mkdirSync(dir,{recursive:true});
+  if(format==="pdf"){const file=path.join(dir,name+".pdf");fs.writeFileSync(file,minimalPdf(content));return {path:path.relative(WORKSPACE,file),format,size:fs.statSync(file).size};}
+  if(format==="zip"){
+    const src=path.join(dir,name+".txt"),zip=path.join(dir,name+".zip");fs.writeFileSync(src,content,"utf8");
+    await runHardwarePowerShell("Compress-Archive -Path "+JSON.stringify(src)+" -DestinationPath "+JSON.stringify(zip)+" -Force",60000);
+    return {path:path.relative(WORKSPACE,zip),format,size:fs.statSync(zip).size};
+  }
+  throw new Error("Rich export currently supports PDF and ZIP on the Home PC.");
+}
+
 async function workspaceTool(tool,request={}){
   if(tool==="system.info")return await systemInfo();
   if(tool==="hardware.inspect")return await hardwareInspect();
@@ -956,7 +1025,7 @@ async function workspaceTool(tool,request={}){
     return {path:path.relative(WORKSPACE,dir),entries:fs.readdirSync(dir,{withFileTypes:true}).map(x=>({name:x.name,type:x.isDirectory()?"directory":"file"})).slice(0,500)};
   }
   if(tool==="workspace.tree")return {path:String(request.path||""),entries:await listTree(String(request.path||""),Number(request.depth||3),Number(request.max_entries||500))};
-  if(tool==="web.research")return await internetResearch(request);
+  if(tool==="web.research")return await internetResearch(request);\n  if(tool==="document.extract")return await documentExtract(request);\n  if(tool==="artifact.export.rich")return await richArtifactExport(request);
   if(tool==="code.agent")return await codingAgent(request);
   if(tool==="code.direct")return await directCodingPlan(request);
   if(tool==="workspace.read"){
