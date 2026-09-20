@@ -2,6 +2,12 @@ name: Build Dexter Android Release APK
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - build/real-dexter-ai
+    paths:
+      - 'android-app/**'
+      - '.github/workflows/build-dexter-android-release.yml'
 
 permissions:
   contents: read
