@@ -92,7 +92,7 @@
     const splitAddress=(value)=>{const v=(value||"").trim();const i=v.lastIndexOf(":");if(i<1)throw new Error("Enter address as IP:port");const host=v.slice(0,i);const port=parseInt(v.slice(i+1),10);if(!host||!port)throw new Error("Invalid IP:port");return {host,port};};
     const pairAdb=document.getElementById("pairLocalAdb");if(pairAdb)pairAdb.onclick=()=>{
       const out=document.getElementById("localAdbResult");if(!nativePhone()){out.textContent="Open inside Dexter Business Phone.";return}
-      try{const a=splitAddress(document.getElementById("adbPairAddress").value),code=document.getElementById("adbPairCode").value.trim();if(!/^\\d{6}$/.test(code))throw new Error("Enter the current 6-digit pairing code");out.textContent="Pairing Dexter locally…";const d=JSON.parse(window.DexterDevice.pairLocalAdb(a.host,a.port,code));out.textContent=JSON.stringify(d,null,2);}catch(e){out.textContent=e.message}
+      try{const a=splitAddress(document.getElementById("adbPairAddress").value),code=document.getElementById("adbPairCode").value.trim();if(!/^\d{6}$/.test(code))throw new Error("Enter the current 6-digit pairing code");out.textContent="Pairing Dexter locally…";const d=JSON.parse(window.DexterDevice.pairLocalAdb(a.host,a.port,code));out.textContent=JSON.stringify(d,null,2);}catch(e){out.textContent=e.message}
     };
     const diag=document.getElementById("runLocalDiagnostics");if(diag)diag.onclick=()=>{
       const out=document.getElementById("localAdbResult");if(!nativePhone()){out.textContent="Open inside Dexter Business Phone.";return}
