@@ -113,6 +113,7 @@ public class DeviceAgentService extends Service {
             case "device.launcher.release": return DeviceOwnerPolicy.releaseLauncher(this);
             case "device.apps.protect": return DeviceOwnerPolicy.protectApps(this,req.optJSONArray("packages"));
             case "device.config.snapshot": return DeviceOwnerPolicy.configurationSnapshot(this);
+            case "device.config.restore": return DeviceOwnerPolicy.restoreStandardConfiguration(this);
             case "apps.inventory": return appInventory();
             case "app.launch": return launchApp(req.getString("packageName"));
             case "app.install":
