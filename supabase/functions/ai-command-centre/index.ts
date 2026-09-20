@@ -81,6 +81,32 @@ async function liveMenuForQuery(query:string){
   }catch{return null;}
   finally{clearTimeout(timer);}
 }
+async function embedTexts(texts:string[]){
+  const cleaned=(texts||[]).map(x=>cleanText(x,8000)).filter(Boolean);
+  if(!cleaned.length)return [];
+  const key=Deno.env.get("OPENAI_API_KEY")||"";
+  if(!key)return [];
+  try{
+    const r=await fetch("https://api.openai.com/v1/embeddings",{
+      method:"POST",
+      headers:{"Content-Type":"application/json","Authorization":"Bearer "+key},
+      body:JSON.stringify({model:"text-embedding-3-small",input:cleaned,dimensions:1536})
+    });
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok||!Array.isArray(d?.data))return [];
+    return d.data.sort((a:any,b:any)=>a.index-b.index).map((x:any)=>x.embedding);
+  }catch{return [];}
+}
+async function hybridProjectSearch(db:any,projectId:string,query:string,limit=12){
+  if(!projectId||!query)return [];
+  const embs=await embedTexts([query]);
+  if(embs[0]){
+    const {data,error}=await db.rpc("dexter_search_project_files_hybrid",{p_project_id:projectId,p_query:query,p_embedding:embs[0],p_limit:limit});
+    if(!error)return data||[];
+  }
+  const {data}=await db.rpc("dexter_search_project_files",{p_project_id:projectId,p_query:query,p_limit:limit});
+  return data||[];
+}
 async function knowledgeSearchQuery(query:string){
   const q=cleanText(query,500);
   if(!q)return "";
@@ -101,7 +127,7 @@ async function loadContext(db:any,query="",role="owner",projectId=""){
   const allowed=businessCategoriesForRole(role);
   const businessPromise=searchQuery ? db.rpc("dexter_search_business_knowledge",{p_query:searchQuery,p_limit:30}) : Promise.resolve({data:[]});
   const projectPromise=projectId ? db.from("dexter_projects").select("id,name,slug,description,status,system_scope,default_agent,metadata,updated_at").eq("id",projectId).maybeSingle() : Promise.resolve({data:null});
-  const fileSearchPromise=(projectId&&searchQuery) ? db.rpc("dexter_search_project_files",{p_project_id:projectId,p_query:searchQuery,p_limit:12}) : Promise.resolve({data:[]});
+  const fileSearchPromise=(projectId&&searchQuery) ? hybridProjectSearch(db,projectId,searchQuery,12).then(data=>({data})) : Promise.resolve({data:[]});
   const [{data:knowledge},{data:memory},{data:agents},{data:permissions},{data:learning},business,liveMenu,projectRow,fileSearch]=await Promise.all([
     db.from("dexter_ai_knowledge").select("category,title,content").eq("enabled",true).order("category").limit(80),
     db.from("dexter_approved_memory").select("category,content").eq("active",true).order("approved_at",{ascending:false}).limit(40),
@@ -584,21 +610,97 @@ Deno.serve(async(req)=>{
       const {data:connectors}=await db.from("ai_connectors").select("connector_key,name,connector_type,status,capabilities,config,last_checked_at,last_error").order("name");
       const {data:toolRequests}=await db.from("ai_tool_requests").select("id,task_id,connector_key,tool_name,status,requires_approval,result,error,created_at,updated_at").order("created_at",{ascending:false}).limit(40);
       const {data:artifacts}=await db.from("dexter_work_artifacts").select("id,task_id,project_id,name,artifact_type,metadata,created_at,updated_at").order("created_at",{ascending:false}).limit(100);
-      const [{data:projects},{data:projectFiles},{data:artifactVersions},{data:memoryProposals},{data:postmortems},{data:operationsHealth},{data:operationsChecks}]=await Promise.all([
+      const [{data:projects},{data:projectFiles},{data:artifactVersions},{data:memoryProposals},{data:postmortems},{data:operationsHealth},{data:operationsChecks},{data:notifications},{data:scheduledJobs},{data:projectMembers},{data:secretHealth},{data:evalRuns}]=await Promise.all([
         db.from("dexter_projects").select("*").order("name"),
         db.from("dexter_project_files").select("id,project_id,name,file_type,mime_type,size_bytes,version,source,metadata,extraction_status,indexed_at,extracted_at,extraction_error,created_at,updated_at").order("updated_at",{ascending:false}).limit(200),
         db.from("dexter_artifact_versions").select("id,artifact_id,version,name,created_by,created_at").order("created_at",{ascending:false}).limit(200),
         db.from("dexter_memory_proposals").select("*").order("created_at",{ascending:false}).limit(100),
         db.from("dexter_postmortems").select("*").order("created_at",{ascending:false}).limit(100),
         db.from("dexter_operations_health").select("*").order("checked_at",{ascending:false}).limit(100),
-        db.from("dexter_operations_checks").select("*").order("name")
+        db.from("dexter_operations_checks").select("*").order("name"),
+        db.from("dexter_notifications").select("*").order("created_at",{ascending:false}).limit(100),
+        db.from("dexter_scheduled_jobs").select("*").order("name"),
+        db.from("dexter_project_members").select("*").eq("active",true).order("created_at"),
+        db.from("dexter_secret_health").select("*").order("provider"),
+        db.from("dexter_eval_runs").select("*").order("created_at",{ascending:false}).limit(20)
       ]);
-      return json({role,agents:agents||[],tasks:tasks||[],approvals:approvals||[],knowledge:knowledge||[],memory:memory||[],learning:learning||[],audit:audit||[],orchestration:orchestration||[],settings:settings||[],connectors:connectors||[],toolRequests:toolRequests||[],artifacts:artifacts||[],projects:projects||[],projectFiles:projectFiles||[],artifactVersions:artifactVersions||[],memoryProposals:memoryProposals||[],postmortems:postmortems||[],operationsHealth:operationsHealth||[],operationsChecks:operationsChecks||[],homeAgents:homeAgents||[],homeJobs:homeJobs||[],environment:"test",liveWrites:false});
+      return json({role,agents:agents||[],tasks:tasks||[],approvals:approvals||[],knowledge:knowledge||[],memory:memory||[],learning:learning||[],audit:audit||[],orchestration:orchestration||[],settings:settings||[],connectors:connectors||[],toolRequests:toolRequests||[],artifacts:artifacts||[],projects:projects||[],projectFiles:projectFiles||[],artifactVersions:artifactVersions||[],memoryProposals:memoryProposals||[],postmortems:postmortems||[],operationsHealth:operationsHealth||[],operationsChecks:operationsChecks||[],notifications:notifications||[],scheduledJobs:scheduledJobs||[],projectMembers:projectMembers||[],secretHealth:secretHealth||[],evalRuns:evalRuns||[],homeAgents:homeAgents||[],homeJobs:homeJobs||[],environment:"test",liveWrites:false});
     }
 
     
     
     
+    if(action==="notifications"){
+      const {data}=await db.from("dexter_notifications").select("*").neq("status","dismissed").order("created_at",{ascending:false}).limit(100);
+      return json({notifications:data||[]});
+    }
+    if(action==="notification_review"){
+      if(role!=="owner")return json({error:"Owner access required."},403);
+      const id=cleanText(body.notificationId,80),status=["read","dismissed"].includes(body.status)?body.status:"read";
+      const {data,error}=await db.from("dexter_notifications").update({status,read_at:status==="read"?now():null}).eq("id",id).select("*").single();
+      if(error)throw error; return json({notification:data});
+    }
+    if(action==="schedule_create"){
+      if(role!=="owner")return json({error:"Owner access required."},403);
+      const name=cleanText(body.name,160),cron=cleanText(body.cronExpression,80),scheduledAction=cleanText(body.scheduledAction,80);
+      if(!name||!cron||!scheduledAction)return json({error:"Name, schedule and action are required."},400);
+      const {data,error}=await db.from("dexter_scheduled_jobs").insert({name,project_id:cleanText(body.projectId,80)||null,action:scheduledAction,payload:body.payload||{},cron_expression:cron,created_by:keyName}).select("*").single();
+      if(error)throw error; return json({job:data});
+    }
+    if(action==="schedule_toggle"){
+      if(role!=="owner")return json({error:"Owner access required."},403);
+      const {data,error}=await db.from("dexter_scheduled_jobs").update({enabled:Boolean(body.enabled),updated_at:now()}).eq("id",cleanText(body.jobId,80)).select("*").single();
+      if(error)throw error; return json({job:data});
+    }
+    if(action==="project_member_set"){
+      if(role!=="owner")return json({error:"Owner access required."},403);
+      const projectId=cleanText(body.projectId,80),subject=cleanText(body.subject,160),memberRole=cleanText(body.memberRole,40);
+      if(!projectId||!subject||!["owner","manager","editor","viewer"].includes(memberRole))return json({error:"Valid project, subject and role are required."},400);
+      const {data,error}=await db.from("dexter_project_members").upsert({project_id:projectId,subject,role:memberRole,capabilities:Array.isArray(body.capabilities)?body.capabilities:[],active:true,updated_at:now()},{onConflict:"project_id,subject"}).select("*").single();
+      if(error)throw error; return json({member:data});
+    }
+    if(action==="secret_health_check"){
+      if(role!=="owner")return json({error:"Owner access required."},403);
+      const {data:bindings}=await db.from("dexter_secret_bindings").select("provider,secret_name,created_at,last_used_at,updated_at,active");
+      const rows:any[]=[];
+      for(const b of (bindings||[])){
+        const basis=b.updated_at||b.created_at||now(),age=Math.max(0,Math.floor((Date.now()-new Date(basis).getTime())/86400000));
+        const status=!b.active?"inactive":age>180?"rotate":age>90?"review":"healthy";
+        rows.push({provider:b.provider,secret_name:b.secret_name,status,last_verified_at:now(),age_days:age,note:status==="healthy"?"Credential age is within policy window.":"Credential should be reviewed/rotated.",metadata:{last_used_at:b.last_used_at||null}});
+      }
+      if(rows.length)await db.from("dexter_secret_health").upsert(rows,{onConflict:"provider,secret_name"});
+      return json({secrets:rows});
+    }
+    if(action==="audit_export"){
+      if(role!=="owner")return json({error:"Owner access required."},403);
+      const {data}=await db.from("ai_audit_logs").select("*").order("created_at",{ascending:false}).limit(Math.min(5000,Math.max(100,Number(body.limit)||1000)));
+      const format=cleanText(body.format||"json",10);
+      if(format==="csv"){
+        const esc=(v:any)=>'"'+String(v??"").replace(/"/g,'""')+'"';
+        const lines=["created_at,actor,action,environment,details",...(data||[]).map((x:any)=>[x.created_at,x.actor,x.action,x.environment,JSON.stringify(x.details||{})].map(esc).join(","))];
+        return json({filename:"dexter-audit.csv",mimeType:"text/csv",content:lines.join("\n")});
+      }
+      return json({filename:"dexter-audit.json",mimeType:"application/json",content:JSON.stringify(data||[],null,2)});
+    }
+    if(action==="eval_run"){
+      if(role!=="owner")return json({error:"Owner access required."},403);
+      const {data:cases}=await db.from("dexter_eval_cases").select("*").eq("enabled",true).limit(30);
+      const {data:run}=await db.from("dexter_eval_runs").insert({status:"running"}).select("*").single();
+      const results:any[]=[]; let passed=0,failed=0,lastModel="";
+      for(const tc of (cases||[])){
+        try{
+          const ctx=await loadContext(db,tc.prompt,role,tc.project_id||"");
+          const agent=chooseAgent(tc.prompt,"",ctx.agents);
+          const ai=await callAI([{role:"system",content:basePrompt(role,ctx,agent)},{role:"user",content:tc.prompt}],500);
+          lastModel=ai.model||lastModel; const lower=String(ai.reply||"").toLowerCase();
+          const good=(tc.expected_contains||[]).every((x:string)=>lower.includes(String(x).toLowerCase())) && !(tc.forbidden_contains||[]).some((x:string)=>lower.includes(String(x).toLowerCase()));
+          good?passed++:failed++; results.push({case:tc.name,ok:good,reply:String(ai.reply||"").slice(0,1000)});
+        }catch(e){failed++;results.push({case:tc.name,ok:false,error:String((e as Error)?.message||e)});}
+      }
+      await db.from("dexter_eval_runs").update({status:failed?"partial":"pass",passed,failed,results,model:lastModel,completed_at:now()}).eq("id",run.id);
+      return json({passed,failed,results,model:lastModel});
+    }
+
     if(action==="project_create"){
       if(role!=="owner")return json({error:"Only owner access can create projects."},403);
       const name=cleanText(body.name,120),description=cleanText(body.description,2000);
@@ -650,7 +752,19 @@ Deno.serve(async(req)=>{
           const content=storedText.slice(pos,pos+chunkSize).trim();
           if(content)chunks.push({file_id:data.id,project_id:projectId,chunk_index:chunks.length,content,token_estimate:Math.ceil(content.length/4),metadata:{file_name:name}});
         }
-        if(chunks.length){const {error:chunkError}=await db.from("dexter_project_file_chunks").insert(chunks);if(chunkError)throw chunkError;chunkCount=chunks.length;}
+        if(chunks.length){
+          const {data:inserted,error:chunkError}=await db.from("dexter_project_file_chunks").insert(chunks).select("id,chunk_index,content");
+          if(chunkError)throw chunkError;
+          chunkCount=chunks.length;
+          const rows=inserted||[];
+          for(let i=0;i<rows.length;i+=50){
+            const batch=rows.slice(i,i+50);
+            const vectors=await embedTexts(batch.map((x:any)=>x.content));
+            for(let j=0;j<vectors.length;j++){
+              if(vectors[j])await db.from("dexter_project_file_chunks").update({embedding:vectors[j]}).eq("id",batch[j].id);
+            }
+          }
+        }
       }
       await logAudit(db,"project.file_uploaded",keyName,{project_id:projectId,file_id:data.id,name,size_bytes:bytes.length,indexed:Boolean(storedText),chunks:chunkCount});
       return json({file:data,indexed:Boolean(storedText),chunks:chunkCount,needsExtraction:!storedText});
