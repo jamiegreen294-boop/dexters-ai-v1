@@ -775,6 +775,40 @@ Deno.serve(async(req)=>{
       return json({checks:rows,checkedAt:now()});
     }
 
+    if(action==="connectors_probe"){
+      if(role!=="owner")return json({error:"Owner access required for connector probes."},403);
+      const results:any[]=[];
+      const probeOne=async(key:string,fn:()=>Promise<any>)=>{
+        const started=Date.now();
+        try{
+          const detail=await fn();
+          const latency_ms=Date.now()-started;
+          await db.from("ai_connectors").update({status:"ready",last_checked_at:now(),last_error:null}).eq("connector_key",key);
+          results.push({connector_key:key,ok:true,latency_ms,detail});
+        }catch(e){
+          const message=String((e as Error)?.message||e).slice(0,500);
+          await db.from("ai_connectors").update({status:"error",last_checked_at:now(),last_error:message}).eq("connector_key",key);
+          results.push({connector_key:key,ok:false,latency_ms:Date.now()-started,error:message});
+        }
+      };
+      await probeOne("github",async()=>{const x=await githubExecute(db,"repo.read",{repo:"jamiegreen294-boop/dexters-ai-v1"},false);return {name:x?.name||"dexters-ai-v1"};});
+      await probeOne("vercel",async()=>{const x=await vercelExecute(db,"deployments.read",{projectId:"prj_jHa0ZVvB2Eu8eMqWBQkDgZFehuCA",limit:1},false);return {reachable:Boolean(x)};});
+      await probeOne("supabase",async()=>{const x=await supabaseExecute(db,"management.read",{method:"GET",path:"/v1/projects/eikruaxxzzxmfjvsmwwo"},false);return {name:x?.name||"Dexters-AI-Test"};});
+      const homeUrl=(Deno.env.get("DEXTER_HOME_HOST_URL")||"").replace(/\/$/,"");
+      if(homeUrl){
+        let homeHealth:any=null;
+        await probeOne("home-host",async()=>{const rr=await fetch(homeUrl+"/health",{signal:AbortSignal.timeout(8000)});if(!rr.ok)throw new Error("Home host health HTTP "+rr.status);homeHealth=await rr.json();return {platform:homeHealth?.platform,ollama:homeHealth?.ollama?.ready,browser:homeHealth?.browser_ready??homeHealth?.browser};});
+        const homeOk=Boolean(homeHealth?.ollama?.ready);
+        await db.from("ai_connectors").update({status:homeOk?"ready":"error",last_checked_at:now(),last_error:homeOk?null:"Ollama not ready"}).eq("connector_key","local-ai");
+        results.push({connector_key:"local-ai",ok:homeOk,detail:{ollama:homeHealth?.ollama||null}});
+        const browserOk=Boolean(homeHealth?.browser_ready??homeHealth?.browser);
+        await db.from("ai_connectors").update({status:browserOk?"ready":"error",last_checked_at:now(),last_error:browserOk?null:"Browser worker not ready"}).eq("connector_key","browser");
+        results.push({connector_key:"browser",ok:browserOk,detail:{browser:browserOk}});
+      }
+      await logAudit(db,"connectors.probed",keyName,{results:results.map(x=>({connector_key:x.connector_key,ok:x.ok,latency_ms:x.latency_ms||null}))});
+      return json({results,checkedAt:now()});
+    }
+
     if(action==="connectors"){
       const {data:rows}=await db.from("ai_connectors").select("*").order("name");
       const envReady=(key:string)=>{
@@ -1164,7 +1198,38 @@ if(action==="task_detail"){
       return json({memory:data});
     }
 
-if(action==="work"){
+if(action==="task_cancel"){
+      if(role!=="owner")return json({error:"Only owner access can cancel Dexter tasks."},403);
+      const taskId=cleanText(body.taskId,80);
+      const {data:task,error}=await db.from("ai_tasks").select("*").eq("id",taskId).maybeSingle();
+      if(error||!task)return json({error:"Task not found."},404);
+      if(["completed","completed_preview","cancelled"].includes(String(task.status)))return json({task,message:"Task is already terminal."});
+      const ts=now();
+      await db.from("dexter_home_jobs").update({status:"cancelled",error:"Cancelled by owner",updated_at:ts,completed_at:ts}).eq("task_id",taskId).in("status",["queued","running"]);
+      await db.from("ai_approvals").update({status:"rejected",updated_at:ts}).eq("task_id",taskId).eq("status","pending");
+      const {data:updated}=await db.from("ai_tasks").update({status:"cancelled",progress:0,cancel_requested_at:ts,cancelled_at:ts,updated_at:ts,error:"Cancelled by owner"}).eq("id",taskId).select("*").single();
+      await db.from("ai_task_events").insert({task_id:taskId,event_type:"cancelled",message:"Task cancelled by owner."});
+      await logAudit(db,"task.cancelled",keyName,{task_id:taskId});
+      return json({task:updated,cancelled:true});
+    }
+
+    if(action==="task_retry"){
+      if(role!=="owner")return json({error:"Only owner access can retry Dexter tasks."},403);
+      const taskId=cleanText(body.taskId,80);
+      const {data:task,error}=await db.from("ai_tasks").select("*").eq("id",taskId).maybeSingle();
+      if(error||!task)return json({error:"Task not found."},404);
+      if(!["failed","approved_preview_failed","cancelled"].includes(String(task.status)))return json({error:"Only failed/cancelled tasks can be retried."},409);
+      const access=req.headers.get("x-dexter-token")||"";
+      const rr=await fetch(req.url,{method:"POST",headers:{"Content-Type":"application/json","x-dexter-token":access},body:JSON.stringify({
+        action:"work",sessionId:crypto.randomUUID(),message:task.description,title:task.title,agent:task.agent_key,
+        projectId:task.project_id,parentTaskId:task.id,retryCount:Number(task.retry_count||0)+1
+      })});
+      const rd=await rr.json().catch(()=>({error:"Retry returned invalid response."}));
+      await logAudit(db,"task.retried",keyName,{task_id:taskId,retry_status:rr.status});
+      return json({retried:true,originalTaskId:taskId,retry:rd},rr.ok?200:rr.status);
+    }
+
+    if(action==="work"){
       if(!["owner","manager"].includes(role))return json({error:"Work mode is restricted to owner/manager test access."},403);
       const request=cleanText(body.message,12000);
       if(!request)return json({error:"Work request is required"},400);
@@ -1172,12 +1237,12 @@ if(action==="work"){
       const plan=await planWork(context,role,request,cleanText(body.agent,60));
       const agentKey=plan.primary_agent;
       const title=(cleanText(body.title||plan.summary||request.split(/\n/)[0],120)||"Dexter work task").slice(0,120);
-      const {data:task,error:taskError}=await db.from("ai_tasks").insert({title,description:request,project_id:cleanText(body.projectId,80)||null,status:plan.needs_approval?"waiting_approval":"running",agent_key:agentKey,progress:plan.needs_approval?5:10,requires_approval:plan.needs_approval}).select("id,title,status,agent_key,progress").single();
+      const {data:task,error:taskError}=await db.from("ai_tasks").insert({title,description:request,project_id:projectId||null,parent_task_id:cleanText(body.parentTaskId,80)||null,retry_count:Math.max(0,Number(body.retryCount)||0),status:plan.needs_approval?"waiting_approval":"running",agent_key:agentKey,progress:plan.needs_approval?5:10,requires_approval:plan.needs_approval}).select("id,title,status,agent_key,progress").single();
       if(taskError||!task)throw new Error(taskError?.message||"Could not create test task");
       await db.from("ai_orchestration_tasks").insert({task_id:task.id,requested_action:request,selected_agent:agentKey,stage:plan.needs_approval?"waiting_approval":"planned",progress:plan.needs_approval?5:10,result:JSON.stringify({plan})});
       await db.from("ai_task_events").insert({task_id:task.id,event_type:"planned",message:"Planner selected "+agentKey+(plan.reviewer_agent?" with reviewer "+plan.reviewer_agent:"")+". " + (plan.steps||[]).join(" → ")});
       await db.from("dexter_work_artifacts").insert({
-        task_id:task.id,project_id:cleanText(body.projectId,80)||null,name:"Work plan",artifact_type:"plan",
+        task_id:task.id,project_id:projectId||null,name:"Work plan",artifact_type:"plan",
         content:JSON.stringify(plan,null,2),metadata:{agent:agentKey,reviewer:plan.reviewer_agent||null}
       });
       if(plan.needs_approval){
@@ -1301,11 +1366,11 @@ await db.from("ai_task_events").insert({task_id:task.id,event_type:"completed",m
         await logAudit(db,"work.completed",keyName,{task_id:task.id,agent_key:agentKey});
         const {data:finalTask}=await db.from("ai_tasks").select("*").eq("id",task.id).single();
         await db.from("dexter_work_artifacts").insert({
-          task_id:task.id,project_id:cleanText(body.projectId,80)||null,name:"Dexter result",artifact_type:codingIntent?"code":researchIntent?"research":"report",
+          task_id:task.id,project_id:projectId||null,name:"Dexter result",artifact_type:codingIntent?"code":researchIntent?"research":"report",
           content:String(finalTask?.result||reply),metadata:{agent:agentKey,reviewer:plan.reviewer_agent||null,model}
         });
         if(Object.keys(connectorContext).length)await db.from("dexter_work_artifacts").insert({
-          task_id:task.id,project_id:cleanText(body.projectId,80)||null,name:"Connected system evidence",artifact_type:"data",
+          task_id:task.id,project_id:projectId||null,name:"Connected system evidence",artifact_type:"data",
           content:JSON.stringify(connectorContext,null,2),metadata:{read_only:true,environment:"test"}
         });
         try{
