@@ -71,6 +71,9 @@ public class DeviceAgentService extends Service {
         info.put("manufacturer",Build.MANUFACTURER);info.put("model",Build.MODEL);
         info.put("osVersion",Build.VERSION.RELEASE+" (API "+Build.VERSION.SDK_INT+")");
         info.put("appVersion",appVersion());
+        info.put("securityPatch",Build.VERSION.SECURITY_PATCH);
+        PowerManager pm=(PowerManager)getSystemService(POWER_SERVICE);
+        info.put("batteryOptimisationIgnored",pm!=null && pm.isIgnoringBatteryOptimizations(getPackageName()));
         JSONObject cap=new JSONObject();
         cap.put("deviceHealth",true);cap.put("appsInventory",true);cap.put("appLaunch",true);
         cap.put("apkInstall",true);cap.put("appUninstall",true);cap.put("silentInstall",DexterDeviceAdminReceiver.isDeviceOwner(this));cap.put("deviceOwner",DexterDeviceAdminReceiver.isDeviceOwner(this));
