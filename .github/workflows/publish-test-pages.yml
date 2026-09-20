@@ -32,7 +32,7 @@ jobs:
         run: |
           rm -rf /tmp/dexter-site
           mkdir -p /tmp/dexter-site
-          cp index.html upgrade.js advanced.js pwa.js sw.js manifest.webmanifest app-icon.svg github-connect.html vercel-connect.html supabase-connect.html .nojekyll /tmp/dexter-site/
+          cp index.html upgrade.js advanced.js phone-agent.js pwa.js sw.js manifest.webmanifest app-icon.svg github-connect.html vercel-connect.html supabase-connect.html .nojekyll /tmp/dexter-site/
       - name: Update gh-pages mirror
         run: |
           git config user.name "Dexter AI Test Publisher"
@@ -41,7 +41,7 @@ jobs:
           git checkout gh-pages
           cp -f /tmp/dexter-site/* .
           touch .nojekyll
-          git add index.html upgrade.js advanced.js pwa.js sw.js manifest.webmanifest app-icon.svg github-connect.html vercel-connect.html supabase-connect.html .nojekyll
+          git add index.html upgrade.js advanced.js phone-agent.js pwa.js sw.js manifest.webmanifest app-icon.svg github-connect.html vercel-connect.html supabase-connect.html .nojekyll
           if git diff --cached --quiet; then
             echo "No test page changes to publish."
           else
