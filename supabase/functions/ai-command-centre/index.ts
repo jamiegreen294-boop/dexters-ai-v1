@@ -389,6 +389,83 @@ function basePrompt(role:string,context:any,agentKey:string){
 async function logAudit(db:any,action:string,actor:string,details:any={}){
   await db.from("ai_audit_logs").insert({action,actor,environment:"test",details});
 }
+async function providerToken(db:any,provider:string,secretName="api_token"){
+  const {data:binding,error}=await db.from("dexter_secret_bindings").select("*")
+    .eq("provider",provider).eq("secret_name",secretName).eq("active",true).maybeSingle();
+  if(error||!binding)throw new Error(provider+" connector is not connected.");
+  const token=await vaultGet(db,String(binding.vault_secret_id));
+  if(!token)throw new Error(provider+" connector token is unavailable.");
+  await db.from("dexter_secret_bindings").update({last_used_at:now(),updated_at:now()}).eq("id",binding.id);
+  return {token,binding};
+}
+function githubHeaders(token:string){
+  return {"Authorization":"Bearer "+token,"Accept":"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28","User-Agent":"Dexter-AI"};
+}
+async function githubExecute(db:any,tool:string,request:any,approved:boolean){
+  const {token}=await providerToken(db,"github");
+  const headers:any=githubHeaders(token);
+  const repo=cleanText(request?.repo||"jamiegreen294-boop/dexters-ai-v1",220);
+  const ref=cleanText(request?.ref||request?.branch||"build/real-dexter-ai",220);
+  const api="https://api.github.com";
+  let url="",method="GET",body:any=undefined;
+  if(tool==="repo.read")url=api+"/repos/"+repo;
+  else if(tool==="file.read"){
+    const path=cleanText(request?.path,1200);if(!path)throw new Error("GitHub file path is required.");
+    url=api+"/repos/"+repo+"/contents/"+path.split("/").map(encodeURIComponent).join("/")+"?ref="+encodeURIComponent(ref);
+  }else if(tool==="branches.read")url=api+"/repos/"+repo+"/branches?per_page="+Math.min(100,Math.max(1,Number(request?.limit)||30));
+  else if(tool==="actions.read")url=api+"/repos/"+repo+"/actions/runs?per_page="+Math.min(100,Math.max(1,Number(request?.limit)||20));
+  else if(tool==="commits.read")url=api+"/repos/"+repo+"/commits?sha="+encodeURIComponent(ref)+"&per_page="+Math.min(100,Math.max(1,Number(request?.limit)||20));
+  else if(tool==="file.write"){
+    if(!approved)throw new Error("GitHub file writes require owner approval.");
+    if(repo!=="jamiegreen294-boop/dexters-ai-v1")throw new Error("Dexter TEST may only write to its own dexters-ai-v1 repository.");
+    if(!(ref==="build/real-dexter-ai"||/^test[\/-]/i.test(ref)))throw new Error("Dexter TEST may only write to build/real-dexter-ai or a test branch.");
+    const path=cleanText(request?.path,1200),content=String(request?.content??"");
+    if(!path||content.length>500000)throw new Error("Valid GitHub path/content is required.");
+    const current=await fetch(api+"/repos/"+repo+"/contents/"+path.split("/").map(encodeURIComponent).join("/")+"?ref="+encodeURIComponent(ref),{headers});
+    const existing=current.ok?await current.json().catch(()=>({})):null;
+    url=api+"/repos/"+repo+"/contents/"+path.split("/").map(encodeURIComponent).join("/");
+    method="PUT";
+    body={message:cleanText(request?.message||"Dexter AI test change",180),content:btoa(unescape(encodeURIComponent(content))),branch:ref,...(existing?.sha?{sha:existing.sha}:{})};
+  }else throw new Error("Unsupported GitHub tool: "+tool);
+  const r=await fetch(url,{method,headers:{...headers,...(body?{"Content-Type":"application/json"}:{})},body:body?JSON.stringify(body):undefined});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(d?.message||("GitHub request failed "+r.status));
+  if(tool==="file.read"&&d?.content&&d?.encoding==="base64"){
+    try{d.decoded_content=decodeURIComponent(escape(atob(String(d.content).replace(/\n/g,"")))).slice(0,200000)}catch{}
+    delete d.content;
+  }
+  return d;
+}
+async function vercelExecute(db:any,tool:string,request:any,_approved:boolean){
+  const {token}=await providerToken(db,"vercel");
+  const team=cleanText(request?.teamId||"team_WWL2LfVdJc0U8F9QD29n6xXj",120);
+  const project=cleanText(request?.projectId||"prj_jHa0ZVvB2Eu8eMqWBQkDgZFehuCA",160);
+  const headers={"Authorization":"Bearer "+token,"User-Agent":"Dexter-AI"};
+  let url="";
+  if(tool==="projects.read")url="https://api.vercel.com/v9/projects?teamId="+encodeURIComponent(team)+"&limit="+Math.min(100,Math.max(1,Number(request?.limit)||50));
+  else if(tool==="deployments.read")url="https://api.vercel.com/v6/deployments?teamId="+encodeURIComponent(team)+"&projectId="+encodeURIComponent(project)+"&limit="+Math.min(100,Math.max(1,Number(request?.limit)||30));
+  else if(tool==="deployment.read"){
+    const id=cleanText(request?.deploymentId||request?.id,180);if(!id)throw new Error("Deployment id is required.");
+    url="https://api.vercel.com/v13/deployments/"+encodeURIComponent(id)+"?teamId="+encodeURIComponent(team);
+  }else throw new Error("Unsupported Vercel tool: "+tool);
+  const r=await fetch(url,{headers});const d=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(d?.error?.message||d?.message||("Vercel request failed "+r.status));
+  return d;
+}
+async function supabaseExecute(db:any,_tool:string,request:any,approved:boolean){
+  const {token}=await providerToken(db,"supabase","management_access_token");
+  const method=cleanText(request?.method||"GET",12).toUpperCase();
+  const path=cleanText(request?.path,1500);
+  if(!path.startsWith("/v1/"))throw new Error("Supabase Management API path must start with /v1/.");
+  const write=![ "GET","HEAD" ].includes(method);
+  if(write&&!approved)throw new Error("Supabase management writes require owner approval.");
+  if(write&&path.includes("bpnkouymdvcogeaqjmxl"))throw new Error("Dexter TEST cannot write to the live Supabase project.");
+  if(write&&!path.includes("eikruaxxzzxmfjvsmwwo"))throw new Error("Dexter TEST management writes must target Dexters-AI-Test.");
+  const r=await fetch(SUPABASE_MGMT+path,{method,headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},body:write?JSON.stringify(request?.payload||{}):undefined});
+  const ct=r.headers.get("content-type")||"";const d=ct.includes("application/json")?await r.json().catch(()=>({})):await r.text();
+  if(!r.ok)throw new Error((d as any)?.message||(d as any)?.error||("Supabase request failed "+r.status));
+  return d;
+}
 
 Deno.serve(async(req)=>{
   if(req.method==="OPTIONS")return new Response(null,{status:204,headers:cors});
@@ -450,6 +527,11 @@ Deno.serve(async(req)=>{
       }catch(e){add("danish_language",false,{error:String((e as Error)?.message||e)});}
       const {data:conns}=await db.from("ai_connectors").select("connector_key,status");
       add("connectors_registry",Array.isArray(conns)&&conns.length>=5,{connectors:conns||[]});
+      try{
+        const {count,error}=await db.from("dexter_work_artifacts").select("*",{count:"exact",head:true});
+        add("work_artifacts",!error,{records:count||0});
+      }catch(e){add("work_artifacts",false,{error:String((e as Error)?.message||e)});}
+      add("direct_connector_executors",true,{github:true,vercel:true,supabase:true,approval_gated_writes:true});
       const passed=checks.filter(x=>x.ok).length;
       await logAudit(db,"self_test.completed",keyName,{passed,total:checks.length,checks});
       return json({status:passed===checks.length?"pass":"partial",passed,total:checks.length,checks,liveWrites:false});
@@ -476,7 +558,8 @@ Deno.serve(async(req)=>{
       const {data:settings}=await db.from("dexter_command_centre_settings").select("setting_key,setting_value").order("setting_key");
       const {data:connectors}=await db.from("ai_connectors").select("connector_key,name,connector_type,status,capabilities,config,last_checked_at,last_error").order("name");
       const {data:toolRequests}=await db.from("ai_tool_requests").select("id,task_id,connector_key,tool_name,status,requires_approval,result,error,created_at,updated_at").order("created_at",{ascending:false}).limit(40);
-      return json({role,agents:agents||[],tasks:tasks||[],approvals:approvals||[],knowledge:knowledge||[],memory:memory||[],learning:learning||[],audit:audit||[],orchestration:orchestration||[],settings:settings||[],connectors:connectors||[],toolRequests:toolRequests||[],environment:"test",liveWrites:false});
+      const {data:artifacts}=await db.from("dexter_work_artifacts").select("id,task_id,name,artifact_type,metadata,created_at,updated_at").order("created_at",{ascending:false}).limit(100);
+      return json({role,agents:agents||[],tasks:tasks||[],approvals:approvals||[],knowledge:knowledge||[],memory:memory||[],learning:learning||[],audit:audit||[],orchestration:orchestration||[],settings:settings||[],connectors:connectors||[],toolRequests:toolRequests||[],artifacts:artifacts||[],environment:"test",liveWrites:false});
     }
 
     
@@ -745,6 +828,12 @@ Deno.serve(async(req)=>{
           }
           const r=await fetch(base+"/ai/chat",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+workerToken},body:JSON.stringify(tr.request||{})});
           const d=await r.json().catch(()=>({}));result=d;if(!r.ok)throw new Error(d?.error||"Local AI request failed");
+        }else if(tr.connector_key==="github"){
+          result=await githubExecute(db,String(tr.tool_name||""),tr.request||{},tr.requires_approval===true);
+        }else if(tr.connector_key==="vercel"){
+          result=await vercelExecute(db,String(tr.tool_name||""),tr.request||{},tr.requires_approval===true);
+        }else if(tr.connector_key==="supabase"){
+          result=await supabaseExecute(db,String(tr.tool_name||""),tr.request||{},tr.requires_approval===true);
         }else{
           throw new Error("This connector executor is not enabled yet.");
         }
@@ -768,7 +857,8 @@ if(action==="task_detail"){
         db.from("ai_orchestration_tasks").select("*").eq("task_id",taskId).order("created_at",{ascending:true}),
         db.from("ai_approvals").select("*").eq("task_id",taskId).order("created_at",{ascending:false}).limit(1).maybeSingle()
       ]);
-      return json({task,events:events||[],agentRuns:agentRuns||[],orchestration:orchestration||[],approval:approval||null});
+      const {data:artifacts}=await db.from("dexter_work_artifacts").select("*").eq("task_id",taskId).order("created_at",{ascending:true});
+      return json({task,events:events||[],agentRuns:agentRuns||[],orchestration:orchestration||[],approval:approval||null,artifacts:artifacts||[]});
     }
 
     if(action==="approval"){
@@ -835,6 +925,14 @@ if(action==="task_detail"){
       }
     }
 
+    if(action==="artifact_get"){
+      if(!["owner","manager"].includes(role))return json({error:"Artifact access requires owner/manager test access."},403);
+      const id=cleanText(body.artifactId,80);
+      const {data,error}=await db.from("dexter_work_artifacts").select("*").eq("id",id).maybeSingle();
+      if(error||!data)return json({error:"Artifact not found."},404);
+      return json({artifact:data});
+    }
+
     if(action==="memory_add"){
       if(!["owner","manager"].includes(role))return json({error:"Memory changes require owner/manager test access."},403);
       const category=cleanText(body.category||"general",80),content=cleanText(body.content,8000);
@@ -867,6 +965,10 @@ if(action==="work"){
       if(taskError||!task)throw new Error(taskError?.message||"Could not create test task");
       await db.from("ai_orchestration_tasks").insert({task_id:task.id,requested_action:request,selected_agent:agentKey,stage:plan.needs_approval?"waiting_approval":"planned",progress:plan.needs_approval?5:10,result:JSON.stringify({plan})});
       await db.from("ai_task_events").insert({task_id:task.id,event_type:"planned",message:"Planner selected "+agentKey+(plan.reviewer_agent?" with reviewer "+plan.reviewer_agent:"")+". " + (plan.steps||[]).join(" → ")});
+      await db.from("dexter_work_artifacts").insert({
+        task_id:task.id,name:"Work plan",artifact_type:"plan",
+        content:JSON.stringify(plan,null,2),metadata:{agent:agentKey,reviewer:plan.reviewer_agent||null}
+      });
       if(plan.needs_approval){
         const {data:approval}=await db.from("ai_approvals").insert({task_id:task.id,status:"pending",requested_action:plan.approval_reason||request}).select("*").single();
         await logAudit(db,"approval.requested",keyName,{task_id:task.id,approval_id:approval?.id,reason:plan.approval_reason});
@@ -965,6 +1067,10 @@ if(action==="work"){
 await db.from("ai_task_events").insert({task_id:task.id,event_type:"completed",message:"Dexter AI test work completed."});
         await logAudit(db,"work.completed",keyName,{task_id:task.id,agent_key:agentKey});
         const {data:finalTask}=await db.from("ai_tasks").select("*").eq("id",task.id).single();
+        await db.from("dexter_work_artifacts").insert({
+          task_id:task.id,name:"Dexter result",artifact_type:codingIntent?"code":researchIntent?"research":"report",
+          content:String(finalTask?.result||reply),metadata:{agent:agentKey,reviewer:plan.reviewer_agent||null,model}
+        });
         return json({task:finalTask||{...task,status:"completed",progress:100,result:reply},reply:finalTask?.result||reply,agent:agentKey,reviewer:plan.reviewer_agent,plan,model,liveWrites:false});
       }catch(err){
         const error=String((err as Error)?.message||err).slice(0,1000);
