@@ -1310,6 +1310,33 @@ Deno.serve(async(req)=>{
       return json({authorize_url:url,state,redirect_url:redirect});
     }
 
+    if(action==="android_signing_secrets_store"){
+      if(role!=="owner")return json({error:"Owner access required."},403);
+      const secrets=(body.secrets&&typeof body.secrets==="object")?body.secrets:{};
+      const names=[
+        "DEXTER_ANDROID_KEYSTORE_B64",
+        "DEXTER_ANDROID_KEYSTORE_PASSWORD",
+        "DEXTER_ANDROID_KEY_ALIAS",
+        "DEXTER_ANDROID_KEY_PASSWORD"
+      ];
+      for(const name of names){
+        const value=String(secrets[name]||"");
+        if(!value||value.length>20000)return json({error:"Missing or invalid signing value: "+name},400);
+      }
+      for(const name of names){
+        const value=String(secrets[name]);
+        const vaultId=await vaultStore(db,value,"dexter_"+name.toLowerCase(),"Dexter Android release signing secret "+name);
+        const {error}=await db.from("dexter_secret_bindings").upsert({
+          provider:"android-signing",secret_name:name,vault_secret_id:vaultId,
+          purpose:"Dexter Android release signing for GitHub Actions",
+          allowed_targets:["dexter-home-agent","ai-command-centre"],active:true,created_by:keyName,updated_at:now()
+        },{onConflict:"provider,secret_name"});
+        if(error)throw error;
+      }
+      await logAudit(db,"android_signing.vault_stored",keyName,{secret_names:names});
+      return json({stored:true,secret_names:names,plaintext_retained:false});
+    }
+
     if(action==="github_actions_secret_sync"){
       if(role!=="owner")return json({error:"Owner access required."},403);
       const repoName=cleanText(body.repo||"jamiegreen294-boop/dexters-ai-v1",220);
