@@ -16,7 +16,9 @@
       p.innerHTML='<div class="hero"><h3>Automation & Alerts</h3><p>Scheduled checks, proactive alerts, credential health and Dexter quality evaluations.</p></div>'+
       '<div class="row" style="max-width:920px;margin:0 auto 12px"><button id="runSecretHealth" class="secondary">Check credential health</button><button id="runEvals" class="secondary">Run Dexter evals</button><button id="exportAuditJson" class="secondary">Export audit JSON</button><button id="exportAuditCsv" class="secondary">Export audit CSV</button><span id="automationState" class="status">Ready</span></div>'+
       '<div class="hero"><h3>Alerts</h3></div><div id="notificationList" class="tasklist"></div>'+
-      '<div class="hero"><h3>Scheduled jobs</h3></div><div id="scheduleList" class="tasklist"></div>'+
+      '<div class="hero"><h3>Scheduled jobs</h3></div>'+
+      '<div class="workbox"><input id="scheduleName" class="miniinput" placeholder="Job name"><select id="scheduleProject" class="miniinput" style="margin-top:8px"></select><textarea id="scheduleMessage" style="min-height:90px;margin-top:8px" placeholder="What Dexter should do each time"></textarea><select id="scheduleCadence" class="miniinput" style="margin-top:8px"><option value="60">Every hour</option><option value="360">Every 6 hours</option><option value="1440" selected>Every day</option><option value="10080">Every week</option></select><button id="createScheduledWork" class="secondary" style="margin-top:8px">Create scheduled Work job</button></div>'+
+      '<div id="scheduleList" class="tasklist"></div>'+
       '<div class="hero"><h3>Credential health</h3></div><div id="secretHealthList" class="tasklist"></div>'+
       '<div class="hero"><h3>Evaluation history</h3></div><div id="evalList" class="tasklist"></div>';
       document.querySelector(".content").appendChild(p);
@@ -85,7 +87,9 @@
       });
     });
   }
+  function ensureScheduleProject(){projectOptions(el("scheduleProject"))}
   function renderAdvanced(){
+    ensureScheduleProject();
     const notes=dashboard.notifications||[];if(el("alertNav"))el("alertNav").textContent=notes.filter(x=>x.status==="unread").length||"OK";
     const nl=el("notificationList");if(nl){nl.innerHTML="";notes.filter(x=>x.status!=="dismissed").forEach(x=>{const d=document.createElement("div");d.className="task";d.innerHTML='<div class="tasktop"><b>'+esc(x.title)+'</b><span class="status">'+esc(x.severity)+'</span></div><p>'+esc(x.message)+'</p><div class="approval-actions"><button class="secondary note-read" data-id="'+x.id+'">Mark read</button><button class="secondary note-dismiss" data-id="'+x.id+'">Dismiss</button></div>';nl.appendChild(d)});if(!nl.children.length)nl.innerHTML='<div class="task"><p>No active alerts.</p></div>';nl.querySelectorAll(".note-read,.note-dismiss").forEach(b=>b.onclick=async()=>{await api({action:"notification_review",notificationId:b.dataset.id,status:b.classList.contains("note-dismiss")?"dismissed":"read"});await loadDashboard()})}
     const sl=el("scheduleList");if(sl){sl.innerHTML="";(dashboard.scheduledJobs||[]).forEach(x=>{const d=document.createElement("div");d.className="task";d.innerHTML='<div class="tasktop"><b>'+esc(x.name)+'</b><span class="status">'+(x.enabled?"enabled":"paused")+'</span></div><p>'+esc(x.cron_expression)+' · '+esc(x.action)+'</p><div class="meta">Next '+esc(x.next_run_at||"")+'</div><div class="approval-actions"><button class="secondary schedule-toggle" data-id="'+x.id+'" data-enabled="'+(!x.enabled)+'">'+(x.enabled?"Pause":"Enable")+'</button></div>';sl.appendChild(d)});sl.querySelectorAll(".schedule-toggle").forEach(b=>b.onclick=async()=>{await api({action:"schedule_toggle",jobId:b.dataset.id,enabled:b.dataset.enabled==="true"});await loadDashboard()})}
@@ -93,6 +97,16 @@
     const ev=el("evalList");if(ev){ev.innerHTML="";(dashboard.evalRuns||[]).forEach(x=>{const d=document.createElement("div");d.className="task";d.innerHTML='<div class="tasktop"><b>Evaluation run</b><span class="status">'+esc(x.status)+'</span></div><p>'+esc(String(x.passed||0))+' passed · '+esc(String(x.failed||0))+' failed</p><div class="meta">'+esc(x.created_at||"")+'</div>';ev.appendChild(d)});if(!ev.children.length)ev.innerHTML='<div class="task"><p>No evaluation runs yet.</p></div>'}
   }
   function wireAutomation(){
+    if(el("createScheduledWork"))el("createScheduledWork").onclick=async()=>{
+      const name=el("scheduleName").value.trim(),message=el("scheduleMessage").value.trim(),cadence=Number(el("scheduleCadence").value||1440),projectId=el("scheduleProject").value;
+      if(!name||!message)return;
+      el("automationState").textContent="Creating schedule…";
+      try{
+        const cron=cadence===60?"0 * * * *":cadence===1440?"0 8 * * *":cadence===10080?"0 8 * * 1":"cadence:"+cadence;
+        await api({action:"schedule_create",name,projectId,scheduledAction:"work",cronExpression:cron,cadenceMinutes:cadence,payload:{message,projectId,cadence_minutes:cadence}});
+        el("scheduleName").value="";el("scheduleMessage").value="";el("automationState").textContent="Scheduled";await loadDashboard();
+      }catch(e){el("automationState").textContent=e.message}
+    };
     if(el("runSecretHealth"))el("runSecretHealth").onclick=async()=>{el("automationState").textContent="Checking credentials…";try{await api({action:"secret_health_check"});el("automationState").textContent="Complete";await loadDashboard()}catch(e){el("automationState").textContent=e.message}};
     if(el("runEvals"))el("runEvals").onclick=async()=>{el("automationState").textContent="Running evals…";try{const d=await api({action:"eval_run"});el("automationState").textContent=d.passed+" passed / "+d.failed+" failed";await loadDashboard()}catch(e){el("automationState").textContent=e.message}};
     if(el("exportAuditJson"))el("exportAuditJson").onclick=async()=>downloadTextFile(await api({action:"audit_export",format:"json"}));
