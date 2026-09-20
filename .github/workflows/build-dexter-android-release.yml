@@ -54,7 +54,7 @@ jobs:
 
       - name: Build signed release APK
         env:
-          DEXTER_ANDROID_KEYSTORE_PATH: dexter-business-phone-release.jks
+          DEXTER_ANDROID_KEYSTORE_PATH: ${{ github.workspace }}/android-app/dexter-business-phone-release.jks
           DEXTER_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.DEXTER_ANDROID_KEYSTORE_PASSWORD }}
           DEXTER_ANDROID_KEY_ALIAS: ${{ secrets.DEXTER_ANDROID_KEY_ALIAS }}
           DEXTER_ANDROID_KEY_PASSWORD: ${{ secrets.DEXTER_ANDROID_KEY_PASSWORD }}
