@@ -978,12 +978,31 @@ if(action==="work"){
       await db.from("ai_task_events").insert({task_id:task.id,event_type:"started",message:"Dexter AI test work started."});
       await db.from("ai_agent_tasks").insert({task_id:task.id,agent_key:agentKey,status:"running",input:{request,environment:"test"}});
       let toolContext:any=null;
+      let connectorContext:any={};
       const urlMatch=request.match(/https?:\/\/[^\s)\]}>"']+/i);
       const githubMatch=request.match(/https?:\/\/github\.com\/[\w.-]+\/[\w.-]+(?:\.git)?/i);
       const homeUrl=(Deno.env.get("DEXTER_HOME_HOST_URL")||"").replace(/\/$/,"");
       const homeToken=Deno.env.get("DEXTER_HOME_HOST_TOKEN")||"";
       const codingIntent=agentKey==="coding-agent"||/\b(build|create|code|fix|debug|website|web app|app|repo|github|javascript|typescript|html|css|sql|supabase|vercel)\b/i.test(request);
       const researchIntent=/\b(latest|current|research|look up|internet|web search|documentation|docs|find online)\b/i.test(request);
+      // Ground Work mode in the connected test services before reasoning.
+      try{
+        if(/\b(github|repo|repository|branch|commit|workflow|actions)\b/i.test(request)){
+          const ghRepo=githubMatch?.[0]?.replace(/^https?:\/\/github\.com\//i,"").replace(/\.git$/i,"")||"jamiegreen294-boop/dexters-ai-v1";
+          connectorContext.github_repo=await githubExecute(db,"repo.read",{repo:ghRepo},false);
+          if(/\b(workflow|actions|build|ci)\b/i.test(request))connectorContext.github_actions=await githubExecute(db,"actions.read",{repo:ghRepo,limit:10},false);
+        }
+      }catch(e){connectorContext.github_error=String((e as Error)?.message||e).slice(0,500);}
+      try{
+        if(/\b(vercel|deployment|deploy|runtime log|build log)\b/i.test(request)){
+          connectorContext.vercel_deployments=await vercelExecute(db,"deployments.read",{projectId:"prj_jHa0ZVvB2Eu8eMqWBQkDgZFehuCA",limit:12},false);
+        }
+      }catch(e){connectorContext.vercel_error=String((e as Error)?.message||e).slice(0,500);}
+      try{
+        if(/\b(supabase|database|edge function|postgres|rls|migration)\b/i.test(request)){
+          connectorContext.supabase_project=await supabaseExecute(db,"management.read",{method:"GET",path:"/v1/projects/eikruaxxzzxmfjvsmwwo"},false);
+        }
+      }catch(e){connectorContext.supabase_error=String((e as Error)?.message||e).slice(0,500);}
       if(homeUrl&&homeToken&&codingIntent){
         try{
           await db.from("ai_task_events").insert({task_id:task.id,event_type:"tool.started",message:"Dexter Home PC autonomous coding agent started."});
@@ -1049,7 +1068,10 @@ if(action==="work"){
         await db.from("ai_task_events").insert({task_id:task.id,event_type:"home.queued",message:"Queued for Dexter Home PC internet research."});
         return json({task:{...task,status:"queued_home",progress:25},plan,homeJob:job,reply:"Dexter queued this internet-research task for the Home PC. It will run automatically when the paired PC is online.",liveWrites:false});
       }
-      const system=basePrompt(role,context,agentKey)+(toolContext?"\n\nHOME PC TOOL CONTEXT\n"+JSON.stringify(toolContext).slice(0,30000):"")+"\n\nWORK MODE\n- Produce the result in the same language as the user's request unless they ask for another language. Danish requests must receive natural Danish output.\n- Produce a completed, practical work result using reasoning, supplied business knowledge and available tool results.\n- When code is requested, provide concrete code or exact changes, but do not pretend they were applied.\n- When diagnosis is requested, separate confirmed facts from hypotheses.\n- If a request requires a live or external action, mark that part as Needs approved tool connection and continue with everything that can be completed safely.\n- Do not ask unnecessary follow-up questions; make a best effort.";
+      const system=basePrompt(role,context,agentKey)
+        +(Object.keys(connectorContext).length?"\n\nDIRECT CONNECTOR CONTEXT (GitHub / Vercel / Supabase, read-only TEST grounding)\n"+JSON.stringify(connectorContext).slice(0,45000):"")
+        +(toolContext?"\n\nHOME PC TOOL CONTEXT\n"+JSON.stringify(toolContext).slice(0,30000):"")
+        +"\n\nWORK MODE\n- Produce the result in the same language as the user's request unless they ask for another language. Danish requests must receive natural Danish output.\n- Produce a completed, practical work result using reasoning, supplied business knowledge and available tool results.\n- When code is requested, provide concrete code or exact changes, but do not pretend they were applied.\n- When diagnosis is requested, separate confirmed facts from hypotheses.\n- If a request requires a live or external action, mark that part as Needs approved tool connection and continue with everything that can be completed safely.\n- Do not ask unnecessary follow-up questions; make a best effort.";
       try{
         const {reply,model}=await callAI([{role:"system",content:system},{role:"user",content:request}],3000);
         await db.from("ai_tasks").update({status:"completed",progress:100,result:reply,updated_at:now()}).eq("id",task.id);
@@ -1070,6 +1092,10 @@ await db.from("ai_task_events").insert({task_id:task.id,event_type:"completed",m
         await db.from("dexter_work_artifacts").insert({
           task_id:task.id,name:"Dexter result",artifact_type:codingIntent?"code":researchIntent?"research":"report",
           content:String(finalTask?.result||reply),metadata:{agent:agentKey,reviewer:plan.reviewer_agent||null,model}
+        });
+        if(Object.keys(connectorContext).length)await db.from("dexter_work_artifacts").insert({
+          task_id:task.id,name:"Connected system evidence",artifact_type:"data",
+          content:JSON.stringify(connectorContext,null,2),metadata:{read_only:true,environment:"test"}
         });
         return json({task:finalTask||{...task,status:"completed",progress:100,result:reply},reply:finalTask?.result||reply,agent:agentKey,reviewer:plan.reviewer_agent,plan,model,liveWrites:false});
       }catch(err){
