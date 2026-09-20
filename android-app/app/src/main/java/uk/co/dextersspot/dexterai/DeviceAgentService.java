@@ -76,6 +76,10 @@ public class DeviceAgentService extends Service {
         cap.put("apkInstall",true);cap.put("appUninstall",true);cap.put("silentInstall",DexterDeviceAdminReceiver.isDeviceOwner(this));cap.put("deviceOwner",DexterDeviceAdminReceiver.isDeviceOwner(this));
         cap.put("canRequestPackageInstalls",getPackageManager().canRequestPackageInstalls());
         cap.put("wirelessDebugging",Build.VERSION.SDK_INT>=30);
+        cap.put("remoteLock",DexterDeviceAdminReceiver.isDeviceOwner(this));
+        cap.put("remoteWipe",DexterDeviceAdminReceiver.isDeviceOwner(this));
+        cap.put("internetPolicy",DexterDeviceAdminReceiver.isDeviceOwner(this));
+        cap.put("configSnapshot",true);
         info.put("capabilities",cap);info.put("management",DeviceOwnerPolicy.status(this));
         post(new JSONObject().put("action","device_heartbeat").put("sessionId",UUID.randomUUID().toString()).put("info",info));
     }
@@ -99,6 +103,13 @@ public class DeviceAgentService extends Service {
             case "device.health": return deviceHealth();
             case "device.policy.status": return DeviceOwnerPolicy.status(this);
             case "device.policy.apply_business": return DeviceOwnerPolicy.applyBusinessMode(this);
+            case "device.lock": return DeviceOwnerPolicy.lockNow(this);
+            case "device.wipe": return DeviceOwnerPolicy.wipeDevice(this,req.optString("reason","Owner-authorised remote wipe"));
+            case "device.internet.protect": return DeviceOwnerPolicy.setInternetProtection(this,req.optString("hostname","security.cloudflare-dns.com"));
+            case "device.internet.clear": return DeviceOwnerPolicy.clearInternetProtection(this);
+            case "device.launcher.release": return DeviceOwnerPolicy.releaseLauncher(this);
+            case "device.apps.protect": return DeviceOwnerPolicy.protectApps(this,req.optJSONArray("packages"));
+            case "device.config.snapshot": return DeviceOwnerPolicy.configurationSnapshot(this);
             case "apps.inventory": return appInventory();
             case "app.launch": return launchApp(req.getString("packageName"));
             case "app.install":
@@ -115,7 +126,10 @@ public class DeviceAgentService extends Service {
         File data=getFilesDir();
         j.put("storageFreeBytes",data.getFreeSpace());j.put("storageTotalBytes",data.getTotalSpace());
         j.put("canRequestPackageInstalls",getPackageManager().canRequestPackageInstalls());
-        j.put("appVersion",appVersion());j.put("management",DeviceOwnerPolicy.status(this));
+        j.put("appVersion",appVersion());
+        j.put("securityPatch",Build.VERSION.SECURITY_PATCH);
+        j.put("buildDisplay",Build.DISPLAY);
+        j.put("management",DeviceOwnerPolicy.status(this));
         return j;
     }
 
