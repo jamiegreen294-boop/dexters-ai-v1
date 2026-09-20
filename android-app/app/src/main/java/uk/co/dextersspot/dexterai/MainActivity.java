@@ -89,9 +89,11 @@ public class MainActivity extends Activity {
                 c.put("appLaunch", true);
                 c.put("apkInstall", true);
                 c.put("appUninstall", true);
-                c.put("silentInstall", DexterDeviceAdminReceiver.isDeviceOwner(context));\n                c.put("deviceOwner", DexterDeviceAdminReceiver.isDeviceOwner(context));
+                c.put("silentInstall", DexterDeviceAdminReceiver.isDeviceOwner(context));
+                c.put("deviceOwner", DexterDeviceAdminReceiver.isDeviceOwner(context));
                 c.put("wirelessDebugging", Build.VERSION.SDK_INT >= 30);
-                j.put("capabilities", c);\n                j.put("management", DeviceOwnerPolicy.status(context));
+                j.put("capabilities", c);
+                j.put("management", DeviceOwnerPolicy.status(context));
                 return j.toString();
             } catch (Exception e) { return "{}"; }
         }
