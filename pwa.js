@@ -3,7 +3,15 @@
 
   if("serviceWorker" in navigator){
     window.addEventListener("load",function(){
-      navigator.serviceWorker.register("./sw.js").catch(function(){});
+      navigator.serviceWorker.register("./sw.js?v=6",{updateViaCache:"none"}).then(function(reg){
+        reg.update().catch(function(){});
+      }).catch(function(){});
+      var reloading=false;
+      navigator.serviceWorker.addEventListener("controllerchange",function(){
+        if(reloading)return;
+        reloading=true;
+        location.reload();
+      });
     });
   }
 
