@@ -14,6 +14,9 @@ on:
       - 'android-app/**'
       - '.github/workflows/build-dexter-android.yml'
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -51,9 +54,27 @@ jobs:
           DEXTER_ANDROID_KEY_PASSWORD: ${{ secrets.DEXTER_ANDROID_KEY_PASSWORD }}
         run: gradle :app:assembleRelease --stacktrace
 
-      - name: Upload signed APK
+      - name: Upload signed APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: Dexter-Business-Phone-v4
           path: android-app/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
+
+      - name: Publish provisioning APK to GitHub Pages
+        working-directory: .
+        run: |
+          git config user.name "Dexter Build"
+          git config user.email "actions@users.noreply.github.com"
+          git fetch origin gh-pages
+          git worktree add "$RUNNER_TEMP/gh-pages" origin/gh-pages
+          mkdir -p "$RUNNER_TEMP/gh-pages/device"
+          cp android-app/app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/gh-pages/device/Dexter-Business-Phone-Release-v4.apk"
+          cd "$RUNNER_TEMP/gh-pages"
+          git add device/Dexter-Business-Phone-Release-v4.apk
+          if git diff --cached --quiet; then
+            echo "Provisioning APK already current"
+          else
+            git commit -m "Publish Dexter Business Phone v4 provisioning APK"
+            git push origin HEAD:gh-pages
+          fi
