@@ -76,7 +76,7 @@ public final class DeviceOwnerPolicy {
         d.setUninstallBlocked(a, c.getPackageName(), true);
 
         // Overnight Android system updates: install during 02:00–05:00.
-        try { d.setSystemUpdatePolicy(a, SystemUpdatePolicy.createWindowedInstall(120,300)); } catch(Exception ignored) {}
+        try { d.setSystemUpdatePolicy(a, SystemUpdatePolicy.createWindowedInstallPolicy(120,300)); } catch(Exception ignored) {}
 
         // Dexter Home stays recoverable through the protected Dexter Admin tile.
         try {
