@@ -39,7 +39,7 @@ if(!TOKEN||TOKEN.length<24){
 for(const dir of [PROFILE,WORKSPACE,JOB_DIR,IMAGE_DIR,SDCPP_DIR,SDCPP_MODEL_DIR])fs.mkdirSync(dir,{recursive:true});
 
 let context;
-const pageSessions=new Map();
+const pageSessions=new Map();\nconst pageDiagnostics=new WeakMap();
 
 function json(res,status,body){
   const data=JSON.stringify(body);
@@ -96,6 +96,14 @@ async function getContext(){
   });
   return context;
 }
+function attachPageDiagnostics(page){
+  if(pageDiagnostics.has(page))return;
+  const state={console_errors:[],page_errors:[],failed_requests:[]};
+  pageDiagnostics.set(page,state);
+  page.on("console",msg=>{if(msg.type()==="error")state.console_errors.push(msg.text().slice(0,1000));});
+  page.on("pageerror",err=>state.page_errors.push(String(err?.message||err).slice(0,1000)));
+  page.on("requestfailed",req=>state.failed_requests.push({url:req.url().slice(0,1000),error:req.failure()?.errorText||"failed"}));
+}
 async function getPage(session="default"){
   let ctx=await getContext();
   if(pageSessions.has(session)){
@@ -132,7 +140,16 @@ async function snapshot(page){
     })});
   });
   const text=(await page.locator("body").innerText().catch(()=>"" )).slice(0,16000);
-  return {url:page.url(),title:await page.title(),text,elements};
+  const diagnostics=pageDiagnostics.get(page)||{console_errors:[],page_errors:[],failed_requests:[]};
+  const accessibility=await page.evaluate(()=>{
+    const missingAlt=Array.from(document.querySelectorAll("img")).filter(x=>!x.getAttribute("alt")).length;
+    const unnamedButtons=Array.from(document.querySelectorAll("button,[role=button]")).filter(x=>!((x.textContent||"").trim()||x.getAttribute("aria-label")||x.getAttribute("title"))).length;
+    const unlabeled=Array.from(document.querySelectorAll("input,textarea,select")).filter(x=>{
+      const id=x.id;return !(x.getAttribute("aria-label")||x.getAttribute("aria-labelledby")||(id&&document.querySelector('label[for="'+CSS.escape(id)+'"]')));
+    }).length;
+    return {missing_alt:missingAlt,unnamed_buttons:unnamedButtons,unlabeled_controls:unlabeled,total_issues:missingAlt+unnamedButtons+unlabeled};
+  }).catch(()=>({missing_alt:0,unnamed_buttons:0,unlabeled_controls:0,total_issues:0}));
+  return {url:page.url(),title:await page.title(),text,elements,diagnostics,accessibility};
 }
 async function byRef(page,ref){
   const value=String(ref||"");
@@ -503,18 +520,27 @@ async function automaticCodeChecks(repoPath){
   }catch(e){results.push({name:"package-check",result:{code:1,stderr:String(e?.message||e)}});}
   return results;
 }
-async function verifyCodingPreview(url){
+async function verifyCodingPreview(url,baselinePath=""){
   if(!url)return null;
   try{
-    const ctx=await getContext(),page=await ctx.newPage();
-    await page.goto(safeUrl(url),{waitUntil:"domcontentloaded",timeout:45000});
+    const ctx=await getContext(),page=await ctx.newPage();attachPageDiagnostics(page);
+    await page.goto(safeUrl(url),{waitUntil:"networkidle",timeout:45000}).catch(async()=>page.goto(safeUrl(url),{waitUntil:"domcontentloaded",timeout:45000}));
     await page.waitForTimeout(800);
-    const file=path.join(IMAGE_DIR,"code-preview-"+Date.now()+".png");
-    await page.screenshot({path:file,fullPage:true});
-    const out={url:page.url(),title:await page.title(),screenshot_path:file};
-    await page.close();
-    return out;
-  }catch(e){return {error:String(e?.message||e),url:String(url)};}
+    const shot=await page.screenshot({fullPage:true});
+    const file=path.join(IMAGE_DIR,"code-preview-"+Date.now()+".png");fs.writeFileSync(file,shot);
+    const currentHash=crypto.createHash("sha256").update(shot).digest("hex");
+    let baseline=null;
+    if(baselinePath){
+      try{
+        const base=fs.readFileSync(safeWorkspacePath(baselinePath));
+        baseline={path:baselinePath,sha256:crypto.createHash("sha256").update(base).digest("hex"),changed:!base.equals(shot)};
+      }catch(e){baseline={path:baselinePath,error:String(e?.message||e)};}
+    }
+    const snap=await snapshot(page);
+    const failed=snap.diagnostics.console_errors.length>0||snap.diagnostics.page_errors.length>0||snap.diagnostics.failed_requests.length>0;
+    const out={url:page.url(),title:await page.title(),screenshot_path:file,screenshot_sha256:currentHash,visual_comparison:baseline,diagnostics:snap.diagnostics,accessibility:snap.accessibility,verification_passed:!failed};
+    await page.close();return out;
+  }catch(e){return {error:String(e?.message||e),url:String(url),verification_passed:false};}
 }
 
 async function codingAgent(request={}){
@@ -588,7 +614,7 @@ async function codingAgent(request={}){
       const finalStatus=await workspaceTool("git.status",{path:repoPath}).catch(()=>null);
       const diff=await workspaceTool("git.diff",{path:repoPath,file:"."}).catch(()=>null);
       const automatic_checks=await automaticCodeChecks(repoPath);
-      const preview=await verifyCodingPreview(request.preview_url||request.previewUrl||"");
+      const preview=await verifyCodingPreview(request.preview_url||request.previewUrl||"",request.baseline_screenshot_path||request.baselineScreenshotPath||"");
       return {
         status:"completed",
         result:String(plan.result||"Fast coding pass completed"),
@@ -650,7 +676,7 @@ async function codingAgent(request={}){
       const diff=await workspaceTool("git.diff",{path:repoPath,file:"."}).catch(()=>null);
       const finalStatus=await workspaceTool("git.status",{path:repoPath}).catch(()=>null);
       const automatic_checks=await automaticCodeChecks(repoPath);
-      const preview=await verifyCodingPreview(request.preview_url||request.previewUrl||"");
+      const preview=await verifyCodingPreview(request.preview_url||request.previewUrl||"",request.baseline_screenshot_path||request.baselineScreenshotPath||"");
       return {status:"completed",result:String(decision.result||decision.reason||"Completed"),repo_path:repoPath,test_branch:testBranch,history,automatic_checks,preview,git_status:finalStatus,git_diff:diff};
     }else if(decision.action==="blocked")return {status:"blocked",reason:String(decision.reason||"Blocked"),repo_path:repoPath,history};
     else throw new Error("Unsupported coding-agent action: "+decision.action);
