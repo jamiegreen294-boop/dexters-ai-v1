@@ -161,6 +161,30 @@ public class MainActivity extends Activity {
             } catch (Exception ignored) {}
         }
 
+        @JavascriptInterface public void openBatteryOptimizationSettings() {
+            try {
+                Intent i = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                context.startActivity(i);
+            } catch (Exception ignored) {}
+        }
+
+        @JavascriptInterface public void openBusinessApps() {
+            try {
+                Intent i = new Intent(context, BusinessAppsActivity.class);
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                context.startActivity(i);
+            } catch (Exception ignored) {}
+        }
+
+        @JavascriptInterface public void openQuickStart() {
+            try {
+                Intent i = new Intent(context, QuickStartActivity.class);
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                context.startActivity(i);
+            } catch (Exception ignored) {}
+        }
+
         @JavascriptInterface public void openUnknownSourcesSettings() {
             try {
                 Intent i = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
