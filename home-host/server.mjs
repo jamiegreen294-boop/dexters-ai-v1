@@ -992,13 +992,36 @@ async function richArtifactExport(request={}){
   const name=String(request.name||"dexter-artifact").replace(/[^A-Za-z0-9._-]/g,"-");
   const content=String(request.content||"");
   const dir=path.join(WORKSPACE,"exports");fs.mkdirSync(dir,{recursive:true});
+  const xmlEsc=v=>String(v||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
   if(format==="pdf"){const file=path.join(dir,name+".pdf");fs.writeFileSync(file,minimalPdf(content));return {path:path.relative(WORKSPACE,file),format,size:fs.statSync(file).size};}
   if(format==="zip"){
     const src=path.join(dir,name+".txt"),zip=path.join(dir,name+".zip");fs.writeFileSync(src,content,"utf8");
     await runHardwarePowerShell("Compress-Archive -Path "+JSON.stringify(src)+" -DestinationPath "+JSON.stringify(zip)+" -Force",60000);
     return {path:path.relative(WORKSPACE,zip),format,size:fs.statSync(zip).size};
   }
-  throw new Error("Rich export currently supports PDF and ZIP on the Home PC.");
+  if(format==="docx"){
+    const work=path.join(dir,name+"-docx-"+Date.now());fs.mkdirSync(path.join(work,"_rels"),{recursive:true});fs.mkdirSync(path.join(work,"word"),{recursive:true});
+    fs.writeFileSync(path.join(work,"[Content_Types].xml"),'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>');
+    fs.writeFileSync(path.join(work,"_rels",".rels"),'<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>');
+    const body=content.split(/\r?\n/).map(x=>'<w:p><w:r><w:t xml:space="preserve">'+xmlEsc(x)+'</w:t></w:r></w:p>').join("");
+    fs.writeFileSync(path.join(work,"word","document.xml"),'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>'+body+'</w:body></w:document>');
+    const tmp=path.join(dir,name+".docx.zip"),out=path.join(dir,name+".docx");
+    await runHardwarePowerShell("Compress-Archive -Path "+JSON.stringify(path.join(work,"*"))+" -DestinationPath "+JSON.stringify(tmp)+" -Force",60000);
+    fs.renameSync(tmp,out);return {path:path.relative(WORKSPACE,out),format,size:fs.statSync(out).size};
+  }
+  if(format==="xlsx"){
+    const work=path.join(dir,name+"-xlsx-"+Date.now());fs.mkdirSync(path.join(work,"_rels"),{recursive:true});fs.mkdirSync(path.join(work,"xl","worksheets"),{recursive:true});fs.mkdirSync(path.join(work,"xl","_rels"),{recursive:true});
+    fs.writeFileSync(path.join(work,"[Content_Types].xml"),'<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>');
+    fs.writeFileSync(path.join(work,"_rels",".rels"),'<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>');
+    fs.writeFileSync(path.join(work,"xl","workbook.xml"),'<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Dexter" sheetId="1" r:id="rId1"/></sheets></workbook>');
+    fs.writeFileSync(path.join(work,"xl","_rels","workbook.xml.rels"),'<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>');
+    const rows=content.split(/\r?\n/).slice(0,5000).map((x,i)=>'<row r="'+(i+1)+'"><c r="A'+(i+1)+'" t="inlineStr"><is><t>'+xmlEsc(x)+'</t></is></c></row>').join("");
+    fs.writeFileSync(path.join(work,"xl","worksheets","sheet1.xml"),'<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>'+rows+'</sheetData></worksheet>');
+    const tmp=path.join(dir,name+".xlsx.zip"),out=path.join(dir,name+".xlsx");
+    await runHardwarePowerShell("Compress-Archive -Path "+JSON.stringify(path.join(work,"*"))+" -DestinationPath "+JSON.stringify(tmp)+" -Force",60000);
+    fs.renameSync(tmp,out);return {path:path.relative(WORKSPACE,out),format,size:fs.statSync(out).size};
+  }
+  throw new Error("Rich export supports PDF, DOCX, XLSX and ZIP on the Home PC.");
 }
 
 async function workspaceTool(tool,request={}){
