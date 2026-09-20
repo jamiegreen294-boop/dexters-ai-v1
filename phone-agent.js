@@ -53,13 +53,27 @@
       const card=document.createElement("div");card.className="task";
       card.innerHTML='<div class="tasktop"><b>'+esc(ph.name||"Dexter Phone")+'</b><span class="status">'+esc(ph.status||"unknown")+'</span></div>'+
       '<p>'+esc((ph.manufacturer||"")+" "+(ph.model||""))+'</p><div class="meta">Android '+esc(ph.os_version||"")+' · Agent '+esc(ph.app_version||"")+' · '+(ph.capabilities&&ph.capabilities.deviceOwner?'<b>Device Owner</b> · ':'')+'last seen '+esc(ph.last_seen_at||"never")+'</div>'+
-      '<div class="approval-actions"><button class="secondary phone-health">Health</button><button class="secondary phone-apps">Apps</button><button class="secondary phone-launch">Launch app</button><button class="secondary phone-install">Install APK</button><button class="secondary phone-uninstall">Uninstall app</button></div>';
+      '<div class="approval-actions"><button class="secondary phone-health">Health</button><button class="secondary phone-apps">Apps</button><button class="secondary phone-policy">Policy</button><button class="secondary phone-business">Business Mode</button><button class="secondary phone-internet">Internet Protect</button><button class="secondary phone-config">Config Backup</button><button class="secondary phone-lock">Remote Lock</button><button class="secondary phone-launch">Launch app</button><button class="secondary phone-install">Install APK</button><button class="secondary phone-uninstall">Uninstall app</button><button class="secondary phone-protectapps">Protect Business Apps</button><button class="secondary phone-release">Recovery Launcher</button><button class="secondary phone-wipe">REMOTE WIPE</button></div>';
       const q=(type,request={})=>api({action:"device_job_create",deviceId:ph.id,jobType:type,request});
       card.querySelector(".phone-health").onclick=async()=>{await q("device.health");state.textContent="Health check queued";};
       card.querySelector(".phone-apps").onclick=async()=>{await q("apps.inventory");state.textContent="App inventory queued";};
+      card.querySelector(".phone-policy").onclick=async()=>{await q("device.policy.status");state.textContent="Policy status queued";};
+      card.querySelector(".phone-business").onclick=async()=>{if(confirm("Apply Dexter business security mode to this managed phone?")){await q("device.policy.apply_business");state.textContent="Business mode queued";}};
+      card.querySelector(".phone-internet").onclick=async()=>{if(confirm("Enable Dexter protected DNS on this phone?")){await q("device.internet.protect",{hostname:"security.cloudflare-dns.com"});state.textContent="Internet protection queued";}};
+      card.querySelector(".phone-config").onclick=async()=>{await q("device.config.snapshot");state.textContent="Configuration snapshot queued";};
+      card.querySelector(".phone-lock").onclick=async()=>{if(confirm("Lock this phone now?")){await q("device.lock");state.textContent="Remote lock queued";}};
       card.querySelector(".phone-launch").onclick=async()=>{const pkg=prompt("Android package name to launch");if(pkg){await q("app.launch",{packageName:pkg});state.textContent="Launch queued";}};
       card.querySelector(".phone-install").onclick=async()=>{const url=prompt("HTTPS APK download URL");if(url){await q("app.install",{url});state.textContent="Install queued — Android may ask for confirmation";}};
       card.querySelector(".phone-uninstall").onclick=async()=>{const pkg=prompt("Android package name to uninstall");if(pkg){await q("app.uninstall",{packageName:pkg});state.textContent="Uninstall queued — Android will ask for confirmation";}};
+      card.querySelector(".phone-protectapps").onclick=async()=>{await q("device.apps.protect",{packages:["uk.co.dextersspot.dexterai","com.google.android.gm","com.whatsapp.w4b","com.android.chrome","com.google.android.apps.maps"]});state.textContent="Business-app protection queued";};
+      card.querySelector(".phone-release").onclick=async()=>{if(confirm("Release Dexter Home as the forced launcher for recovery? You can re-apply Business Mode later.")){await q("device.launcher.release");state.textContent="Launcher recovery queued";}};
+      card.querySelector(".phone-wipe").onclick=async()=>{
+        const a=prompt("DANGER: this permanently erases the managed phone. Type WIPE DEXTER PHONE to continue.");
+        if(a!=="WIPE DEXTER PHONE"){state.textContent="Wipe cancelled";return}
+        const reason=prompt("Reason for remote wipe (required)");
+        if(!reason){state.textContent="Wipe cancelled — reason required";return}
+        if(confirm("FINAL CONFIRMATION: erase this phone now?")){await q("device.wipe",{reason});state.textContent="Remote wipe queued";}
+      };
       list.appendChild(card);
     });
     if(!phones.length)list.innerHTML='<div class="task"><p>No Dexter business phones paired yet.</p></div>';
@@ -88,6 +102,13 @@
       try{const d=JSON.parse(window.DexterDevice.applyBusinessMode());st.textContent=d.error||"Dexters business mode applied";document.getElementById("managedInfo").innerHTML='<b>Dexters business mode</b><pre>'+esc(JSON.stringify(d,null,2))+'</pre>';}catch(e){st.textContent=e.message}
     };
     const unknown=document.getElementById("unknownSources");if(unknown)unknown.onclick=()=>{if(nativePhone())window.DexterDevice.openUnknownSourcesSettings();else alert("Open inside the Android app.");};
+    const box=document.querySelector("#page-phone .workbox .row");
+    if(box&&!document.getElementById("batteryProtection")){
+      const b=document.createElement("button");b.id="batteryProtection";b.className="secondary";b.textContent="Battery protection";
+      b.onclick=()=>{if(nativePhone())window.DexterDevice.openBatteryOptimizationSettings();else alert("Open inside the Android app.");};box.insertBefore(b,document.getElementById("phoneState"));
+      const a=document.createElement("button");a.id="businessApps";a.className="secondary";a.textContent="Business Apps";a.onclick=()=>{if(nativePhone())window.DexterDevice.openBusinessApps();};box.insertBefore(a,document.getElementById("phoneState"));
+      const q=document.createElement("button");q.id="quickStart";q.className="secondary";q.textContent="Staff Quick Start";q.onclick=()=>{if(nativePhone())window.DexterDevice.openQuickStart();};box.insertBefore(q,document.getElementById("phoneState"));
+    }
     const wd=document.getElementById("openWirelessDebugging");if(wd)wd.onclick=()=>{if(nativePhone())window.DexterDevice.openWirelessDebuggingSettings();else alert("Open inside the Android app.");};
     const splitAddress=(value)=>{const v=(value||"").trim();const i=v.lastIndexOf(":");if(i<1)throw new Error("Enter address as IP:port");const host=v.slice(0,i);const port=parseInt(v.slice(i+1),10);if(!host||!port)throw new Error("Invalid IP:port");return {host,port};};
     const pairAdb=document.getElementById("pairLocalAdb");if(pairAdb)pairAdb.onclick=()=>{
