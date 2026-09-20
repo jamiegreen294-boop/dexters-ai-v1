@@ -1,4 +1,4 @@
-const CACHE="dexter-ai-test-v4";
+const CACHE="dexter-ai-test-v5";
 const SHELL=["./","./index.html","./manifest.webmanifest","./app-icon.svg","./upgrade.js","./advanced.js"];
 self.addEventListener("install",event=>{
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL)).then(()=>self.skipWaiting()));
