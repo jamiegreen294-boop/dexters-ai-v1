@@ -620,12 +620,30 @@ Deno.serve(async(req)=>{
       const storagePath=projectId+"/"+crypto.randomUUID()+"-"+safeName;
       const {error:uploadError}=await db.storage.from("dexter-ai-project-files").upload(storagePath,bytes,{contentType:mime,upsert:false});
       if(uploadError)throw uploadError;
-      const readable=/^(text\/|application\/(json|javascript|xml)|image\/svg\+xml)/i.test(mime);
-      const storedText=readable&&textContent!==null?textContent:null;
-      const {data,error}=await db.from("dexter_project_files").insert({project_id:projectId,name,file_type:cleanText(body.fileType||"",80)||null,mime_type:mime,storage_path:storagePath,content_text:storedText,size_bytes:bytes.length,sha256:hash,source:"upload",metadata:{original_name:name}}).select("*").single();
+      const readable=/^(text\/|application\/(json|javascript|xml)|image\/svg\+xml)/i.test(mime)||/\.(md|txt|json|js|ts|tsx|jsx|css|html|xml|csv|sql|yml|yaml)$/i.test(name);
+      let storedText:string|null=null;
+      if(readable){
+        try{storedText=(textContent!==null?textContent:new TextDecoder("utf-8",{fatal:false}).decode(bytes)).slice(0,1000000);}catch{storedText=null;}
+      }
+      const extractionStatus=storedText?"indexed":"needs_extraction";
+      const {data,error}=await db.from("dexter_project_files").insert({
+        project_id:projectId,name,file_type:cleanText(body.fileType||"",80)||null,mime_type:mime,storage_path:storagePath,
+        content_text:storedText,size_bytes:bytes.length,sha256:hash,source:"upload",
+        metadata:{original_name:name,searchable:Boolean(storedText)},extraction_status:extractionStatus,
+        extracted_at:storedText?now():null,indexed_at:storedText?now():null
+      }).select("*").single();
       if(error)throw error;
-      await logAudit(db,"project.file_uploaded",keyName,{project_id:projectId,file_id:data.id,name,size_bytes:bytes.length});
-      return json({file:data});
+      let chunkCount=0;
+      if(storedText){
+        const chunks:any[]=[]; const chunkSize=2800,overlap=300;
+        for(let pos=0;pos<storedText.length&&chunks.length<400;pos+=chunkSize-overlap){
+          const content=storedText.slice(pos,pos+chunkSize).trim();
+          if(content)chunks.push({file_id:data.id,project_id:projectId,chunk_index:chunks.length,content,token_estimate:Math.ceil(content.length/4),metadata:{file_name:name}});
+        }
+        if(chunks.length){const {error:chunkError}=await db.from("dexter_project_file_chunks").insert(chunks);if(chunkError)throw chunkError;chunkCount=chunks.length;}
+      }
+      await logAudit(db,"project.file_uploaded",keyName,{project_id:projectId,file_id:data.id,name,size_bytes:bytes.length,indexed:Boolean(storedText),chunks:chunkCount});
+      return json({file:data,indexed:Boolean(storedText),chunks:chunkCount,needsExtraction:!storedText});
     }
 
     if(action==="project_file_get"){
@@ -639,6 +657,29 @@ Deno.serve(async(req)=>{
         signedUrl=signed?.signedUrl||null;
       }
       return json({file:data,signedUrl});
+    }
+
+    if(action==="project_file_search"){
+      if(!["owner","manager"].includes(role))return json({error:"Project file search requires owner/manager access."},403);
+      const projectId=cleanText(body.projectId,80),query=cleanText(body.query,1000);
+      if(!projectId||!query)return json({error:"Project and search query are required."},400);
+      const searchQuery=await knowledgeSearchQuery(query);
+      const {data,error}=await db.rpc("dexter_search_project_files",{p_project_id:projectId,p_query:searchQuery,p_limit:Math.min(30,Math.max(1,Number(body.limit)||12))});
+      if(error)throw error;
+      await logAudit(db,"project.files_searched",keyName,{project_id:projectId,query:searchQuery,matches:(data||[]).length});
+      return json({results:data||[],query:searchQuery});
+    }
+
+    if(action==="artifact_export"){
+      if(!["owner","manager"].includes(role))return json({error:"Artifact export requires owner/manager access."},403);
+      const id=cleanText(body.artifactId,80),format=cleanText(body.format||"md",20).toLowerCase();
+      const {data,error}=await db.from("dexter_work_artifacts").select("*").eq("id",id).maybeSingle();
+      if(error||!data)return json({error:"Artifact not found."},404);
+      const safe=(String(data.name||"dexter-artifact").replace(/[^a-zA-Z0-9._-]+/g,"-").replace(/^-|-$/g,"").slice(0,100)||"dexter-artifact");
+      const content=String(data.content||"");
+      if(format==="json")return json({filename:safe+".json",mimeType:"application/json",content:JSON.stringify({name:data.name,type:data.artifact_type,metadata:data.metadata,content},null,2)});
+      const ext=format==="txt"?"txt":"md";
+      return json({filename:safe+"."+ext,mimeType:ext==="txt"?"text/plain":"text/markdown",content});
     }
 
     if(action==="artifact_update"){
