@@ -13,13 +13,16 @@ public class DexterDeviceAdminReceiver extends DeviceAdminReceiver {
 
     @Override
     public void onEnabled(Context context, Intent intent) {
-        DeviceAgentService.start(context);
+        // Do not start foreground/background work while Setup Wizard is
+        // still provisioning the device. MainActivity/BootReceiver starts
+        // the agent once Android setup has completed.
     }
 
     @Override
     public void onProfileProvisioningComplete(Context context, Intent intent) {
+        // Device Owner has now been assigned. Apply only safe synchronous
+        // policy defaults here; defer service startup until after Setup Wizard.
         DeviceOwnerPolicy.applySafeDefaults(context);
-        DeviceAgentService.start(context);
     }
 
     @Override
