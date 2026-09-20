@@ -96,7 +96,14 @@
     };
     const diag=document.getElementById("runLocalDiagnostics");if(diag)diag.onclick=()=>{
       const out=document.getElementById("localAdbResult");if(!nativePhone()){out.textContent="Open inside Dexter Business Phone.";return}
-      try{const a=splitAddress(document.getElementById("adbConnectAddress").value);out.textContent="Running local Android policy diagnostics…";const d=JSON.parse(window.DexterDevice.runLocalOwnerDiagnostics(a.host,a.port));out.textContent=JSON.stringify(d,null,2);}catch(e){out.textContent=e.message}
+      try{
+        const raw=(document.getElementById("adbConnectAddress").value||"").trim();
+        let host="",port=0;
+        if(raw){const a=splitAddress(raw);host=a.host;port=a.port;}
+        out.textContent="Running local Android policy diagnostics…";
+        const d=JSON.parse(window.DexterDevice.runLocalOwnerDiagnostics(host,port));
+        out.textContent=JSON.stringify(d,null,2);
+      }catch(e){out.textContent=e.message}
     };
   }
   ensurePhonePage();wire();
