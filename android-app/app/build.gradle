@@ -8,8 +8,30 @@ android {
         applicationId 'uk.co.dextersspot.dexterai'
         minSdk 26
         targetSdk 35
-        versionCode 2
-        versionName '2.0-device-agent-test'
+        versionCode 4
+        versionName '4.0-device-owner-provisioning-fix'
+    }
+
+    def ksPath = System.getenv('DEXTER_ANDROID_KEYSTORE_PATH')
+    def ksPassword = System.getenv('DEXTER_ANDROID_KEYSTORE_PASSWORD')
+    def ksAlias = System.getenv('DEXTER_ANDROID_KEY_ALIAS')
+    def ksKeyPassword = System.getenv('DEXTER_ANDROID_KEY_PASSWORD')
+
+    if (ksPath && ksPassword && ksAlias && ksKeyPassword) {
+        signingConfigs {
+            release {
+                storeFile file(ksPath)
+                storePassword ksPassword
+                keyAlias ksAlias
+                keyPassword ksKeyPassword
+            }
+        }
+        buildTypes {
+            release {
+                signingConfig signingConfigs.release
+                minifyEnabled false
+            }
+        }
     }
 }
 
