@@ -1,554 +1,120 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#11100f">
-<link rel="manifest" href="./manifest.json?v=3">
-<link rel="icon" href="./icon-192.png" type="image/png">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Dexter AI">
-<meta name="robots" content="noindex,nofollow,noarchive">
-<title>Dexter AI — Test Workspace</title>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0c10"><title>Dexter AI Test Workspace</title>
 <style>
-:root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#090909;color:#f7f1ea;--panel:#171514;--panel2:#201d1b;--line:#37312c;--muted:#a8a09a;--accent:#ef8b22;--good:#8fe0b6;--warn:#ffd27a}
-*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(circle at 12% 0,#47200d 0,#181311 25%,#090909 62%);overflow:hidden}
-button,input,textarea,select{font:inherit}button{cursor:pointer}.hidden{display:none!important}
-.shell{display:grid;grid-template-columns:250px 1fr;height:100vh}
-.sidebar{border-right:1px solid var(--line);background:#0f0e0ddd;backdrop-filter:blur(18px);padding:18px 14px;display:flex;flex-direction:column;gap:18px}
-.brand{display:flex;gap:11px;align-items:center;padding:2px 4px}.logo{width:42px;height:42px;border-radius:13px;background:var(--accent);display:grid;place-items:center;color:#1b0f05;font-weight:950;font-size:24px}.brand h1{font-size:18px;margin:0}.brand p{margin:2px 0 0;color:var(--muted);font-size:11px;letter-spacing:.08em}
-.nav{display:grid;gap:7px}.nav button{border:1px solid transparent;background:transparent;color:#d9d1ca;text-align:left;padding:11px 12px;border-radius:12px;font-weight:750}.nav button.active,.nav button:hover{background:#211d1a;border-color:#3c342e;color:#fff}.nav small{float:right;color:#8f8881}
-.sidecard{margin-top:auto;border:1px solid var(--line);background:#171412;border-radius:14px;padding:12px}.sidecard b{display:block;font-size:12px}.sidecard span{display:block;color:var(--muted);font-size:11px;margin-top:4px}.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:5px 8px;background:#211d1a;border:1px solid #3b342f;font-size:11px}.dot{width:7px;height:7px;border-radius:50%;background:#888}.dot.ok{background:var(--good)}
-.main{min-width:0;height:100vh;display:grid;grid-template-rows:auto 1fr}.topbar{display:flex;gap:12px;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line);background:#11100fe8;backdrop-filter:blur(18px)}.topbar h2{margin:0;font-size:18px}.topbar p{margin:2px 0 0;color:var(--muted);font-size:12px}.top-actions{margin-left:auto;display:flex;gap:8px;align-items:center}.select{background:#201d1b;color:#fff;border:1px solid #3d3731;border-radius:10px;padding:8px 10px;max-width:210px}.iconbtn{background:#211e1b;color:#eee;border:1px solid #3d3731;border-radius:10px;padding:8px 10px}
-.content{min-height:0;overflow:auto;padding:18px}.page{display:none;min-height:100%}.page.active{display:block}
-.chat-layout{height:100%;display:grid;grid-template-rows:1fr auto;gap:12px}.chatlog{overflow:auto;padding:4px 4px 24px;max-width:960px;width:100%;margin:0 auto}.bubble{max-width:82%;padding:13px 15px;margin:10px 0;border-radius:18px;line-height:1.55;white-space:pre-wrap;word-break:break-word}.assistant{background:#201d1b;border:1px solid #3c342e;border-bottom-left-radius:5px}.user{background:var(--accent);color:#1b0f05;margin-left:auto;border-bottom-right-radius:5px}.meta{font-size:10px;opacity:.62;margin-top:6px}.composerwrap{max-width:960px;width:100%;margin:0 auto}.composer{background:#151312;border:1px solid #3a342e;border-radius:18px;padding:9px;display:flex;gap:8px;box-shadow:0 16px 44px #0008}.composer textarea{flex:1;min-height:48px;max-height:150px;resize:none;border:0;outline:0;background:transparent;color:#fff;padding:10px}.send{border:0;border-radius:13px;background:var(--accent);color:#1b0f05;font-weight:900;padding:0 18px}.send:disabled{opacity:.45}.hint{font-size:11px;color:var(--muted);padding:7px 4px 0}
-.hero{max-width:920px;margin:8px auto 18px}.hero h3{font-size:28px;margin:0 0 7px}.hero p{margin:0;color:var(--muted);line-height:1.5}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;max-width:920px;margin:auto}.card{background:#171513;border:1px solid var(--line);border-radius:16px;padding:15px}.card h4{margin:0 0 6px}.card p{color:var(--muted);font-size:13px;line-height:1.45;margin:0}.workbox{max-width:920px;margin:auto;background:#171513;border:1px solid var(--line);border-radius:18px;padding:16px}.workbox textarea{width:100%;min-height:160px;background:#0e0d0c;color:#fff;border:1px solid #3b3530;border-radius:13px;padding:13px;outline:none;resize:vertical}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.primary{border:0;background:var(--accent);color:#1b0f05;font-weight:900;border-radius:12px;padding:11px 15px}.secondary{border:1px solid #3c352f;background:#211e1b;color:#eee;font-weight:750;border-radius:12px;padding:10px 13px}.tasklist,.knowledge-list,.agent-list,.approval-list,.memory-list,.audit-list{display:grid;gap:10px;max-width:920px;margin:14px auto}.task,.knowledge,.agent{background:#171513;border:1px solid var(--line);border-radius:14px;padding:13px}.tasktop,.agenttop{display:flex;gap:8px;align-items:center}.tasktop b,.agenttop b{flex:1}.status{font-size:11px;border:1px solid #3a342f;border-radius:999px;padding:4px 8px;color:#d7d0c9}.result{margin-top:9px;color:#ddd5cf;white-space:pre-wrap;line-height:1.5;font-size:13px}.kcat{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);font-weight:850}.knowledge b{display:block;margin:4px 0 6px}.knowledge p{white-space:pre-wrap}.system-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;max-width:920px;margin:0 auto}.metric{background:#171513;border:1px solid var(--line);border-radius:14px;padding:14px}.metric strong{display:block;font-size:24px}.metric span{color:var(--muted);font-size:11px}
-.notice{max-width:920px;margin:12px auto;border:1px solid #554224;background:#2b2113;border-radius:14px;padding:12px;color:#f5d7a0;font-size:12px}.approval,.memoryrow,.auditrow,.detailbox{background:#171513;border:1px solid var(--line);border-radius:14px;padding:13px}.approval-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}.danger{border:1px solid #5d302e;background:#2b1715;color:#ffb1aa;font-weight:800;border-radius:10px;padding:8px 11px}.good{border:1px solid #315445;background:#15271f;color:#9be8bf;font-weight:800;border-radius:10px;padding:8px 11px}.detailbox{max-width:920px;margin:12px auto}.detailbox pre{white-space:pre-wrap;word-break:break-word;color:#ddd4cd;font:inherit;font-size:12px;line-height:1.5}.miniinput{width:100%;background:#0e0d0c;color:#fff;border:1px solid #3b3530;border-radius:10px;padding:10px}.muted{color:var(--muted);font-size:12px}.auditrow code{font-size:11px;white-space:pre-wrap;word-break:break-word}
-.gate{position:fixed;inset:0;z-index:30;background:#080808f4;display:grid;place-items:center;padding:20px}.gate form{width:min(430px,100%);background:#191716;border:1px solid #3d352f;border-radius:24px;padding:26px;box-shadow:0 20px 80px #000}.gate h2{margin-bottom:6px}.gate p{color:var(--muted);line-height:1.45}.gate input{width:100%;margin:10px 0;padding:13px;border:1px solid #463d36;border-radius:12px;background:#0f0e0d;color:#fff}.gate button{width:100%;height:46px;border:0;border-radius:13px;background:var(--accent);font-weight:900}.error{color:#ffad9d;font-size:12px}
-.mobile-nav{display:none}.mobile-nav button{flex:1;border:0;border-top:1px solid var(--line);background:#151312;color:#cfc7c0;padding:11px 5px;font-size:11px;font-weight:800}.mobile-nav button.active{color:var(--accent);background:#201b17}@media(max-width:820px){body{overflow:auto;padding-bottom:52px}.shell{grid-template-columns:1fr;height:auto;min-height:100vh}.sidebar{display:none}.mobile-nav{display:flex;position:fixed;bottom:0;left:0;right:0;z-index:20;background:#11100f}.main{height:auto;min-height:100vh}.content{padding:12px}.topbar{position:sticky;top:0;z-index:10}.grid,.system-grid{grid-template-columns:1fr}.bubble{max-width:92%}.select{max-width:145px}.hero h3{font-size:23px}}
-
-/* Dexter automatic seasonal themes */
-body.theme-burns{--accent:#d7b56d;--panel:#171515;--panel2:#241d1d;--line:#57433d;background:radial-gradient(circle at 12% 0,#3a2320 0,#171111 28%,#090909 65%)}
-body.theme-valentines{--accent:#ff6f91;--panel:#1b1116;--panel2:#26131c;--line:#5b2d3c;background:radial-gradient(circle at 12% 0,#5a1730 0,#201018 30%,#090909 68%)}
-body.theme-april-fools{--accent:#ffd54f;--panel:#16151d;--panel2:#241f2f;--line:#51446e;background:radial-gradient(circle at 12% 0,#432a67 0,#171322 30%,#090909 68%)}
-body.theme-easter{--accent:#f2c1ff;--panel:#14171b;--panel2:#1d2427;--line:#46555c;background:radial-gradient(circle at 12% 0,#294a4d 0,#141b1c 30%,#090909 68%)}
-body.theme-pride{--accent:#ffcf4d;--panel:#15151b;--panel2:#20202a;--line:#4c4c67;background:linear-gradient(135deg,#401840 0,#18234a 38%,#153e39 68%,#090909 100%)}
-body.theme-halloween{--accent:#ff7a18;--panel:#17120f;--panel2:#24170f;--line:#5b351b;background:radial-gradient(circle at 12% 0,#5d2608 0,#1c130e 30%,#070606 68%)}
-body.theme-christmas{--accent:#e6c86e;--panel:#111714;--panel2:#17231d;--line:#355443;background:radial-gradient(circle at 12% 0,#143b2a 0,#101914 32%,#080a09 68%)}
-body.theme-st-andrews{--accent:#78b7ff;--panel:#101722;--panel2:#16243a;--line:#34577d;background:radial-gradient(circle at 12% 0,#17467a 0,#101827 34%,#080a0f 68%)}
-body.theme-hogmanay{--accent:#e7d994;--panel:#12131b;--panel2:#1b1e2a;--line:#454b66;background:radial-gradient(circle at 12% 0,#29365f 0,#131826 34%,#07080d 70%)}
-body[class*="theme-"] .logo{box-shadow:0 0 22px color-mix(in srgb,var(--accent) 45%,transparent)}
-body.theme-pride .topbar{background:linear-gradient(90deg,#2a1333e8,#16263de8,#15352de8)}
-body.theme-halloween .topbar{background:#160d08e8}
-body.theme-christmas .topbar{background:#0f1813e8}
-body.theme-st-andrews .topbar{background:#0d1726e8}
-body.theme-hogmanay .topbar{background:#10131fe8}
-
+:root{--bg:#08090d;--card:#151821;--card2:#0f1219;--line:#303645;--txt:#f6f7f8;--mut:#9ea6b8;--a:#ffb36d;--b:#ff702d;--ok:#51d483;--warn:#ffc65c;--bad:#ff7182}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 15% 0,#29212a 0,#0d0f14 36%,#07080b 74%);color:var(--txt);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}.app{max-width:1450px;margin:auto;padding:14px 14px 80px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:3px 0 12px}.brand{display:flex;align-items:center;gap:12px}.logo{width:48px;height:48px;border-radius:15px;display:grid;place-items:center;font-size:25px;background:#1c1820;border:1px solid #ffffff17}h1{font-size:clamp(24px,5vw,36px);margin:0}.sub,.small{font-size:12px;color:var(--mut)}.pill{padding:7px 10px;border:1px solid var(--line);border-radius:999px;background:#12151d;color:var(--mut);font-size:11px;font-weight:800}.ok{color:var(--ok)}.bad{color:var(--bad)}.warn{color:var(--warn)}
+.card{background:linear-gradient(180deg,#171a23ef,#101218ef);border:1px solid #ffffff14;border-radius:19px;overflow:hidden;box-shadow:0 18px 50px #0008}.head{padding:14px 16px;border-bottom:1px solid #ffffff11;display:flex;justify-content:space-between;align-items:center;gap:8px}.head h2{margin:0;font-size:16px}.body{padding:14px 16px}
+.auth{max-width:620px;margin:9vh auto;padding:22px}.auth h2{margin:0 0 6px}.auth p{color:var(--mut);line-height:1.5}.authrow{display:grid;grid-template-columns:1fr auto;gap:8px}
+.input,textarea,select{width:100%;border:1px solid #ffffff1d;background:#0c0f15;color:var(--txt);border-radius:12px;padding:11px;outline:none}.input:focus,textarea:focus,select:focus{border-color:#ff9c48aa;box-shadow:0 0 0 3px #ff9c4820}.btn{border:0;border-radius:12px;padding:10px 13px;font-weight:900;background:linear-gradient(135deg,var(--a),var(--b));color:#1a110b;cursor:pointer}.btn.secondary{background:#222733;color:var(--txt);border:1px solid #ffffff14}.btn.danger{background:#3a2026;color:#ffd8df}.btn:disabled{opacity:.45;cursor:not-allowed}
+.shell{display:grid;grid-template-columns:225px 1fr;gap:13px}@media(max-width:850px){.shell{grid-template-columns:1fr}.nav{display:flex;overflow:auto;position:sticky;top:0;z-index:4;padding:6px;background:#090b10dd;backdrop-filter:blur(10px)}.nav button{min-width:max-content}.desktop-only{display:none!important}}
+.nav{align-self:start;display:grid;gap:6px}.nav button{padding:11px 12px;text-align:left;border:1px solid transparent;border-radius:12px;background:transparent;color:var(--mut);font-weight:800;cursor:pointer}.nav button.active{color:#fff;background:#1c202b;border-color:#ffffff15}.nav .navtitle{color:#767e91;font-size:10px;text-transform:uppercase;letter-spacing:.13em;padding:10px 10px 3px}
+.panel{display:none}.panel.active{display:block}.grid2{display:grid;grid-template-columns:1.2fr .8fr;gap:13px}@media(max-width:1050px){.grid2{grid-template-columns:1fr}}.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}@media(max-width:850px){.grid3{grid-template-columns:1fr}}
+.metric{background:#0d1016;border:1px solid #ffffff0e;border-radius:14px;padding:13px}.metric b{font-size:22px}.metric span{display:block;color:var(--mut);font-size:11px;margin-top:4px}.list{display:grid;gap:8px}.item{background:#0c0f15;border:1px solid #ffffff0d;border-radius:13px;padding:11px}.item h3,.item b{margin:0;font-size:13px}.item p,.item .meta{margin:4px 0 0;color:var(--mut);font-size:11px;line-height:1.45}.row{display:flex;justify-content:space-between;gap:10px;align-items:center}.actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}.status{font-size:10px;padding:5px 7px;border-radius:999px;background:#202532;color:#bac2d1}
+.chat{height:min(58vh,610px);overflow:auto;padding:15px;display:flex;flex-direction:column;gap:10px;background:#090c11}.msg{max-width:88%;padding:11px 13px;border-radius:16px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere}.msg.a{align-self:flex-start;background:#1a1e28;border:1px solid #ffffff10;border-bottom-left-radius:5px}.msg.u{align-self:flex-end;background:linear-gradient(135deg,#ffc086,#ff7634);color:#17100b;font-weight:700;border-bottom-right-radius:5px}.composer{display:grid;grid-template-columns:1fr auto;gap:8px;padding:12px;background:#11141b;border-top:1px solid #ffffff12;align-items:end}.composer textarea{min-height:66px;max-height:180px;resize:vertical}
+.workbox{display:grid;gap:8px}.workbox textarea{min-height:150px}.twocol{display:grid;grid-template-columns:1fr 1fr;gap:9px}@media(max-width:650px){.twocol{grid-template-columns:1fr}}
+pre{white-space:pre-wrap;word-break:break-word;background:#090b10;padding:12px;border-radius:11px;border:1px solid #ffffff0c;color:#dfe4ec;font-size:12px;max-height:420px;overflow:auto}.toast{position:fixed;right:14px;bottom:14px;max-width:380px;padding:12px 14px;border-radius:13px;background:#252a36;border:1px solid #ffffff17;box-shadow:0 15px 45px #0009;z-index:30}.hidden{display:none!important}.muted{color:var(--mut)}.splithead{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:9px}.sectiontitle{font-size:11px;color:#8e96a8;text-transform:uppercase;letter-spacing:.11em;margin:13px 0 7px}.footer{text-align:center;color:#70788a;font-size:10px;margin-top:12px}
 </style>
 </head>
-<body>
-<div id="gate" class="gate">
-<form id="login">
-<div class="logo">D</div>
-<h2>Dexter AI — Test</h2>
-<p>Private Dexters assistant test workspace. This environment is isolated and does not make live changes.</p>
-<input id="token" type="password" autocomplete="current-password" placeholder="Dexter test access code" required>
-<button>Open Dexter AI</button>
-<p id="loginError" class="error"></p>
-</form>
-</div>
+<body><div class="app">
+<div class="top"><div class="brand"><div class="logo">🤖</div><div><h1>Dexter AI</h1><div class="sub">Private TEST workspace · one brain · approval-gated actions</div></div></div><div id="env" class="pill">TEST · LOCKED</div></div>
 
-<div class="shell">
-<aside class="sidebar">
-<div class="brand"><div class="logo">D</div><div><h1>Dexter AI</h1><p>TEST WORKSPACE</p></div></div>
-<div class="nav">
-<button class="active" data-page="chat">Chat <small>AI</small></button>
-<button data-page="work">Work <small>Tasks</small></button>
-<button data-page="agents">Agents <small>4</small></button>
-<button data-page="knowledge">Knowledge <small id="knowledgeNav">—</small></button>
-<button data-page="learning">Learning <small id="learningNav">—</small></button>
-<button data-page="memory">Memory <small id="memoryNav">—</small></button>
-<button data-page="approvals">Approvals <small id="approvalNav">—</small></button>
-<button data-page="audit">Audit <small>Logs</small></button>
-<button data-page="connectors">Connectors <small id="connectorNav">—</small></button>
-<button data-page="system">System <small>Status</small></button>
-</div>
-<div class="sidecard"><b>Safe test mode</b><span>No live writes, deployments, orders, payments or customer/staff changes.</span></div>
-</aside>
+<div id="lock" class="card auth"><h2>Owner access</h2><p>Enter your Dexter owner code. This opens the real Dexter AI Test workspace connected to the Supabase command centre. Live writes remain disabled/approval-gated.</p><div class="authrow"><input id="token" class="input" type="password" placeholder="Dexter owner code"><button id="unlock" class="btn">Unlock</button></div><label class="small"><input id="remember" type="checkbox"> Remember on this device</label></div>
 
-<section class="main">
-<header class="topbar">
-<div><h2 id="pageTitle">Chat</h2><p id="subtitle">Ask Dexter about Dexters, systems, coding or operations.</p></div>
-<div class="top-actions"><span id="themeBadge" class="status">Standard</span>
-<select id="agentSelect" class="select"></select>
-<button id="installApp" class="iconbtn" type="button">Install App</button>
-<button id="newChat" class="iconbtn" type="button">New</button>
-<button id="logout" class="iconbtn" type="button">Lock</button>
-</div>
-</header>
+<div id="workspace" class="shell hidden">
+<nav class="nav">
+<div class="navtitle desktop-only">Workspace</div>
+<button data-tab="chat" class="active">💬 Chat</button>
+<button data-tab="work">🧠 Work</button>
+<button data-tab="tasks">✅ Tasks</button>
+<button data-tab="artifacts">📄 Artifacts</button>
+<button data-tab="approvals">🔐 Approvals</button>
+<div class="navtitle desktop-only">Knowledge</div>
+<button data-tab="memory">🧷 Memory</button>
+<button data-tab="learning">📚 Learning</button>
+<div class="navtitle desktop-only">System</div>
+<button data-tab="connections">🔌 Connections</button>
+<button data-tab="health">🩺 Health</button>
+<button data-tab="activity">🧾 Activity</button>
+</nav>
 
-<main class="content">
-<section id="page-chat" class="page active">
-<div class="chat-layout">
-<div id="chat" class="chatlog"><div class="bubble assistant">Awrite! I’m Dexter. This is the isolated test workspace. Ask me something or switch to Work mode when you want a task worked through properly.</div></div>
-<div class="composerwrap">
-<form id="composer" class="composer"><textarea id="message" placeholder="Ask Dexter…" rows="1" required></textarea><button id="send" class="send">Send</button></form>
-<div class="hint">Chat uses conversation memory in Dexters-AI-Test. Live systems are not changed.</div>
-</div>
-</div>
-</section>
+<main>
+<section id="p-chat" class="panel active"><div class="grid2">
+<div class="card"><div class="head"><h2>Chat with Dexter</h2><div id="agent" class="pill">Dexter</div></div><div id="chat" class="chat"></div><div class="composer"><textarea id="msg" placeholder="Ask Dexter anything…"></textarea><button id="send" class="btn">Send</button></div></div>
+<div class="card"><div class="head"><h2>At a glance</h2><button id="refreshAll" class="btn secondary">Refresh</button></div><div class="body"><div id="metrics" class="grid3"></div><div class="sectiontitle">System</div><div id="healthMini" class="list"></div><div class="sectiontitle">Recent work</div><div id="recentMini" class="list"></div></div></div>
+</div></section>
 
-<section id="page-work" class="page">
-<div class="hero"><h3>Dexter Work</h3><p>Give Dexter a substantial job. It plans the work, selects specialist agents, grounds itself in connected GitHub/Vercel/Supabase evidence, uses the paired PC for browser/research/coding when useful, reviews the result, and saves persistent plan/result/evidence artifacts.</p></div>
-<div class="workbox">
-<textarea id="workRequest" placeholder="Example: Review the POS order flow, identify likely failure points and produce the exact code changes that should be made in a test branch."></textarea>
-<div class="row" style="margin-top:10px"><button id="runWork" class="primary">Run work task</button><button id="refreshTasks" class="secondary">Refresh tasks</button><span id="workState" class="status">Ready</span></div>
-</div>
-<div id="taskList" class="tasklist"></div>
-</section>
+<section id="p-work" class="panel"><div class="grid2">
+<div class="card"><div class="head"><h2>New Work task</h2><span class="pill">TEST execution</span></div><div class="body workbox"><input id="workTitle" class="input" placeholder="Optional task title"><textarea id="workMsg" placeholder="Describe the work Dexter should carry out. Live/consequential actions will stop for owner approval."></textarea><select id="workAgent"><option value="">Auto-select agent</option><option value="coding-agent">Coding Agent</option><option value="platform-doctor">Platform Doctor</option><option value="business-agent">Business Agent</option><option value="customer-assistant">Customer Assistant</option></select><button id="runWork" class="btn">Start Work</button><div id="workResult" class="small"></div></div></div>
+<div class="card"><div class="head"><h2>How Work behaves</h2></div><div class="body"><div class="list"><div class="item"><b>Read & analyse</b><p>Can run automatically inside Dexter AI Test.</p></div><div class="item"><b>Test changes</b><p>Use isolated test resources only.</p></div><div class="item"><b>Live / destructive / payment actions</b><p>Must stop for owner approval. Approval still permits TEST preview only unless the system is explicitly upgraded later.</p></div><div class="item"><b>Artifacts</b><p>Plans and completed outputs are stored as persistent work artifacts.</p></div></div></div></div>
+</div></section>
 
-<section id="page-agents" class="page">
-<div class="hero"><h3>Agents</h3><p>Dexter automatically chooses an agent from your request, or you can select one manually from the top bar.</p></div>
-<div id="agentList" class="agent-list"></div>
-</section>
+<section id="p-tasks" class="panel"><div class="card"><div class="head"><h2>Tasks</h2><button class="btn secondary" onclick="refresh()">Refresh</button></div><div class="body"><div id="tasks" class="list"></div><div id="taskDetail" class="sectiontitle"></div><div id="taskDetailBody"></div></div></div></section>
+<section id="p-artifacts" class="panel"><div class="card"><div class="head"><h2>Artifacts</h2><span class="pill">persistent work</span></div><div class="body"><div id="artifacts" class="list"></div><div id="artifactBody"></div></div></div></section>
+<section id="p-approvals" class="panel"><div class="card"><div class="head"><h2>Owner approvals</h2><span class="pill">TEST only</span></div><div class="body"><div id="approvals" class="list"></div></div></div></section>
 
-<section id="page-knowledge" class="page">
-<div class="hero"><h3>Test knowledge</h3><p>This is the business/system knowledge Dexter is allowed to use in the isolated build. Volatile live facts are deliberately not treated as current unless connected later with approval.</p></div>
-<div id="knowledgeList" class="knowledge-list"></div>
-</section>
+<section id="p-memory" class="panel"><div class="grid2"><div class="card"><div class="head"><h2>Approved memory</h2></div><div class="body"><div id="memoryList" class="list"></div></div></div><div class="card"><div class="head"><h2>Add memory</h2></div><div class="body workbox"><input id="memoryCategory" class="input" value="business" placeholder="Category"><textarea id="memoryContent" placeholder="A durable fact or rule Dexter should remember…"></textarea><button id="addMemory" class="btn">Add approved memory</button><div class="small">Only durable facts belong here. Conversation history is stored separately.</div></div></div></div></section>
+<section id="p-learning" class="panel"><div class="grid2"><div class="card"><div class="head"><h2>Verified learning</h2></div><div class="body"><div id="learningList" class="list"></div></div></div><div class="card"><div class="head"><h2>Research & learn</h2></div><div class="body workbox"><input id="learnCategory" class="input" value="operations" placeholder="Category"><textarea id="learnTopic" placeholder="Topic Dexter should research and learn about…"></textarea><button id="learnBtn" class="btn">Queue research</button><div class="small">Learning is queued through the Home PC research worker and only verified notes are used as trusted context.</div></div></div></div></section>
 
-<section id="page-learning" class="page">
-<div class="hero"><h3>Learning</h3><p>Tell Dexter what to learn. It will research the public internet, keep source links, cross-check where possible, and save verified lessons for future work.</p></div>
-<div class="workbox">
-<select id="learningCategory" class="miniinput">
-<option value="coding">Coding</option>
-<option value="systems">Systems</option>
-<option value="payments">Payments</option>
-<option value="business">Business</option>
-<option value="hardware">Hardware</option>
-<option value="food-safety">Food safety</option>
-<option value="suppliers">Suppliers</option>
-<option value="operations">Operations</option>
-<option value="general">General</option>
-</select>
-<textarea id="learningTopic" placeholder="Example: Learn the latest Square Terminal API flow for launching a card payment from a POS." style="min-height:110px;margin-top:8px"></textarea>
-<div class="row" style="margin-top:10px"><button id="runLearning" class="primary">Learn from internet</button><span id="learningState" class="status">Ready</span></div>
-</div>
-<div id="learningList" class="knowledge-list"></div>
-</section>
-
-<section id="page-memory" class="page">
-<div class="hero"><h3>Memory</h3><p>Approved Dexter memory lives only in the separate test project. Owner access can approve or disable memories.</p></div>
-<div class="workbox">
-<input id="memoryCategory" class="miniinput" placeholder="Category (for example: operations)">
-<textarea id="memoryContent" placeholder="Add a fact or rule Dexter should remember in test mode." style="min-height:100px;margin-top:8px"></textarea>
-<div class="row" style="margin-top:10px"><button id="addMemory" class="primary">Add memory</button><span class="status">Owner entries activate immediately</span></div>
-</div>
-<div id="memoryList" class="memory-list"></div>
-</section>
-
-<section id="page-approvals" class="page">
-<div class="hero"><h3>Approvals</h3><p>Dexter pauses consequential requests here for owner approval. Approving resumes safe test work automatically; approval-gated tools become ready for explicit execution inside Dexter. Live actions remain disabled in test mode.</p></div>
-<div id="approvalList" class="approval-list"></div>
-</section>
-
-<section id="page-audit" class="page">
-<div class="hero"><h3>Audit trail</h3><p>Recent command-centre actions, agent work and approval events.</p></div>
-<div id="auditList" class="audit-list"></div>
-</section>
-
-<section id="page-connectors" class="page">
-<div class="hero"><h3>Connectors & Browser</h3><p>Dexter can use direct APIs where possible and a remote browser worker for sites that need real navigation. Sensitive actions are approval-gated.</p></div>
-<div id="connectorList" class="agent-list"></div>
-<div class="hero"><h3>Tool queue</h3><p>Requests created by Dexter appear here. Read-only/local test tools can run directly; consequential actions remain approval-gated.</p></div>
-<div id="toolRequestList" class="agent-list"></div>
-<div class="detailbox">
-<b>Browser tool request</b>
-<p class="muted">Use this to queue a browser action after the Browser Worker service is connected.</p>
-<input id="browserUrl" class="miniinput" placeholder="https://example.com">
-<input id="browserInstruction" class="miniinput" style="margin-top:8px" placeholder="What Dexter should do on the site">
-<div class="approval-actions"><button id="queueBrowser" class="primary">Queue browser request</button></div>
-</div>
-<div class="detailbox">
-<b>Code workspace request</b>
-<p class="muted">Queue a controlled home-PC workspace tool. Writes remain approval-gated.</p>
-<select id="workspaceTool" class="miniinput">
-<option value="workspace.list">List files</option>
-<option value="workspace.read">Read file</option>
-<option value="git.status">Git status</option>
-<option value="git.diff">Git diff</option>
-<option value="code.check">Code check</option>
-</select>
-<input id="workspacePath" class="miniinput" style="margin-top:8px" placeholder="Workspace/repo path">
-<input id="workspaceFile" class="miniinput" style="margin-top:8px" placeholder="Optional file or check kind">
-<div class="approval-actions"><button id="queueWorkspace" class="primary">Queue workspace request</button></div>
-</div>
-</section>
-
-<section id="page-system" class="page">
-<div class="hero"><h3>System</h3><p>Backend readiness and isolation status for Dexter AI.</p></div>
-<div class="system-grid">
-<div class="metric"><strong id="mBackend">—</strong><span>Backend</span></div>
-<div class="metric"><strong id="mAI">—</strong><span>AI model</span></div>
-<div class="metric"><strong id="mKnowledge">—</strong><span>Base knowledge</span></div>
-<div class="metric"><strong id="mBusinessKnowledge">—</strong><span>Business knowledge</span></div>
-<div class="metric"><strong id="mLiveMenu">—</strong><span>Live menu</span></div>
-<div class="metric"><strong id="mHomePC">—</strong><span>Home PC</span></div>
-<div class="metric"><strong id="mTasks">—</strong><span>Work tasks</span></div>
-</div>
-<div id="systemSettings" class="detailbox"><b>Brain settings</b><pre>Loading…</pre></div>
-<div class="detailbox">
-<b>Dexter Home PC</b>
-<p class="muted">Pair the free Windows host so cloud/phone Work tasks can run the local browser, internet research and coding agent.</p>
-<div class="approval-actions"><button id="createPairCode" class="primary">Create pairing code</button></div>
-<pre id="pairCodeResult">Not paired from this device yet.</pre>
-</div>
-<div class="detailbox"><b>Full Dexter readiness test</b><p class="muted">Checks AI, live read-only menu, business knowledge, memory, agents and connector registry. It does not make live changes.</p><div class="approval-actions"><button id="runSelfTest" class="primary">Run Full Dexter Test</button></div><pre id="selfTestResult">Not run yet.</pre></div>
-<div class="notice">Environment: TEST. Live writes are disabled. Git pushes, deployments and consequential browser actions remain locked until live mode is explicitly enabled after testing.</div>
-</section>
-</main>
-</section>
-</div>
+<section id="p-connections" class="panel"><div class="card"><div class="head"><h2>Connections</h2><button class="btn secondary" onclick="refresh()">Refresh</button></div><div class="body"><div id="connectors" class="grid3"></div></div></div></section>
+<section id="p-health" class="panel"><div class="grid2"><div class="card"><div class="head"><h2>Self test</h2><button id="selfTest" class="btn">Run self test</button></div><div class="body"><div id="selfResults" class="list"><div class="small">Run the full AI, menu, memory, agent and connector checks.</div></div></div></div><div class="card"><div class="head"><h2>Runtime health</h2></div><div class="body"><div id="healthFull" class="list"></div><div class="sectiontitle">Home jobs</div><div id="homeJobs" class="list"></div></div></div></div></section>
+<section id="p-activity" class="panel"><div class="card"><div class="head"><h2>Audit activity</h2><span class="pill">TEST environment</span></div><div class="body"><div id="audit" class="list"></div></div></div></section>
+</main></div>
+<div class="footer">Dexter AI Test Workspace · live systems remain protected</div>
+</div><div id="toast" class="toast hidden"></div>
 
 <script>
-var ENDPOINT="https://eikruaxxzzxmfjvsmwwo.supabase.co/functions/v1/ai-command-centre";
-var $=function(id){return document.getElementById(id)};
-var token=sessionStorage.dexterToken||"";
-var sessionId=localStorage.dexterSession||crypto.randomUUID();
-var dashboard={agents:[],tasks:[],knowledge:[],learning:[],memory:[],approvals:[],audit:[],orchestration:[],settings:[],connectors:[],toolRequests:[],artifacts:[],homeAgents:[],homeJobs:[]};
-var currentPage="chat";
+const EP='https://eikruaxxzzxmfjvsmwwo.supabase.co/functions/v1/ai-command-centre', $=x=>document.getElementById(x);
+let tok='',sid='',dash={},health={};
+function uid(){return crypto.randomUUID?crypto.randomUUID():'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{let r=Math.random()*16|0,v=c==='x'?r:(r&3|8);return v.toString(16)})}
+function esc(v){return String(v??'').replace(/[&<>"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[s]))}
+function note(t){$('toast').textContent=t;$('toast').classList.remove('hidden');clearTimeout(note.t);note.t=setTimeout(()=>$('toast').classList.add('hidden'),3500)}
+async function api(action,extra={}){const r=await fetch(EP,{method:'POST',headers:{'content-type':'application/json','x-dexter-token':tok},body:JSON.stringify({action,sessionId:sid,...extra})});const d=await r.json().catch(()=>({error:'Bad server response'}));if(!r.ok)throw Error(d.error||'Request failed');return d}
+function addMsg(role,text,meta=''){const e=document.createElement('div');e.className='msg '+role;e.textContent=text;if(meta){const m=document.createElement('div');m.className='meta';m.textContent=meta;e.append(m)}$('chat').append(e);$('chat').scrollTop=$('chat').scrollHeight}
+function item(title,meta='',status=''){return '<div class="item"><div class="row"><b>'+esc(title)+'</b>'+(status?'<span class="status">'+esc(status)+'</span>':'')+'</div>'+(meta?'<p>'+esc(meta)+'</p>':'')+'</div>'}
+function fmtDate(v){try{return new Date(v).toLocaleString('en-GB')}catch{return String(v||'')}}
+function setTab(name){document.querySelectorAll('.nav button[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));$('p-'+name)?.classList.add('active')}
+document.querySelectorAll('.nav button[data-tab]').forEach(b=>b.onclick=()=>setTab(b.dataset.tab));
 
-function easterSundayUTC(year){
-  var a=year%19,b=Math.floor(year/100),c=year%100,d=Math.floor(b/4),e=b%4;
-  var f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30;
-  var i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451);
-  var month=Math.floor((h+l-7*m+114)/31),day=((h+l-7*m+114)%31)+1;
-  return new Date(Date.UTC(year,month-1,day));
+function showHealth(h){
+ health=h||{};
+ const home=!!h.homeAgentOnline, ai=!!h.ai;
+ $('env').textContent='TEST · '+(home?'HOME PC ONLINE':'CLOUD READY');
+ const rows=[['AI',ai?(h.aiProvider||'ready'):'offline'],['Home PC',home?'online':'offline'],['Memory',h.memory?'ready':'offline'],['Knowledge',String(h.businessKnowledge??h.knowledge??0)],['Live menu',h.liveMenu?'connected':'on demand'],['Live writes',h.liveWrites?'enabled':'approval-gated']];
+ const out=rows.map(x=>'<div class="item row"><span class="muted">'+esc(x[0])+'</span><b class="'+(String(x[1]).includes('offline')?'bad':'ok')+'">'+esc(x[1])+'</b></div>').join('');
+ $('healthMini').innerHTML=out;$('healthFull').innerHTML=out;
 }
-function currentDexterTheme(now){
-  now=now||new Date();
-  var parts=new Intl.DateTimeFormat("en-GB",{timeZone:"Europe/London",year:"numeric",month:"numeric",day:"numeric"}).formatToParts(now);
-  var get=function(t){return Number((parts.find(function(p){return p.type===t})||{}).value||0)};
-  var y=get("year"),m=get("month"),d=get("day");
-  if((m===12&&d>=27)||(m===1&&d<=2))return {key:"hogmanay",label:"Hogmanay 🎆"};
-  if(m===1&&d>=18&&d<=25)return {key:"burns",label:"Burns Night 🥃"};
-  if(m===2&&d>=1&&d<=14)return {key:"valentines",label:"Valentine’s ❤️"};
-  if((m===3&&d>=25)||(m===4&&d===1))return {key:"april-fools",label:"April Fools 🤡"};
-  var easter=easterSundayUTC(y),start=new Date(easter),end=new Date(easter),today=new Date(Date.UTC(y,m-1,d));
-  start.setUTCDate(easter.getUTCDate()-7);end.setUTCDate(easter.getUTCDate()+1);
-  if(today>=start&&today<=end)return {key:"easter",label:"Easter 🐣"};
-  if(m===6&&d>=1&&d<=30)return {key:"pride",label:"Pride 🌈"};
-  if(m===9||(m===10&&d<=31))return {key:"halloween",label:"Halloween 🎃"};
-  if(m===11&&d>=23&&d<=30)return {key:"st-andrews",label:"St Andrew’s 🏴"};
-  if(m===11||(m===12&&d<=31))return {key:"christmas",label:"Christmas 🎄"};
-  return {key:"standard",label:"Standard"};
+function renderDashboard(d){
+ dash=d||{};
+ const tasks=d.tasks||[], arts=d.artifacts||[], apps=d.approvals||[], mem=d.memory||[], learn=d.learning||[], conns=d.connectors||[], jobs=d.homeJobs||[], audit=d.audit||[];
+ $('metrics').innerHTML=[['Tasks',tasks.length],['Artifacts',arts.length],['Memory',mem.length],['Learning',learn.length],['Connections',conns.filter(x=>x.status==='ready').length],['Approvals',apps.filter(x=>x.status==='pending').length]].map(x=>'<div class="metric"><b>'+x[1]+'</b><span>'+x[0]+'</span></div>').join('');
+ $('recentMini').innerHTML=tasks.slice(0,5).map(t=>item(t.title,(t.agent_key||'Dexter')+' · '+(t.progress??0)+'%',t.status)).join('')||'<div class="small">No recent work.</div>';
+ $('tasks').innerHTML=tasks.map(t=>'<div class="item"><div class="row"><b>'+esc(t.title)+'</b><span class="status">'+esc(t.status)+'</span></div><p>'+esc((t.agent_key||'Dexter')+' · '+(t.progress??0)+'% · '+fmtDate(t.created_at))+'</p><div class="actions"><button class="btn secondary" onclick="openTask(\''+esc(t.id)+'\')">Open task</button></div></div>').join('')||'<div class="small">No tasks yet.</div>';
+ $('artifacts').innerHTML=arts.map(a=>'<div class="item"><div class="row"><b>'+esc(a.name)+'</b><span class="status">'+esc(a.artifact_type)+'</span></div><p>'+esc(fmtDate(a.created_at))+'</p><div class="actions"><button class="btn secondary" onclick="openArtifact(\''+esc(a.id)+'\')">Open artifact</button></div></div>').join('')||'<div class="small">No artifacts yet. Work mode will create them.</div>';
+ $('approvals').innerHTML=apps.map(a=>'<div class="item"><div class="row"><b>'+esc(a.requested_action||'Approval')+'</b><span class="status">'+esc(a.status)+'</span></div><p>'+esc(fmtDate(a.created_at))+'</p>'+(a.status==='pending'?'<div class="actions"><button class="btn" onclick="decide(\''+esc(a.id)+'\',\'approved\')">Approve TEST preview</button><button class="btn danger" onclick="decide(\''+esc(a.id)+'\',\'rejected\')">Reject</button></div>':'')+'</div>').join('')||'<div class="small">No approvals pending.</div>';
+ $('memoryList').innerHTML=mem.map(m=>item(m.category,m.content,'approved')).join('')||'<div class="small">No approved memory yet.</div>';
+ $('learningList').innerHTML=learn.map(l=>item(l.topic,(l.category||'general')+' · '+l.lesson,(l.verified?'verified':'unverified'))).join('')||'<div class="small">No verified learning yet.</div>';
+ $('connectors').innerHTML=conns.map(c=>'<div class="item"><div class="row"><b>'+esc(c.name)+'</b><span class="status">'+esc(c.status)+'</span></div><p>'+esc(c.last_error||('Last checked '+fmtDate(c.last_checked_at)))+'</p><p>'+(c.runtime_ready===false?'⚪ Runtime credential not loaded':'✅ Registry configured')+'</p></div>').join('')||'<div class="small">No connectors.</div>';
+ $('homeJobs').innerHTML=jobs.slice(0,15).map(j=>item(j.tool_name||j.job_type,(j.error||'')+(j.completed_at?' · '+fmtDate(j.completed_at):''),j.status)).join('')||'<div class="small">No Home PC jobs.</div>';
+ $('audit').innerHTML=audit.map(a=>item(a.action,(a.actor||'system')+' · '+fmtDate(a.created_at),a.environment||'test')).join('')||'<div class="small">No audit activity.</div>';
 }
-function applyDexterTheme(){
-  var t=currentDexterTheme();
-  Array.from(document.body.classList).filter(function(c){return c.indexOf("theme-")===0}).forEach(function(c){document.body.classList.remove(c)});
-  if(t.key!=="standard")document.body.classList.add("theme-"+t.key);
-  var badge=document.getElementById("themeBadge");if(badge)badge.textContent=t.label;
-  document.documentElement.setAttribute("data-dexter-theme",t.key);
-  return t;
+async function refresh(){
+ try{const [h,d,c]=await Promise.all([api('health'),api('dashboard'),api('connectors')]);showHealth(h);d.connectors=c.connectors||d.connectors;renderDashboard(d)}catch(e){note(e.message)}
 }
-applyDexterTheme();
-
-
-function api(body){
-  body.sessionId=sessionId;
-  return fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json","x-dexter-token":token},body:JSON.stringify(body)}).then(async function(r){
-    var d=await r.json().catch(function(){return {}});
-    if(r.status===401){sessionStorage.removeItem("dexterToken");token="";$("gate").classList.remove("hidden");throw new Error(d.error||"Access code rejected.");}
-    if(!r.ok)throw new Error(d.error||"Dexter is unavailable.");
-    return d;
-  });
-}
-function bubble(text,who,meta){
-  var d=document.createElement("div");d.className="bubble "+who;d.textContent=text;
-  if(meta){var m=document.createElement("div");m.className="meta";m.textContent=meta;d.appendChild(m);}
-  $("chat").appendChild(d);$("chat").scrollTop=$("chat").scrollHeight;return d;
-}
-async function pollDexterImage(jobId,container){
-  var tries=0,maxTries=200;
-  while(tries++<maxTries){
-    await new Promise(function(r){setTimeout(r,3000)});
-    var d=await api({action:"image_status",job_id:jobId});
-    var job=d.job||{};
-    if(job.status==="failed"){container.textContent="Image generation failed: "+(job.error||"unknown error");return;}
-    if(job.status==="completed"){
-      var result=job.result||{};
-      container.textContent="";
-      var note=document.createElement("div");
-      note.textContent="Done — generated locally on Dexter Home PC · £0 image API cost.";
-      container.appendChild(note);
-      if(result.image_url){
-        var img=document.createElement("img");
-        img.src=result.image_url;img.alt="Dexter generated image";
-        img.style.maxWidth="100%";img.style.borderRadius="14px";img.style.marginTop="10px";img.style.display="block";
-        container.appendChild(img);
-        var a=document.createElement("a");
-        a.href=result.image_url;a.target="_blank";a.rel="noopener";a.textContent="Open / download image";
-        a.style.display="inline-block";a.style.marginTop="10px";
-        container.appendChild(a);
-      }else{
-        var p=document.createElement("div");p.textContent="Image completed on the Home PC.";container.appendChild(p);
-      }
-      $("chat").scrollTop=$("chat").scrollHeight;
-      return;
-    }
-    container.textContent="Generating image locally… "+Math.max(0,tries*3)+"s";
-  }
-  container.textContent="The Home PC is still generating the image. Check again shortly.";
-}
-function escapeHtml(s){return String(s||"").replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]});}
-function setPage(name){
-  currentPage=name;
-  document.querySelectorAll(".page").forEach(function(x){x.classList.remove("active")});
-  document.querySelectorAll("[data-page]").forEach(function(x){x.classList.toggle("active",x.dataset.page===name)});
-  $("page-"+name).classList.add("active");
-  var titles={chat:["Chat","Ask Dexter about Dexters, systems, coding or operations."],work:["Work","Run substantial tasks through Dexter's planner and specialist agents."],agents:["Agents","Choose the specialist Dexter should use."],knowledge:["Knowledge","Review the facts available to Dexter."],learning:["Learning","Teach Dexter using sourced public internet research."],memory:["Memory","Manage approved test memory."],approvals:["Approvals","Review consequential requests before any preview work continues."],audit:["Audit","Inspect recent command-centre activity."],connectors:["Connectors","Manage Square, developer APIs and Dexter's browser worker."],system:["System","Check backend, AI, brain settings and isolation status."]};
-  $("pageTitle").textContent=titles[name][0];$("subtitle").textContent=titles[name][1];
-  if(name!=="chat")loadDashboard();
-  if(name==="system")health();
-}
-document.querySelectorAll("[data-page]").forEach(function(b){b.onclick=function(){setPage(b.dataset.page)}});
-
-async function health(){
-  try{
-    var d=await api({action:"health"});
-    $("mBackend").textContent=d.status==="ready"?"Ready":"Check";
-    $("mAI").textContent=d.ai?"Ready":"Missing";
-    $("mKnowledge").textContent=d.knowledge||0;
-    $("mBusinessKnowledge").textContent=d.businessKnowledge||0;
-    $("mLiveMenu").textContent=d.liveMenu?"Ready":"Check";
-    $("mHomePC").textContent=d.homeAgentOnline?"Online":"Offline";
-    $("mTasks").textContent=d.tasks||0;
-    $("knowledgeNav").textContent=d.knowledge||0;
-    return d;
-  }catch(e){
-    $("mBackend").textContent="Offline";$("mAI").textContent="—";throw e;
-  }
-}
-async function loadHistory(){
-  var d=await api({action:"history"});var rows=d.history||[];
-  if(rows.length){$("chat").innerHTML="";rows.forEach(function(x){bubble(x.content,x.role==="assistant"?"assistant":"user")});}
-}
-function renderAgents(){
-  var list=$("agentList"),sel=$("agentSelect");list.innerHTML="";var keep=sel.value;sel.innerHTML="";
-  (dashboard.agents||[]).forEach(function(a){
-    var opt=document.createElement("option");opt.value=a.agent_key;opt.textContent=a.name;sel.appendChild(opt);
-    var div=document.createElement("div");div.className="agent";div.innerHTML='<div class="agenttop"><b>'+escapeHtml(a.name)+'</b><span class="status">'+escapeHtml(a.agent_key)+'</span></div><p>'+escapeHtml(a.description||"")+'</p>';list.appendChild(div);
-  });
-  if(keep&&Array.from(sel.options).some(function(o){return o.value===keep}))sel.value=keep;
-}
-function renderKnowledge(){
-  var list=$("knowledgeList");list.innerHTML="";
-  (dashboard.knowledge||[]).forEach(function(k){
-    var div=document.createElement("div");div.className="knowledge";
-    div.innerHTML='<span class="kcat">'+escapeHtml(k.category)+'</span><b>'+escapeHtml(k.title)+'</b><p>'+escapeHtml(k.content)+'</p>';list.appendChild(div);
-  });
-  $("knowledgeNav").textContent=(dashboard.knowledge||[]).length;
-}
-function renderLearning(){
-  var list=$("learningList");if(!list)return;list.innerHTML="";
-  var rows=dashboard.learning||[];$("learningNav").textContent=rows.length;
-  if(!rows.length){list.innerHTML='<div class="knowledge"><p>No learned internet knowledge yet.</p></div>';return;}
-  rows.forEach(function(x){
-    var div=document.createElement("div");div.className="knowledge";
-    var srcs=Array.isArray(x.sources)?x.sources.slice(0,4):[];
-    var links=srcs.map(function(s){return escapeHtml(s.title||s.url||"source")+" — "+escapeHtml(s.url||"")}).join("\n");
-    div.innerHTML='<span class="kcat">'+escapeHtml(x.category||"general")+'</span><b>'+escapeHtml(x.topic||"Learned topic")+'</b><p>'+escapeHtml(x.lesson||"")+'</p><div class="meta">Confidence '+Math.round(Number(x.confidence||0)*100)+'% · '+(x.verified?"verified":"needs more checking")+'</div><pre>'+links+'</pre><div class="approval-actions"><button class="danger learning-toggle" data-id="'+escapeHtml(x.id)+'">Disable lesson</button></div>';
-    list.appendChild(div);
-  });
-  document.querySelectorAll(".learning-toggle").forEach(function(b){b.onclick=async function(){await api({action:"learning_toggle",learningId:b.dataset.id,active:false});await loadDashboard();}});
-}
-function renderTasks(){
-  var list=$("taskList");list.innerHTML="";
-  if(!(dashboard.tasks||[]).length){list.innerHTML='<div class="task"><p>No work tasks yet.</p></div>';return;}
-  (dashboard.tasks||[]).forEach(function(t){
-    var div=document.createElement("div");div.className="task";
-    var arts=(dashboard.artifacts||[]).filter(function(a){return a.task_id===t.id});
-    var body='<div class="tasktop"><b>'+escapeHtml(t.title)+'</b><span class="status">'+escapeHtml(t.status)+'</span></div><div class="meta">'+escapeHtml(t.agent_key||"")+" · "+escapeHtml(String(t.progress||0))+'% · '+arts.length+' artifact'+(arts.length===1?'':'s')+'</div>';
-    if(t.result)body+='<div class="result">'+escapeHtml(t.result)+'</div>';
-    if(t.error)body+='<div class="result error">'+escapeHtml(t.error)+'</div>';
-    body+='<div class="approval-actions"><button class="secondary task-detail" data-task="'+escapeHtml(t.id)+'">Open task details</button>';
-    arts.slice(0,6).forEach(function(a){body+='<button class="secondary artifact-open" data-artifact="'+escapeHtml(a.id)+'">'+escapeHtml(a.name||a.artifact_type||"Artifact")+'</button>'});
-    body+='</div>';
-    div.innerHTML=body;list.appendChild(div);
-  });
-  document.querySelectorAll(".task-detail").forEach(function(b){b.onclick=function(){openTask(b.dataset.task)}});
-  document.querySelectorAll(".artifact-open").forEach(function(b){b.onclick=function(){openArtifact(b.dataset.artifact)}});
-}
-function renderMemory(){
-  var list=$("memoryList");list.innerHTML="";
-  var rows=dashboard.memory||[];$("memoryNav").textContent=rows.length;
-  if(!rows.length){list.innerHTML='<div class="memoryrow"><p>No approved memory yet.</p></div>';return;}
-  rows.forEach(function(m){
-    var div=document.createElement("div");div.className="memoryrow";
-    div.innerHTML='<span class="kcat">'+escapeHtml(m.category||"general")+'</span><p>'+escapeHtml(m.content)+'</p><div class="meta">'+escapeHtml(m.approved_at||"")+'</div><div class="approval-actions"><button class="danger memory-toggle" data-id="'+escapeHtml(m.id)+'">Disable memory</button></div>';
-    list.appendChild(div);
-  });
-  document.querySelectorAll(".memory-toggle").forEach(function(b){b.onclick=async function(){await api({action:"memory_toggle",memoryId:b.dataset.id,active:false});await loadDashboard();}});
-}
-function renderApprovals(){
-  var list=$("approvalList");list.innerHTML="";
-  var rows=(dashboard.approvals||[]).filter(function(a){return a.status==="pending"});$("approvalNav").textContent=rows.length;
-  if(!rows.length){list.innerHTML='<div class="approval"><p>No pending approvals.</p></div>';return;}
-  rows.forEach(function(a){
-    var div=document.createElement("div");div.className="approval";
-    div.innerHTML='<div class="tasktop"><b>Approval required</b><span class="status">'+escapeHtml(a.status)+'</span></div><p>'+escapeHtml(a.requested_action||"")+'</p><div class="meta">Task '+escapeHtml(a.task_id||"")+'</div><div class="approval-actions"><button class="good approval-do" data-id="'+escapeHtml(a.id)+'" data-decision="approved">Approve &amp; continue</button><button class="danger approval-do" data-id="'+escapeHtml(a.id)+'" data-decision="rejected">Reject</button></div>';
-    list.appendChild(div);
-  });
-  document.querySelectorAll(".approval-do").forEach(function(b){b.onclick=async function(){b.disabled=true;try{var d=await api({action:"approval",approvalId:b.dataset.id,decision:b.dataset.decision});await loadDashboard();if(d&&d.next==="tool_execute")alert("Approved. The tool is now ready to execute inside Dexter.");else if(d&&d.previewCompleted)alert("Approved. Dexter completed the safe preview.");}catch(e){alert(e.message);}finally{b.disabled=false;}}});
-}
-function renderAudit(){
-  var list=$("auditList");list.innerHTML="";
-  var rows=dashboard.audit||[];
-  if(!rows.length){list.innerHTML='<div class="auditrow"><p>No audit events yet.</p></div>';return;}
-  rows.forEach(function(a){
-    var div=document.createElement("div");div.className="auditrow";
-    div.innerHTML='<div class="tasktop"><b>'+escapeHtml(a.action)+'</b><span class="status">'+escapeHtml(a.environment||"test")+'</span></div><div class="meta">'+escapeHtml(a.actor||"")+" · "+escapeHtml(a.created_at||"")+'</div><code>'+escapeHtml(JSON.stringify(a.details||{},null,2))+'</code>';
-    list.appendChild(div);
-  });
-}
-function renderConnectors(){
-  var list=$("connectorList");if(!list)return;list.innerHTML="";
-  var rows=dashboard.connectors||[];$("connectorNav").textContent=rows.length;
-  rows.forEach(function(x){
-    var div=document.createElement("div");div.className="agent";
-    var caps=Array.isArray(x.capabilities)?x.capabilities.join(", "):JSON.stringify(x.capabilities||[]);
-    var action="";
-    if(x.connector_key==="square")action='<div class="approval-actions"><button class="secondary square-connect">Connect Square</button></div>';
-    div.innerHTML='<div class="agenttop"><b>'+escapeHtml(x.name)+'</b><span class="status">'+escapeHtml(x.status)+'</span></div><p>'+escapeHtml(x.connector_type)+' · '+escapeHtml(caps)+'</p>'+action;
-    list.appendChild(div);
-  });
-  document.querySelectorAll(".square-connect").forEach(function(b){b.onclick=async function(){
-    try{var d=await api({action:"square_authorize"});if(d.authorize_url)window.open(d.authorize_url,"_blank");}
-    catch(e){alert(e.message);}
-  }});
-  var tools=$("toolRequestList");if(!tools)return;tools.innerHTML="";
-  var reqs=dashboard.toolRequests||[];
-  if(!reqs.length){tools.innerHTML='<div class="agent"><p>No connector tool requests yet.</p></div>';}
-  reqs.forEach(function(t){
-    var div=document.createElement("div");div.className="agent";
-    var canRun=t.status==="pending"||t.status==="approved"||t.status==="waiting_approval";
-    div.innerHTML='<div class="agenttop"><b>'+escapeHtml(t.connector_key+" / "+t.tool_name)+'</b><span class="status">'+escapeHtml(t.status)+'</span></div><div class="meta">'+escapeHtml(t.created_at||"")+'</div>'+(t.error?'<div class="result error">'+escapeHtml(t.error)+'</div>':'')+(t.result?'<div class="result">'+escapeHtml(JSON.stringify(t.result,null,2))+'</div>':'')+(canRun?'<div class="approval-actions"><button class="secondary tool-run" data-id="'+escapeHtml(t.id)+'">Execute tool</button></div>':'');
-    tools.appendChild(div);
-  });
-  document.querySelectorAll(".tool-run").forEach(function(b){b.onclick=async function(){
-    b.disabled=true;
-    try{await api({action:"tool_execute",toolRequestId:b.dataset.id});await loadDashboard();}
-    catch(e){alert(e.message);}finally{b.disabled=false;}
-  }});
-}
-function renderSystem(){
-  var box=$("systemSettings");
-  if(!box)return;
-  var agents=(dashboard.homeAgents||[]).map(function(a){return {name:a.name,last_seen_at:a.last_seen_at,active:a.active,capabilities:a.capabilities}});
-  box.innerHTML='<b>Brain settings</b><pre>'+escapeHtml(JSON.stringify(dashboard.settings||[],null,2))+'</pre><b>Paired home agents</b><pre>'+escapeHtml(JSON.stringify(agents,null,2))+'</pre>';
-}
-async function openTask(id){
-  var d=await api({action:"task_detail",taskId:id});
-  var old=document.getElementById("taskDetail");if(old)old.remove();
-  var box=document.createElement("div");box.id="taskDetail";box.className="detailbox";
-  box.innerHTML='<div class="tasktop"><b>Task detail</b><button class="secondary" onclick="this.parentNode.parentNode.remove()">Close</button></div><pre>'+escapeHtml(JSON.stringify(d,null,2))+'</pre>';
-  $("taskList").prepend(box);
-}
-async function openArtifact(id){
-  var d=await api({action:"artifact_get",artifactId:id});
-  var a=d.artifact||{};
-  var old=document.getElementById("artifactDetail");if(old)old.remove();
-  var box=document.createElement("div");box.id="artifactDetail";box.className="detailbox";
-  box.innerHTML='<div class="tasktop"><b>'+escapeHtml(a.name||"Work artifact")+'</b><button class="secondary" onclick="this.parentNode.parentNode.remove()">Close</button></div><div class="meta">'+escapeHtml(a.artifact_type||"artifact")+' · '+escapeHtml(a.created_at||"")+'</div><pre>'+escapeHtml(a.content||"")+'</pre><div class="approval-actions"><button id="copyArtifact" class="secondary">Copy artifact</button></div>';
-  $("taskList").prepend(box);
-  var copy=document.getElementById("copyArtifact");if(copy)copy.onclick=function(){navigator.clipboard.writeText(a.content||"");copy.textContent="Copied";};
-}
-async function loadDashboard(){
-  try{
-    dashboard=await api({action:"dashboard"});renderAgents();renderKnowledge();renderLearning();renderTasks();renderMemory();renderApprovals();renderAudit();renderConnectors();renderSystem();
-  }catch(e){}
-}
-$("login").onsubmit=async function(e){
-  e.preventDefault();$("loginError").textContent="";token=$("token").value.trim();sessionStorage.dexterToken=token;
-  try{
-    await health();localStorage.dexterSession=sessionId;$("gate").classList.add("hidden");await loadDashboard();await loadHistory();$("message").focus();
-  }catch(err){$("loginError").textContent=err.message;sessionStorage.removeItem("dexterToken");token="";}
-};
-$("logout").onclick=function(){sessionStorage.removeItem("dexterToken");token="";$("token").value="";$("gate").classList.remove("hidden");$("token").focus();};
-$("newChat").onclick=function(){sessionId=crypto.randomUUID();localStorage.dexterSession=sessionId;$("chat").innerHTML="";bubble("Fresh conversation started. What are we sorting?","assistant");$("message").focus();};
-$("composer").onsubmit=async function(e){
-  e.preventDefault();var text=$("message").value.trim();if(!text||!token)return;$("message").value="";bubble(text,"user");$("send").disabled=true;var wait=bubble("Thinking…","assistant");
-  try{
-    var d=await api({action:"chat",message:text,agent:$("agentSelect").value});wait.firstChild?wait.firstChild.nodeValue=d.reply:wait.textContent=d.reply;wait.textContent=d.reply;
-    var meta=document.createElement("div");meta.className="meta";meta.textContent=(d.agent||"Dexter")+" · "+(d.model||"AI");wait.appendChild(meta);
-    if(d.imageJob&&d.imageJob.id){pollDexterImage(d.imageJob.id,wait).catch(function(err){wait.textContent=err.message;});}
-  }catch(err){wait.textContent=err.message;}finally{$("send").disabled=false;$("message").focus();}
-};
-$("message").onkeydown=function(e){if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();$("composer").requestSubmit();}};
-$("runWork").onclick=async function(){
-  var req=$("workRequest").value.trim();if(!req)return;$("runWork").disabled=true;$("workState").textContent="Working…";
-  try{
-    var d=await api({action:"work",message:req,agent:$("agentSelect").value});$("workState").textContent="Completed";$("workRequest").value="";await loadDashboard();
-    if(d.reply){setPage("work");}
-  }catch(err){$("workState").textContent=err.message;}finally{$("runWork").disabled=false;}
-};
-$("refreshTasks").onclick=function(){loadDashboard()};
-$("createPairCode").onclick=async function(){
-  var b=$("createPairCode"),out=$("pairCodeResult");b.disabled=true;out.textContent="Creating secure pairing code…";
-  try{
-    var d=await api({action:"home_pair_code"});
-    out.textContent="PAIRING CODE: "+d.code+"\nExpires: "+d.expires_at+"\n\nOn the home PC run home-host\\PAIR-HOME-PC.ps1 and enter this code.";
-  }catch(e){out.textContent="FAILED: "+e.message;}
-  finally{b.disabled=false;}
-};
-$("runSelfTest").onclick=async function(){
-  var b=$("runSelfTest"),out=$("selfTestResult");b.disabled=true;out.textContent="Running full Dexter test…";
-  try{
-    var d=await api({action:"self_test"});
-    out.textContent=JSON.stringify(d,null,2);
-  }catch(e){out.textContent="FAILED: "+e.message;}
-  finally{b.disabled=false;}
-};
-$("queueWorkspace").onclick=async function(){
-  var tool=$("workspaceTool").value,path=$("workspacePath").value.trim(),extra=$("workspaceFile").value.trim();
-  var req={path:path};
-  if(tool==="workspace.read")req.path=extra||path;
-  if(tool==="git.diff")req.file=extra||".";
-  if(tool==="code.check")req.kind=extra||"npm-build";
-  try{await api({action:"tool_request",connector:"home-host",tool:tool,request:req});await loadDashboard();alert("Workspace request queued.");}
-  catch(e){alert(e.message);}
-};
-$("queueBrowser").onclick=async function(){
-  var url=$("browserUrl").value.trim(),instruction=$("browserInstruction").value.trim();
-  if(!url||!instruction)return;
-  try{
-    await api({action:"tool_request",connector:"browser",tool:"browser.navigate_and_act",request:{url:url,instruction:instruction}});
-    $("browserInstruction").value="";await loadDashboard();alert("Browser request queued for approval.");
-  }catch(e){alert(e.message);}
-};
-$("runLearning").onclick=async function(){
-  var topic=$("learningTopic").value.trim();if(!topic)return;
-  var b=$("runLearning"),state=$("learningState");b.disabled=true;state.textContent="Researching…";
-  try{
-    await api({action:"learn",topic:topic,category:$("learningCategory").value});
-    $("learningTopic").value="";
-    state.textContent="Queued on Home PC";
-    setTimeout(function(){loadDashboard();},7000);
-  }catch(e){state.textContent=e.message;}finally{b.disabled=false;}
-};
-$("addMemory").onclick=async function(){
-  var content=$("memoryContent").value.trim();if(!content)return;
-  $("addMemory").disabled=true;
-  try{
-    await api({action:"memory_add",category:$("memoryCategory").value.trim()||"general",content:content});
-    $("memoryContent").value="";await loadDashboard();
-  }catch(e){alert(e.message)}finally{$("addMemory").disabled=false;}
-};
-if(token){
-  $("gate").classList.add("hidden");
-  health().then(loadDashboard).then(loadHistory).catch(function(){sessionStorage.removeItem("dexterToken");token="";$("gate").classList.remove("hidden");});
-}
-</script>
-<script src="./pwa.js"></script>
-</body>
-</html>
+async function loadHistory(){try{const d=await api('history');$('chat').innerHTML='';if(!(d.history||[]).length)addMsg('a','Awright. Dexter AI Test is ready. Ask a question or use Work mode for a proper task.');else(d.history||[]).forEach(m=>addMsg(m.role==='assistant'?'a':'u',m.content,fmtDate(m.created_at)))}catch{addMsg('a','Awright. Dexter AI Test is ready.')}}
+async function unlock(){tok=$('token').value.trim();if(!tok)return note('Enter your Dexter owner code.');sid=localStorage.getItem('dexter_sid')||uid();try{const h=await api('health');($('remember').checked?localStorage:sessionStorage).setItem('dexter_tok',tok);localStorage.setItem('dexter_sid',sid);$('lock').classList.add('hidden');$('workspace').classList.remove('hidden');showHealth(h);await Promise.all([refresh(),loadHistory()])}catch(e){tok='';note(e.message)}}
+async function send(){const m=$('msg').value.trim();if(!m)return;$('msg').value='';addMsg('u',m);$('send').disabled=true;try{const d=await api('chat',{message:m});addMsg('a',d.reply||'No reply returned.',[d.agent,d.model].filter(Boolean).join(' · '));$('agent').textContent=d.agent||'Dexter'}catch(e){addMsg('a','Error: '+e.message)}finally{$('send').disabled=false;$('msg').focus()}}
+async function runWork(){const message=$('workMsg').value.trim();if(!message)return note('Describe the task first.');$('runWork').disabled=true;$('workResult').textContent='Dexter is planning the task…';try{const d=await api('work',{message,title:$('workTitle').value.trim(),agent:$('workAgent').value});$('workResult').textContent=d.reply||('Task created: '+(d.task?.title||''));await refresh();if(d.task?.id){setTab('tasks');await openTask(d.task.id)}}catch(e){$('workResult').textContent='Error: '+e.message}finally{$('runWork').disabled=false}}
+async function openTask(id){try{const d=await api('task_detail',{taskId:id});$('taskDetail').textContent=d.task?.title||'Task detail';const parts=[];if(d.task)parts.push('<div class="item"><b>Status: '+esc(d.task.status)+'</b><p>'+esc((d.task.agent_key||'Dexter')+' · '+(d.task.progress??0)+'%')+'</p>'+(d.task.error?'<p class="bad">'+esc(d.task.error)+'</p>':'')+(d.task.result?'<pre>'+esc(d.task.result)+'</pre>':'')+'</div>');if((d.events||[]).length)parts.push('<div class="sectiontitle">Timeline</div>'+d.events.map(e=>item(e.event_type,e.message,fmtDate(e.created_at))).join(''));if((d.artifacts||[]).length)parts.push('<div class="sectiontitle">Artifacts</div>'+d.artifacts.map(a=>'<div class="item"><b>'+esc(a.name)+'</b><div class="actions"><button class="btn secondary" onclick="openArtifact(\''+esc(a.id)+'\')">Open</button></div></div>').join(''));$('taskDetailBody').innerHTML=parts.join('')||'<div class="small">No detail.</div>'}catch(e){note(e.message)}}
+async function openArtifact(id){try{const d=await api('artifact_get',{artifactId:id});const a=d.artifact;$('artifactBody').innerHTML='<div class="sectiontitle">'+esc(a.name)+'</div><div class="item"><div class="row"><b>'+esc(a.name)+'</b><span class="status">'+esc(a.artifact_type)+'</span></div><pre>'+esc(a.content)+'</pre></div>';setTab('artifacts')}catch(e){note(e.message)}}
+async function decide(id,decision){try{await api('approval',{approvalId:id,decision});note('Approval '+decision+'.');await refresh()}catch(e){note(e.message)}}
+async function addMemory(){const content=$('memoryContent').value.trim();if(!content)return note('Enter the memory first.');try{await api('memory_add',{category:$('memoryCategory').value.trim()||'general',content});$('memoryContent').value='';note('Approved memory added.');await refresh()}catch(e){note(e.message)}}
+async function learn(){const topic=$('learnTopic').value.trim();if(!topic)return note('Enter a research topic.');try{await api('learn',{topic,category:$('learnCategory').value.trim()||'general'});$('learnTopic').value='';note('Research queued on Dexter Home PC.');await refresh()}catch(e){note(e.message)}}
+async function selfTest(){ $('selfTest').disabled=true;$('selfResults').innerHTML='<div class="small">Running checks…</div>';try{const d=await api('self_test');$('selfResults').innerHTML=(d.checks||[]).map(c=>'<div class="item"><div class="row"><b>'+esc(c.name)+'</b><span class="'+(c.ok?'ok':'bad')+'">'+(c.ok?'PASS':'FAIL')+'</span></div><pre>'+esc(JSON.stringify(c.detail||{},null,2))+'</pre></div>').join('')||item('Self test',d.passed+'/'+d.total+' passed')}catch(e){$('selfResults').innerHTML=item('Self test failed',e.message,'FAIL')}finally{$('selfTest').disabled=false}}
+$('unlock').onclick=unlock;$('send').onclick=send;$('runWork').onclick=runWork;$('addMemory').onclick=addMemory;$('learnBtn').onclick=learn;$('selfTest').onclick=selfTest;$('refreshAll').onclick=refresh;
+$('msg').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}});
+window.addEventListener('load',async()=>{tok=localStorage.getItem('dexter_tok')||sessionStorage.getItem('dexter_tok')||'';sid=localStorage.getItem('dexter_sid')||uid();if(tok){try{const h=await api('health');$('lock').classList.add('hidden');$('workspace').classList.remove('hidden');showHealth(h);await Promise.all([refresh(),loadHistory()])}catch{tok=''}}});
+</script></body></html>
