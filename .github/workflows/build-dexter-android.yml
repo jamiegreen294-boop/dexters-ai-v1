@@ -9,7 +9,7 @@ on:
   push:
     branches:
       - build/real-dexter-ai
-      - upgrade/meizu-device-owner-v5-force-fully-managed
+      - upgrade/meizu-v6-local-admin-bridge
     paths:
       - 'android-app/**'
       - '.github/workflows/build-dexter-android.yml'
@@ -57,7 +57,7 @@ jobs:
       - name: Upload signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Dexter-Business-Phone-v5
+          name: Dexter-Business-Phone-v6
           path: android-app/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
 
@@ -69,12 +69,12 @@ jobs:
           git fetch origin gh-pages
           git worktree add "$RUNNER_TEMP/gh-pages" origin/gh-pages
           mkdir -p "$RUNNER_TEMP/gh-pages/device"
-          cp android-app/app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/gh-pages/device/Dexter-Business-Phone-Release-v5.apk"
+          cp android-app/app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/gh-pages/device/Dexter-Business-Phone-Release-v6.apk"
           cd "$RUNNER_TEMP/gh-pages"
-          git add device/Dexter-Business-Phone-Release-v5.apk
+          git add device/Dexter-Business-Phone-Release-v6.apk
           if git diff --cached --quiet; then
             echo "Provisioning APK already current"
           else
-            git commit -m "Publish Dexter Business Phone v5 provisioning APK"
+            git commit -m "Publish Dexter Business Phone v6 local admin bridge"
             git push origin HEAD:gh-pages
           fi
