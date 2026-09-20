@@ -1,0 +1,131 @@
+{
+  "version": 1,
+  "agent": "dexter-meizu-agent",
+  "environment": "test",
+  "heartbeat": {
+    "fields": [
+      "deviceId",
+      "agentVersion",
+      "androidVersion",
+      "batteryPercent",
+      "freeStorageMb",
+      "network",
+      "lastSeenAt",
+      "installedDexterApps"
+    ]
+  },
+  "commands": [
+    {
+      "type": "device.health",
+      "approval": "none"
+    },
+    {
+      "type": "app.status",
+      "approval": "none",
+      "args": [
+        "packageName"
+      ]
+    },
+    {
+      "type": "app.launch",
+      "approval": "none",
+      "args": [
+        "packageName"
+      ]
+    },
+    {
+      "type": "app.restart",
+      "approval": "none",
+      "args": [
+        "packageName"
+      ]
+    },
+    {
+      "type": "app.logs",
+      "approval": "none",
+      "args": [
+        "packageName",
+        "since"
+      ]
+    },
+    {
+      "type": "app.install",
+      "approval": "policy",
+      "args": [
+        "artifactUrl",
+        "sha256",
+        "packageName",
+        "version"
+      ]
+    },
+    {
+      "type": "app.update",
+      "approval": "policy",
+      "args": [
+        "artifactUrl",
+        "sha256",
+        "packageName",
+        "version"
+      ]
+    },
+    {
+      "type": "app.rollback",
+      "approval": "owner",
+      "args": [
+        "packageName",
+        "targetVersion"
+      ]
+    },
+    {
+      "type": "device.reboot",
+      "approval": "owner"
+    },
+    {
+      "type": "settings.check",
+      "approval": "none",
+      "args": [
+        "setting"
+      ]
+    },
+    {
+      "type": "playbook.run",
+      "approval": "policy",
+      "args": [
+        "playbookId",
+        "parameters"
+      ]
+    }
+  ],
+  "result": {
+    "required": [
+      "requestId",
+      "deviceId",
+      "command",
+      "status",
+      "startedAt",
+      "finishedAt"
+    ],
+    "status": [
+      "accepted",
+      "running",
+      "succeeded",
+      "failed",
+      "needs_owner_action"
+    ],
+    "optional": [
+      "message",
+      "diagnostics",
+      "before",
+      "after",
+      "rollbackAvailable"
+    ]
+  },
+  "restrictions": [
+    "no-call-control",
+    "no-factory-reset",
+    "no-account-removal",
+    "no-credential-reading",
+    "no-arbitrary-third-party-apk",
+    "no-unverified-apk"
+  ]
+}
