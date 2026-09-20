@@ -39,7 +39,7 @@ public final class DeviceOwnerPolicy {
         boolean owner=isOwner(c);
         j.put("deviceOwner", owner);
         j.put("activeAdmin", d!=null && d.isAdminActive(admin(c)));
-        j.put("organization", owner ? String.valueOf(d.getDeviceOwnerOrganizationName()) : "");
+        j.put("organization", owner ? String.valueOf(d.getOrganizationName(admin(c))) : "");
         j.put("silentManagementAvailable", owner);
         return j;
     }
