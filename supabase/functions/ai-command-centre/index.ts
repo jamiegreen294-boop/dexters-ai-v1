@@ -1260,7 +1260,8 @@ if(action==="home_job_retry"){
 
     if(action==="work"){
       if(!["owner","manager"].includes(role))return json({error:"Work mode is restricted to owner/manager test access."},403);
-      const request=cleanText(body.message,12000);\n      const projectId=cleanText(body.projectId,80);
+      const request=cleanText(body.message,12000);
+      const projectId=cleanText(body.projectId,80);
       if(!request)return json({error:"Work request is required"},400);
       const context=await loadContext(db,request,role,projectId);
       const plan=await planWork(context,role,request,cleanText(body.agent,60));
