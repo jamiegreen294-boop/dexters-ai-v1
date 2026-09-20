@@ -65,6 +65,7 @@ body.theme-hogmanay .topbar{background:#10131fe8}
 <button class="active" data-page="chat">Chat <small>AI</small></button>
 <button data-page="work">Work <small>Tasks</small></button>
 <button data-page="artifacts">Artifacts <small id="artifactNav">—</small></button>
+<button data-page="phone">Business Phone <small id="phoneNav">—</small></button>
 <button data-page="agents">Agents <small>4</small></button>
 <button data-page="knowledge">Knowledge <small id="knowledgeNav">—</small></button>
 <button data-page="learning">Learning <small id="learningNav">—</small></button>
@@ -113,6 +114,22 @@ body.theme-hogmanay .topbar{background:#10131fe8}
 <div id="artifactList" class="tasklist"></div>
 </section>
 
+<section id="page-phone" class="page">
+<div class="hero"><h3>Dexter Business Phone</h3><p>Pair and manage the dedicated Meizu from Dexter AI TEST.</p></div>
+<div class="workbox">
+  <div class="row">
+    <button id="pairThisPhone" class="primary">Pair this Meizu</button>
+    <button id="refreshPhones" class="secondary">Refresh phones</button>
+    <button id="managementStatus" class="secondary">Check managed status</button>
+    <button id="applyBusinessMode" class="secondary">Apply Dexters business mode</button>
+    <button id="unknownSources" class="secondary">Allow APK installs</button>
+    <span id="phoneState" class="status">Ready</span>
+  </div>
+  <p class="muted" id="localPhoneInfo"></p>
+  <div id="managedInfo" class="detailbox" style="margin-top:10px"><b>Managed-device setup</b><p>Pair this Meizu first. Full Device Owner status is applied during managed-device provisioning.</p></div>
+</div>
+<div id="phoneList"></div>
+</section>
 <section id="page-agents" class="page">
 <div class="hero"><h3>Agents</h3><p>Dexter automatically chooses an agent from your request, or you can select one manually from the top bar.</p></div>
 <div id="agentList" class="agent-list"></div>
