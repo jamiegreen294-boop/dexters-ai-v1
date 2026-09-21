@@ -8,8 +8,8 @@ android {
         applicationId 'uk.co.dextersspot.dexterai'
         minSdk 26
         targetSdk 35
-        versionCode 11
-        versionName '11.0-meizu-business-mode-fix'
+        versionCode 12
+        versionName '12.0-premium-iphone-style-home'
     }
 
     def ksPath = System.getenv('DEXTER_ANDROID_KEYSTORE_PATH')
