@@ -9,10 +9,9 @@ import android.os.Bundle;
 import android.view.Gravity;
 import android.view.Window;
 import android.widget.FrameLayout;
-import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.ProgressBar;
 import android.widget.TextView;
+import android.view.View;
 
 public class DexterBootSplashActivity extends Activity {
     @Override protected void onCreate(Bundle state){
@@ -28,47 +27,47 @@ public class DexterBootSplashActivity extends Activity {
         centre.setOrientation(LinearLayout.VERTICAL);
         centre.setGravity(Gravity.CENTER_HORIZONTAL);
         FrameLayout.LayoutParams cp=new FrameLayout.LayoutParams(-1,-2);
-        cp.gravity=Gravity.CENTER;
-        cp.leftMargin=dp(28); cp.rightMargin=dp(28);
+        cp.gravity=Gravity.TOP|Gravity.CENTER_HORIZONTAL;
+        cp.topMargin=dp(205); cp.leftMargin=dp(24); cp.rightMargin=dp(24);
         shell.addView(centre,cp);
 
-        FrameLayout logoRing=new FrameLayout(this);
-        GradientDrawable ring=new GradientDrawable();
-        ring.setShape(GradientDrawable.OVAL);
-        ring.setColor(Color.rgb(18,18,19));
-        ring.setStroke(dp(2),Color.rgb(218,170,78));
-        logoRing.setBackground(ring);
-        logoRing.setElevation(dp(8));
-        centre.addView(logoRing,new LinearLayout.LayoutParams(dp(132),dp(132)));
-
-        ImageView logo=new ImageView(this);
-        logo.setImageResource(R.drawable.ic_launcher);
-        logo.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-        logo.setPadding(dp(18),dp(18),dp(18),dp(18));
-        logoRing.addView(logo,new FrameLayout.LayoutParams(-1,-1));
+        TextView d=text("D",104,Color.rgb(244,207,113),true);
+        d.setShadowLayer(dp(12),0,0,Color.rgb(115,77,22));
+        centre.addView(d,new LinearLayout.LayoutParams(-2,-2));
 
         TextView title=text("DEXTERS",31,Color.WHITE,true);
-        LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(-2,-2); tp.topMargin=dp(22);
+        LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(-2,-2); tp.topMargin=dp(-8);
         centre.addView(title,tp);
 
-        TextView sub=text("B U S I N E S S   P H O N E",11,Color.rgb(218,170,78),true);
-        LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(-2,-2); sp.topMargin=dp(6);
+        TextView sub=text("B U S I N E S S   P H O N E",11,Color.rgb(231,199,101),true);
+        LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(-2,-2); sp.topMargin=dp(5);
         centre.addView(sub,sp);
 
-        TextView line=text("WORK SMARTER  •  GO FURTHER",10,Color.rgb(205,205,208),false);
-        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-2,-2); lp.topMargin=dp(34);
-        centre.addView(line,lp);
+        TextView line=text("W O R K   S M A R T E R\nG O   F U R T H E R",10,Color.rgb(231,199,101),false);
+        line.setGravity(Gravity.CENTER); line.setLineSpacing(dp(6),1f);
+        FrameLayout.LayoutParams lp=new FrameLayout.LayoutParams(-2,-2);
+        lp.gravity=Gravity.TOP|Gravity.CENTER_HORIZONTAL; lp.topMargin=dp(500);
+        shell.addView(line,lp);
 
-        ProgressBar progress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);
-        progress.setIndeterminate(true);
-        FrameLayout.LayoutParams pp=new FrameLayout.LayoutParams(dp(210),dp(3));
-        pp.gravity=Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL; pp.bottomMargin=dp(112);
-        shell.addView(progress,pp);
+        View track=new View(this);
+        GradientDrawable tg=new GradientDrawable();
+        tg.setColor(Color.rgb(75,80,83)); tg.setCornerRadius(dp(3)); track.setBackground(tg);
+        FrameLayout.LayoutParams trp=new FrameLayout.LayoutParams(dp(185),dp(4));
+        trp.gravity=Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL; trp.bottomMargin=dp(135);
+        shell.addView(track,trp);
 
-        TextView powered=text("Powered by\nDexter OS",11,Color.rgb(210,210,214),false);
+        View fill=new View(this);
+        GradientDrawable fg=new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,new int[]{Color.WHITE,Color.rgb(218,166,46)});
+        fg.setCornerRadius(dp(3)); fill.setBackground(fg);
+        FrameLayout.LayoutParams fp=new FrameLayout.LayoutParams(dp(108),dp(4));
+        fp.gravity=Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL; fp.bottomMargin=dp(135);
+        fp.leftMargin=-dp(77);
+        shell.addView(fill,fp);
+
+        TextView powered=text("Powered by\nDexter OS",11,Color.rgb(220,220,224),false);
         powered.setGravity(Gravity.CENTER);
         FrameLayout.LayoutParams pw=new FrameLayout.LayoutParams(-2,-2);
-        pw.gravity=Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL; pw.bottomMargin=dp(44);
+        pw.gravity=Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL; pw.bottomMargin=dp(52);
         shell.addView(powered,pw);
 
         setContentView(shell);
@@ -78,7 +77,7 @@ public class DexterBootSplashActivity extends Activity {
             startActivity(home);
             finish();
             overridePendingTransition(android.R.anim.fade_in,android.R.anim.fade_out);
-        },1450);
+        },1500);
     }
 
     @Override public void onBackPressed(){}
