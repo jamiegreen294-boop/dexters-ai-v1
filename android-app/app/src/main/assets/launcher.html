@@ -95,7 +95,7 @@ button{font:inherit;color:inherit}
 <div class="slider"><svg style="width:28px;height:28px"><use href="#i-sun"/></svg>☀ <div class="bar"></div></div><div class="slider"><span style="font-size:28px">🔊</span><div class="bar" style="width:52%"></div></div>
 <div class="quick"><button><div class="qcircle"><svg><use href="#i-moon"/></svg></div>Dark Mode</button><button><div class="qcircle"><svg><use href="#i-moon"/></svg></div>Do Not Disturb</button><button><div class="qcircle"><svg><use href="#i-rotate"/></svg></div>Auto Rotate</button><button><div class="qcircle"><svg><use href="#i-torch"/></svg></div>Torch</button><button><div class="qcircle"><svg><use href="#i-location"/></svg></div>Location</button><button><div class="qcircle"><svg><use href="#i-wifi"/></svg></div>Hotspot</button><button><div class="qcircle"><svg><use href="#i-plane"/></svg></div>Airplane Mode</button><button><div class="qcircle"><svg><use href="#i-video"/></svg></div>Screen Record</button></div><div class="storejump" onclick="show('store')"><div class="ico" style="width:58px;height:58px;background:linear-gradient(145deg,#f849b5,#7928ff 55%,#ffd166)"><svg><use href="#i-store"/></svg></div><div class="grow"><b>Dexter Store</b><small>Apps, tools and updates</small></div><div class="arrow">›</div></div></section>
 
-<section id="settings" class="page"><div class="h1">Settings</div><div class="search">⌕ &nbsp;&nbsp; Search settings</div>
+<section id="settings" class="page"><div style="display:flex;align-items:center;gap:10px"><button onclick="show('home')" style="border:0;background:#151d22;color:white;width:40px;height:40px;border-radius:20px;font-size:22px">⌂</button><div class="h1" style="margin:12px 0 2px">Settings</div></div><div class="search">⌕ &nbsp;&nbsp; Search settings</div>
 <div class="owner"><div class="roundico" style="background:#111;border:2px solid var(--gold);color:var(--gold);font-weight:900">D</div><div style="flex:1"><b>Dexters Business</b><small>Owner</small></div><div class="arrow">›</div></div>
 <div class="label">Device</div><div class="group"><div class="row" onclick="setting('wifi')"><div class="rIcon"><svg><use href="#i-wifi"/></svg></div><b>Network & Internet</b><div class="arrow">›</div></div><div class="row" onclick="setting('bluetooth')"><div class="rIcon"><svg><use href="#i-business"/></svg></div><b>Connected Devices</b><div class="arrow">›</div></div><div class="row" onclick="setting('settings')"><div class="rIcon"><svg><use href="#i-sun"/></svg></div><b>Display</b><div class="arrow">›</div></div><div class="row" onclick="setting('settings')"><div class="rIcon"><svg><use href="#i-msg"/></svg></div><b>Sound & Vibration</b><div class="arrow">›</div></div><div class="row" onclick="setting('battery')"><div class="rIcon"><svg><use href="#i-battery"/></svg></div><b>Battery</b><div class="arrow">›</div></div><div class="row" onclick="setting('storage')"><div class="rIcon"><svg><use href="#i-storage"/></svg></div><b>Storage</b><div class="arrow">›</div></div><div class="row" onclick="setting('security')"><div class="rIcon"><svg><use href="#i-lock"/></svg></div><b>Security & Privacy</b><div class="arrow">›</div></div></div>
 <div class="label">Dexter</div><div class="group"><div class="row" onclick="url('https://jamiegreen294-boop.github.io/dexters-ai-v1/')"><div class="rIcon"><svg><use href="#i-ai"/></svg></div><b>Dexter AI</b><div class="arrow">›</div></div><div class="row" onclick="show('store')"><div class="rIcon"><svg><use href="#i-office"/></svg></div><b>Dexter Apps</b><div class="arrow">›</div></div><div class="row" onclick="show('control')"><div class="rIcon"><svg><use href="#i-business"/></svg></div><b>Business Tools</b><div class="arrow">›</div></div><div class="row" onclick="show('store')"><div class="rIcon"><svg><use href="#i-store"/></svg></div><b>Dexter Store</b><div class="arrow">›</div></div><div class="row" onclick="show('about')"><div class="rIcon"><svg><use href="#i-user"/></svg></div><b>About Dexter OS</b><div class="arrow">›</div></div></div>
@@ -117,7 +117,38 @@ function messages(){try{B().openMessages()}catch(e){}}
 function phone(){try{B().openPhone()}catch(e){}}
 function launch(p){try{B().launchPackages(p)}catch(e){}}
 function setting(k){try{B().openSetting(k)}catch(e){}}
-function dexterBack(){if(current!=='home'){show('home');return true}return false}
+function openDexterSetting(k){
+  const map={
+    network:['Network & Internet','Wi‑Fi, mobile data and hotspot stay inside Dexter OS.',['Wi‑Fi','Mobile Data','Hotspot','Private DNS']],
+    devices:['Connected Devices','Manage Bluetooth and approved business hardware.',['Bluetooth','Paired scanners','Square Reader','Printers']],
+    display:['Display','Dexter OS display controls.',['Brightness','Dark Mode','Text Size','Auto Rotate']],
+    sound:['Sound & Vibration','Dexter OS sound controls.',['Media volume','Ringtone volume','Vibration','Do Not Disturb']],
+    battery:['Battery','Battery and power management.',['Battery level','Battery saver','Background activity','Charging']],
+    storage:['Storage','Device files and storage.',['Internal storage','Downloads','Cached files','Business documents']],
+    security:['Security & Privacy','Dexter-managed security controls.',['Screen lock','App permissions','Privacy','Security updates']],
+    accounts:['Accounts','Managed business accounts.',['Dexters Business','Google business account','Sync','Owner access']],
+    system:['System','Dexter OS system controls.',['Language','Date & time','Updates','Device information']]
+  };
+  const d=map[k]||map.system;
+  document.getElementById('settingTitle').textContent=d[0];
+  document.getElementById('settingBody').innerHTML=
+    '<div class="owner"><div class="roundico">D</div><div><b>'+d[0]+'</b><small>'+d[1]+'</small></div></div>'+
+    '<div class="group">'+d[2].map((x,i)=>'<div class="row"><div class="rIcon">'+['●','◉','◆','▣'][i%4]+'</div><b>'+x+'</b><div class="arrow">›</div></div>').join('')+'</div>'+
+    '<div style="font-size:12px;color:#9fa8ad;padding:8px 4px 18px">Advanced Android controls are kept behind Dexter OS so the normal business-phone flow does not drop into the old Android settings screen.</div>';
+  show('settingDetail');
+}
+function dexterBack(){if(current==='settingDetail'){show('settings');return true}if(current!=='home'){show('home');return true}return false}
+let swipeX=null,swipeY=null;
+document.addEventListener('touchstart',e=>{if(e.touches&&e.touches.length===1){swipeX=e.touches[0].clientX;swipeY=e.touches[0].clientY}}, {passive:true});
+document.addEventListener('touchend',e=>{
+  if(swipeX===null||!e.changedTouches||!e.changedTouches.length)return;
+  const dx=e.changedTouches[0].clientX-swipeX, dy=e.changedTouches[0].clientY-swipeY;
+  swipeX=swipeY=null;
+  if(Math.abs(dx)<70||Math.abs(dx)<=Math.abs(dy))return;
+  if(current==='home'&&dx<0)show('control');
+  else if(current==='control'&&dx>0)show('home');
+  else if((current==='settings'||current==='store'||current==='about'||current==='settingDetail')&&dx>0)show('home');
+}, {passive:true});
 try{let b=B();let v=b.getBatteryLevel();if(v>=0)document.getElementById('batt').textContent=v+'%';document.getElementById('model').textContent='Business Phone · '+b.getDeviceModel()}catch(e){}
 setTimeout(()=>document.getElementById('boot').style.display='none',1500);
 </script></body></html>
