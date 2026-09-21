@@ -176,7 +176,7 @@ async function ollama(messages,format,model=LOCAL_MODEL){
 }
 async function ollamaFast(messages,format,model=CODE_MODEL){
   const controller=new AbortController();
-  const timer=setTimeout(()=>controller.abort(),90000);
+  const timer=setTimeout(()=>controller.abort(),150000);
   const fastMessages=(Array.isArray(messages)?messages:[]).map((m,i)=>i===0&&m?.role==="user"
     ?{...m,content:"/no_think\n"+String(m.content||"")}
     :m);
@@ -279,7 +279,7 @@ async function autonomousBrowser(page,request={}){
   if(request.url)await page.goto(safeUrl(request.url),{waitUntil:"domcontentloaded",timeout:45000});
   const history=[];
   const stepLimit=Math.max(1,Math.min(MAX_AGENT_STEPS,Number(request.max_steps||MAX_AGENT_STEPS)));
-  const deadline=Date.now()+Math.max(15000,Math.min(180000,Number(request.timeout_ms||120000)));
+  const deadline=Date.now()+Math.max(15000,Math.min(300000,Number(request.timeout_ms||180000)));
   for(let step=1;step<=stepLimit;step++){
     if(Date.now()>deadline)return {status:"timeout",reason:"Browser task exceeded its time limit.",history,state:await snapshot(page)};
     const state=await snapshot(page);
@@ -296,7 +296,7 @@ async function autonomousBrowser(page,request={}){
       "RECENT ACTIONS:",JSON.stringify(history.slice(-8))
     ].join("\n");
     if(Date.now()>deadline)return {status:"timeout",reason:"Browser task exceeded its time limit before the next AI step.",history,state};
-    const decision=parseJson(await ollama([{role:"user",content:prompt}],"json",LOCAL_MODEL));
+    const decision=parseJson(await ollamaFast([{role:"user",content:prompt}],"json",LOCAL_MODEL));
     if(isConsequence(decision)&&!allowConsequential)return {status:"blocked",reason:"Consequence requires separate owner approval and live mode.",state,history};
     if(decision.action==="done")return {status:"completed",result:String(decision.result||decision.reason||"Completed"),state,history};
     if(decision.action==="blocked")return {status:"blocked",reason:String(decision.reason||"Blocked"),state,history};
