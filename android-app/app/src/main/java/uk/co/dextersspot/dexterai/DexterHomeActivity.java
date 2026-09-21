@@ -71,6 +71,11 @@ public class DexterHomeActivity extends Activity {
         if (DeviceAgentService.hasToken(this)) DeviceAgentService.start(this);
     }
 
+    @Override public void onBackPressed() {
+        // Dexter Home is the device home screen. Back should never dismiss,
+        // slide, recreate or refresh the launcher.
+    }
+
     private void render() {
         FrameLayout shell = new FrameLayout(this);
 
