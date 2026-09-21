@@ -8,8 +8,8 @@ android {
         applicationId 'uk.co.dextersspot.dexterai'
         minSdk 26
         targetSdk 35
-        versionCode 14
-        versionName '14.0-self-update-fix'
+        versionCode 15
+        versionName '15.0-swipe-gesture-fix'
     }
 
     def ksPath = System.getenv('DEXTER_ANDROID_KEYSTORE_PATH')
