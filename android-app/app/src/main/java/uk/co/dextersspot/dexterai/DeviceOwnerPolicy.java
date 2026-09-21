@@ -67,30 +67,52 @@ public final class DeviceOwnerPolicy {
         if(!isOwner(c)) throw new IllegalStateException("Dexter is not Device Owner.");
         DevicePolicyManager d=dpm(c); ComponentName a=admin(c);
         applySafeDefaults(c);
-        d.addUserRestriction(a, UserManager.DISALLOW_ADD_USER);
-        d.addUserRestriction(a, UserManager.DISALLOW_REMOVE_USER);
-        d.addUserRestriction(a, UserManager.DISALLOW_FACTORY_RESET);
-        d.addUserRestriction(a, UserManager.DISALLOW_CONFIG_DATE_TIME);
-        d.addUserRestriction(a, UserManager.DISALLOW_INSTALL_UNKNOWN_SOURCES);
-        if(Build.VERSION.SDK_INT>=26) d.addUserRestriction(a, UserManager.DISALLOW_INSTALL_UNKNOWN_SOURCES_GLOBALLY);
-        d.setUninstallBlocked(a, c.getPackageName(), true);
 
-        // Overnight Android system updates: install during 02:00–05:00.
-        try { d.setSystemUpdatePolicy(a, SystemUpdatePolicy.createWindowedInstallPolicy(120,300)); } catch(Exception ignored) {}
+        JSONObject applied=new JSONObject();
+        JSONObject skipped=new JSONObject();
 
-        // Dexter Home stays recoverable through the protected Dexter Admin tile.
+        applyRestriction(d,a,UserManager.DISALLOW_ADD_USER,"disallowAddUser",applied,skipped);
+        applyRestriction(d,a,UserManager.DISALLOW_REMOVE_USER,"disallowRemoveUser",applied,skipped);
+        applyRestriction(d,a,UserManager.DISALLOW_FACTORY_RESET,"disallowFactoryReset",applied,skipped);
+        applyRestriction(d,a,UserManager.DISALLOW_CONFIG_DATE_TIME,"disallowConfigDateTime",applied,skipped);
+        applyRestriction(d,a,UserManager.DISALLOW_INSTALL_UNKNOWN_SOURCES,"disallowUnknownSources",applied,skipped);
+        if(Build.VERSION.SDK_INT>=26)
+            applyRestriction(d,a,UserManager.DISALLOW_INSTALL_UNKNOWN_SOURCES_GLOBALLY,"disallowUnknownSourcesGlobally",applied,skipped);
+
+        try { d.setUninstallBlocked(a,c.getPackageName(),true); applied.put("protectDexterApp",true); }
+        catch(Exception e){ skipped.put("protectDexterApp",safeMessage(e)); }
+
         try {
-            IntentFilter home = new IntentFilter(Intent.ACTION_MAIN);
+            d.setSystemUpdatePolicy(a,SystemUpdatePolicy.createWindowedInstallPolicy(120,300));
+            applied.put("systemUpdates","02:00-05:00");
+        } catch(Exception e){ skipped.put("systemUpdates",safeMessage(e)); }
+
+        try {
+            IntentFilter home=new IntentFilter(Intent.ACTION_MAIN);
             home.addCategory(Intent.CATEGORY_HOME);
             home.addCategory(Intent.CATEGORY_DEFAULT);
-            d.addPersistentPreferredActivity(a, home, new ComponentName(c, DexterHomeActivity.class));
-        } catch(Exception ignored) {}
+            d.addPersistentPreferredActivity(a,home,new ComponentName(c,DexterHomeActivity.class));
+            applied.put("dexterHomePreferred",true);
+        } catch(Exception e){ skipped.put("dexterHomePreferred",safeMessage(e)); }
 
-        JSONObject j=status(c);
-        j.put("businessMode", true);
-        j.put("unknownSourcesBlocked", true);
-        j.put("systemUpdates", "windowed-02:00-05:00");
+        JSONObject j=new JSONObject();
+        j.put("deviceOwner",true);
+        j.put("businessMode",true);
+        j.put("applied",applied);
+        j.put("skipped",skipped);
+        j.put("partial",skipped.length()>0);
+        j.put("status",status(c));
         return j;
+    }
+
+    private static void applyRestriction(DevicePolicyManager d,ComponentName a,String restriction,String label,JSONObject applied,JSONObject skipped){
+        try { d.addUserRestriction(a,restriction); applied.put(label,true); }
+        catch(Exception e){ try { skipped.put(label,safeMessage(e)); } catch(Exception ignored){} }
+    }
+
+    private static String safeMessage(Exception e){
+        String m=e.getMessage();
+        return m==null?e.getClass().getSimpleName():m;
     }
 
     public static JSONObject lockNow(Context c) throws Exception {
