@@ -1,0 +1,177 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>Dexter OS</title>
+<style>
+:root{
+  --bg:#030506; --panel:#11171c; --panel2:#182129; --line:#28323a;
+  --text:#fff; --muted:#bcc4ca; --gold:#f2c760; --gold2:#b78626;
+  --blue:#1396ff; --green:#19c873; --cyan:#21d7cf; --purple:#8a4cf4;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;width:100%;height:100%;background:#000;color:var(--text);font-family:Arial,Helvetica,sans-serif;overflow:hidden}
+body{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
+.page{display:none;height:100%;overflow:auto;background:radial-gradient(circle at 90% 8%,#082338 0,#061019 22%,#030506 52%);padding:14px 16px 22px}
+.page.active{display:block}
+.status{height:24px;display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:700}
+.brand{display:flex;align-items:center;justify-content:center;gap:8px;margin:8px 0 15px}
+.dmark{font-size:34px;font-weight:900;color:var(--gold);text-shadow:0 0 14px rgba(242,199,96,.35)}
+.brandtext{font-weight:800;letter-spacing:1px;font-size:21px}
+.brandsub{display:block;color:var(--gold);letter-spacing:3px;font-size:8px;margin-top:1px}
+.hero{height:165px;border:1px solid #36424c;border-radius:19px;overflow:hidden;background:
+linear-gradient(90deg,rgba(12,19,25,.96) 0 48%,rgba(8,15,22,.32) 72%),
+linear-gradient(180deg,#18354f,#0d1822);
+position:relative;padding:20px 15px;margin-bottom:20px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.02)}
+.hero .hello{font-size:14px}.hero .title{font-size:21px;line-height:1.25;margin-top:5px;max-width:210px}
+.skyline{position:absolute;right:0;bottom:34px;width:48%;height:96px}
+.bld{position:absolute;bottom:0;background:linear-gradient(#10263b,#0b1722);border:1px solid #24445e}
+.bld:after{content:"";position:absolute;inset:7px;background:repeating-linear-gradient(180deg,rgba(239,190,71,.9) 0 3px,transparent 3px 11px)}
+.b1{left:8px;width:24px;height:42px}.b2{left:42px;width:28px;height:65px}.b3{left:78px;width:32px;height:90px}.b4{left:118px;width:24px;height:55px}.b5{left:147px;width:36px;height:78px}
+.weather{position:absolute;left:14px;bottom:10px;font-size:12px}.date{position:absolute;right:14px;bottom:10px;font-size:16px}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:20px 12px}
+.app{text-align:center;font-size:11px}
+.icon{width:52px;height:52px;margin:0 auto 7px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:26px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.09),0 5px 16px rgba(0,0,0,.28);position:relative;overflow:hidden}
+.icon:after{content:"";position:absolute;left:5px;right:5px;top:4px;height:14px;border-radius:9px;background:linear-gradient(rgba(255,255,255,.22),rgba(255,255,255,0))}
+.purple{background:linear-gradient(145deg,#30323b,#141922)} .gold{background:linear-gradient(145deg,#e9ab3b,#8f5c13)}
+.teal{background:linear-gradient(145deg,#23dbc8,#08796f)} .blue{background:linear-gradient(145deg,#36a9ff,#0b4a86)}
+.slate{background:linear-gradient(145deg,#6c8596,#293944)} .green{background:linear-gradient(145deg,#31e477,#068c42)}
+.mail{background:linear-gradient(145deg,#48a9ff,#0759ae)}
+.dock{margin-top:22px;height:70px;border-radius:24px;background:rgba(36,47,56,.87);border:1px solid #40505c;display:grid;grid-template-columns:repeat(4,1fr);align-items:center;padding:8px 10px}
+.dock .icon{width:48px;height:48px;margin:0}
+.handle{width:45px;height:4px;border-radius:3px;background:linear-gradient(90deg,#fff 0 55%,var(--gold) 55% 100%);opacity:.9;margin:22px auto 0}
+.section-title{font-size:22px;font-weight:800;margin:12px 0 4px}
+.sub{color:#d8dde1;font-size:15px;margin-bottom:14px}
+.search{background:#1d252b;border-radius:14px;color:#b9c0c5;padding:12px 14px;margin:8px 0 10px;font-size:13px}
+.card{background:linear-gradient(180deg,#131b21,#0c1216);border:1px solid #24313a;border-radius:14px;padding:13px 14px;margin:7px 0;display:flex;align-items:center;gap:12px}
+.card .ci{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:#101419;color:var(--gold);font-size:17px}
+.card .grow{flex:1}.card .main{font-size:14px}.card .minor{font-size:11px;color:#aeb8bf;margin-top:2px}.chev{font-size:23px;color:#e7ebee}
+.label{font-size:14px;font-weight:700;margin:14px 3px 4px}
+.ccgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.ccgrid .card{margin:0;min-height:72px}
+.slider{height:42px;border-radius:16px;background:#1c252b;margin:15px 0;display:flex;align-items:center;padding:7px 10px;gap:10px}
+.knob{height:26px;width:56%;background:#eef2f5;border-radius:16px}
+.rounds{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:16px}
+.round{text-align:center;font-size:10px}.round .r{width:49px;height:49px;border-radius:50%;background:#182229;border:1px solid #2f3a43;margin:0 auto 6px;display:flex;align-items:center;justify-content:center;font-size:23px}
+.storehero{height:125px;border-radius:15px;background:linear-gradient(110deg,#141c27,#0b2750);border:1px solid #38475a;padding:18px;margin:10px 0;position:relative;overflow:hidden}
+.storehero .big{font-size:22px;font-weight:800}.storehero .small{color:var(--gold);letter-spacing:2px;font-size:10px;margin-top:8px}
+.tabs{display:flex;gap:8px;margin:9px 0}.tab{padding:9px 13px;border-radius:13px;background:#13181d;font-size:11px}.tab.on{background:linear-gradient(#ffe398,#d5a02b);color:#111}
+.open{color:#ffe08b;background:#171b1e;border-radius:11px;padding:8px 11px;font-size:11px}
+.bottomnav{position:sticky;bottom:-22px;margin:12px -16px -22px;padding:8px 14px 13px;background:#090d10;border-top:1px solid #253039;display:grid;grid-template-columns:repeat(4,1fr);text-align:center;font-size:10px;color:#c8d0d6}
+.bottomnav b{display:block;color:#f7d77c;font-size:18px;margin-bottom:2px}
+.boot{position:fixed;inset:0;background:#000;z-index:30;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.boot .bigD{font-size:110px;font-weight:900;color:var(--gold);text-shadow:0 0 26px rgba(242,199,96,.4)}
+.boot .dex{font-size:30px;font-weight:800;letter-spacing:4px}.boot .biz{font-size:13px;letter-spacing:5px;color:#e6c76f;margin-top:5px}
+.boot .strap{position:absolute;top:72%;font-size:11px;letter-spacing:5px;color:#e2c26b;text-align:center;line-height:2}
+.boot .bar{position:absolute;bottom:13%;width:55%;height:4px;border-radius:4px;background:#4f5458;overflow:hidden}.boot .bar i{display:block;height:100%;width:58%;background:linear-gradient(90deg,#fff,#dca62f)}
+.boot .powered{position:absolute;bottom:6%;font-size:11px;text-align:center;color:#ddd}
+@media (min-width:500px){.page{max-width:430px;margin:auto}}
+</style>
+</head>
+<body>
+<div id="boot" class="boot">
+  <div class="bigD">D</div><div class="dex">DEXTERS</div><div class="biz">BUSINESS PHONE</div>
+  <div class="strap">WORK SMARTER<br>GO FURTHER</div><div class="bar"><i></i></div><div class="powered">Powered by<br><b>Dexter OS</b></div>
+</div>
+
+<section id="home" class="page active">
+  <div class="status"><span>09:41</span><span>▮▮⌁ ▰</span></div>
+  <div class="brand"><span class="dmark">D</span><div><span class="brandtext">DEXTERS</span><span class="brandsub">BUSINESS PHONE</span></div></div>
+  <div class="hero"><div class="hello">Hello,</div><div class="title">Let's make<br>business happen.</div>
+    <div class="skyline"><i class="bld b1"></i><i class="bld b2"></i><i class="bld b3"></i><i class="bld b4"></i><i class="bld b5"></i></div>
+    <div class="weather">🌤️ &nbsp; Glasgow<br>&nbsp;&nbsp;&nbsp;&nbsp;12°C</div><div class="date">Tue 10 Dec</div>
+  </div>
+  <div class="grid">
+    <div class="app" onclick="url('https://jamiegreen294-boop.github.io/dexters-ai-v1/')"><div class="icon purple">🤖</div>Dexter AI</div>
+    <div class="app" onclick="url('https://app.dextersspot.co.uk')"><div class="icon gold">♕</div>Loyalty</div>
+    <div class="app" onclick="url('https://backoffice.dextersspot.co.uk/pc-pos-test/')"><div class="icon teal">▤</div>POS</div>
+    <div class="app" onclick="url('https://backoffice.dextersspot.co.uk/')"><div class="icon blue">♟</div>Back Office</div>
+
+    <div class="app" onclick="launch('com.google.zxing.client.android')"><div class="icon slate">⌗</div>Scanner</div>
+    <div class="app" onclick="url('https://www.google.com')"><div class="icon blue">◎</div>Internet</div>
+    <div class="app" onclick="url('https://dextersspot.co.uk')"><div class="icon purple">◉</div>Website</div>
+    <div class="app" onclick="showPage('control')"><div class="icon slate">⌂</div>Business</div>
+
+    <div class="app" onclick="Dexter.messages()"><div class="icon green">●●●</div>Messages</div>
+    <div class="app" onclick="Dexter.dial()"><div class="icon green">☎</div>Phone</div>
+    <div class="app" onclick="url('mailto:')"><div class="icon mail">✉</div>Email</div>
+    <div class="app" onclick="showPage('store')"><div class="icon gold">♜</div>Dexter Store</div>
+  </div>
+  <div style="text-align:center;margin-top:18px;font-size:18px">• <span style="opacity:.35">•</span></div>
+  <div class="dock">
+    <div class="icon green" onclick="Dexter.dial()">☎</div>
+    <div class="icon blue" onclick="Dexter.messages()">•••</div>
+    <div class="icon slate" onclick="Dexter.camera()">◉</div>
+    <div class="icon purple" onclick="showPage('settings')">⚙</div>
+  </div>
+</section>
+
+<section id="control" class="page">
+  <div class="status"><span>09:41</span><span>▮▮⌁ ▰</span></div>
+  <div class="section-title">Dexter OS</div><div class="sub">Control Centre</div>
+  <div class="ccgrid">
+    <div class="card" onclick="Dexter.wifiSettings()"><div class="ci" style="background:#0e69e9;color:white">⌁</div><div><div class="main">Wi‑Fi</div><div class="minor">Connected</div></div></div>
+    <div class="card" onclick="Dexter.bluetoothSettings()"><div class="ci" style="background:#176ae7;color:white">ᛒ</div><div><div class="main">Bluetooth</div><div class="minor">On</div></div></div>
+    <div class="card"><div class="ci" style="background:#14b967;color:white">▥</div><div><div class="main">Mobile Data</div><div class="minor">On</div></div></div>
+    <div class="card" onclick="Dexter.batterySettings()"><div class="ci" style="background:#1cbb67;color:white">▣</div><div><div class="main">Battery</div><div class="minor">85%</div></div></div>
+  </div>
+  <div class="slider">☀ <div class="knob"></div></div><div class="slider">🔊 <div class="knob"></div></div>
+  <div class="rounds">
+    <div class="round"><div class="r">◐</div>Dark Mode</div><div class="round"><div class="r">☾</div>Do Not Disturb</div>
+    <div class="round"><div class="r">⟳</div>Auto Rotate</div><div class="round"><div class="r">🔦</div>Torch</div>
+    <div class="round"><div class="r">⌖</div>Location</div><div class="round"><div class="r">⌁</div>Hotspot</div>
+    <div class="round"><div class="r">✈</div>Airplane Mode</div><div class="round"><div class="r">▣</div>Screen Record</div>
+  </div>
+  <div class="card" style="margin-top:24px" onclick="showPage('store')"><div class="ci" style="background:linear-gradient(#ed4adf,#f5a829);color:white">▣</div><div class="grow"><div class="main">Dexter Store</div><div class="minor">Apps, tools and updates</div></div><div class="chev">›</div></div>
+  <div class="handle" onclick="showPage('home')"></div>
+</section>
+
+<section id="settings" class="page">
+  <div class="status"><span>09:41</span><span>▮▮⌁ ▰</span></div>
+  <div class="section-title">Settings</div>
+  <div class="search">⌕ &nbsp; Search settings</div>
+  <div class="card"><div class="ci" style="border:2px solid #e5bd55;border-radius:50%">D</div><div class="grow"><div class="main">Dexters Business</div><div class="minor">Owner</div></div><div class="chev">›</div></div>
+  <div class="label">Device</div>
+  <div class="card" onclick="Dexter.wifiSettings()"><div class="ci">⌁</div><div class="grow"><div class="main">Network & Internet</div></div><div class="chev">›</div></div>
+  <div class="card" onclick="Dexter.bluetoothSettings()"><div class="ci">▣</div><div class="grow"><div class="main">Connected Devices</div></div><div class="chev">›</div></div>
+  <div class="card"><div class="ci">☀</div><div class="grow"><div class="main">Display</div></div><div class="chev">›</div></div>
+  <div class="card"><div class="ci">🔊</div><div class="grow"><div class="main">Sound & Vibration</div></div><div class="chev">›</div></div>
+  <div class="card" onclick="Dexter.batterySettings()"><div class="ci">▣</div><div class="grow"><div class="main">Battery</div></div><div class="chev">›</div></div>
+  <div class="card"><div class="ci">▤</div><div class="grow"><div class="main">Storage</div></div><div class="chev">›</div></div>
+  <div class="card" onclick="Dexter.securitySettings()"><div class="ci">⬟</div><div class="grow"><div class="main">Security & Privacy</div></div><div class="chev">›</div></div>
+  <div class="label">Dexter</div>
+  <div class="card" onclick="url('https://jamiegreen294-boop.github.io/dexters-ai-v1/')"><div class="ci" style="color:#9d6bff">◉</div><div class="grow"><div class="main">Dexter AI</div></div><div class="chev">›</div></div>
+  <div class="card"><div class="ci">▦</div><div class="grow"><div class="main">Dexter Apps</div></div><div class="chev">›</div></div>
+  <div class="card" onclick="showPage('home')"><div class="ci">🧰</div><div class="grow"><div class="main">Business Tools</div></div><div class="chev">›</div></div>
+  <div class="card" onclick="showPage('store')"><div class="ci">▣</div><div class="grow"><div class="main">Dexter Store</div></div><div class="chev">›</div></div>
+  <div class="card"><div class="ci">●</div><div class="grow"><div class="main">About Dexter OS</div></div><div class="chev">›</div></div>
+  <div class="label">Owner</div>
+  <div class="card"><div class="ci">♙</div><div class="grow"><div class="main">Accounts</div></div><div class="chev">›</div></div>
+  <div class="card" onclick="Dexter.systemSettings()"><div class="ci">⚙</div><div class="grow"><div class="main">System</div></div><div class="chev">›</div></div>
+</section>
+
+<section id="store" class="page">
+  <div class="status"><span>09:41</span><span>▮▮⌁ ▰</span></div>
+  <div class="section-title">Dexter Store</div>
+  <div class="search">⌕ &nbsp; Search apps, tools and updates</div>
+  <div class="storehero"><div class="big">D DEXTERS</div><div class="small">TOOLS FOR A<br>STRONGER TOMORROW</div><div class="skyline" style="height:85px;bottom:0"><i class="bld b1"></i><i class="bld b2"></i><i class="bld b3"></i><i class="bld b4"></i><i class="bld b5"></i></div></div>
+  <div class="tabs"><div class="tab on">Featured</div><div class="tab">Business</div><div class="tab">Tools</div><div class="tab">Updates</div></div>
+  <div class="card"><div class="ci" style="background:#7b3dec;color:#fff">✣</div><div class="grow"><div class="main">Dexter AI</div><div class="minor">Your AI business assistant</div></div><div class="open" onclick="url('https://jamiegreen294-boop.github.io/dexters-ai-v1/')">Open</div></div>
+  <div class="card"><div class="ci" style="background:#d69727;color:#fff">♕</div><div class="grow"><div class="main">Loyalty</div><div class="minor">Rewards and customer loyalty</div></div><div class="open" onclick="url('https://app.dextersspot.co.uk')">Open</div></div>
+  <div class="card"><div class="ci" style="background:#0fae9e;color:#fff">▤</div><div class="grow"><div class="main">POS</div><div class="minor">Point of sale made simple</div></div><div class="open" onclick="url('https://backoffice.dextersspot.co.uk/pc-pos-test/')">Open</div></div>
+  <div class="card"><div class="ci" style="background:#0da7a7;color:#fff">♟</div><div class="grow"><div class="main">Back Office</div><div class="minor">Manage your business</div></div><div class="open" onclick="url('https://backoffice.dextersspot.co.uk/')">Open</div></div>
+  <div class="card"><div class="ci" style="background:#397391;color:#fff">⌗</div><div class="grow"><div class="main">Scanner</div><div class="minor">Scan and store documents</div></div><div class="open">Open</div></div>
+  <div class="card"><div class="ci" style="background:#8b37f2;color:#fff">◎</div><div class="grow"><div class="main">Website</div><div class="minor">Manage your online presence</div></div><div class="open" onclick="url('https://dextersspot.co.uk')">Open</div></div>
+  <div class="bottomnav"><div onclick="showPage('home')"><b>⌂</b>Home</div><div><b>▦</b>Apps</div><div><b>♧</b>Updates</div><div onclick="showPage('settings')"><b>♙</b>Account</div></div>
+</section>
+
+<script>
+let current='home';
+function showPage(id){document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));document.getElementById(id).classList.add('active');current=id;window.scrollTo(0,0)}
+function url(u){try{Dexter.openUrl(u)}catch(e){location.href=u}}
+function launch(p){try{Dexter.launch(p)}catch(e){}}
+function dexterBack(){if(current!=='home'){showPage('home');return true}return false}
+setTimeout(()=>{document.getElementById('boot').style.display='none'},1700);
+</script>
+</body>
+</html>
