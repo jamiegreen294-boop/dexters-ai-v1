@@ -8,6 +8,7 @@ import android.graphics.Canvas;
 import android.graphics.drawable.Drawable;
 import android.hardware.camera2.CameraManager;
 import android.content.Context;
+import android.Manifest;
 import android.net.Uri;
 import android.os.BatteryManager;
 import android.os.Build;
@@ -51,7 +52,18 @@ public class DexterHomeActivity extends Activity {
 
     @Override public void onBackPressed() {
         if (web != null) {
-            web.evaluateJavascript("(function(){var a=document.querySelector('.page.active');if(a&&a.id!=='home'){showPage('home');return 'home';}return 'stay';})()", null);
+            web.evaluateJavascript("(function(){try{return dexterBack()?'handled':'home'}catch(e){return 'home'}})()", value -> {
+                if ("\"home\"".equals(value)) DexterHomeActivity.super.onBackPressed();
+            });
+        } else super.onBackPressed();
+    }
+
+    @Override protected void onNewIntent(Intent intent){
+        super.onNewIntent(intent);
+        setIntent(intent);
+        String page=intent.getStringExtra("page");
+        if(web!=null && page!=null && page.matches("home|control|settings|store|about")){
+            web.evaluateJavascript("show('"+page+"')",null);
         }
     }
 
@@ -95,6 +107,10 @@ public class DexterHomeActivity extends Activity {
         }
         @JavascriptInterface public boolean toggleTorch() {
             try {
+                if (Build.VERSION.SDK_INT >= 23 && checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                    runOnUiThread(() -> requestPermissions(new String[]{Manifest.permission.CAMERA}, 404));
+                    return false;
+                }
                 CameraManager cm=(CameraManager)getSystemService(Context.CAMERA_SERVICE);
                 if(cm==null)return false;
                 String selected=null;
