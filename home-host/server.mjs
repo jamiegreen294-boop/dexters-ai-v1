@@ -1164,6 +1164,27 @@ async function androidTool(tool,request={}){
     return {address,paired:/success/i.test(r.stdout+r.stderr),output:(r.stdout+r.stderr).trim().slice(0,2000)};
   }
   if(tool==="android.info")return await androidDeviceInfo(String(request.serial||"").trim());
+  if(tool==="android.dexter_os_activate"){
+    if(request?.approval_granted!==true)throw new Error("Dexter OS launcher activation requires owner approval.");
+    const serial=String(request.serial||"").trim();
+    const target=serial?["-s",serial]:[];
+    const component="uk.co.dextersspot.dexteros.preview/uk.co.dextersspot.dexterai.DexterHomeActivity";
+    const steps=[];
+    for(const cmd of [
+      [...target,"shell","cmd","package","set-home-activity",component],
+      [...target,"shell","settings","put","global","policy_control","immersive.navigation=*"],
+      [...target,"shell","am","start","-a","android.intent.action.MAIN","-c","android.intent.category.HOME"]
+    ]){
+      try{
+        const r=await adbRun(cmd,30000);
+        steps.push({ok:true,command:cmd.slice(target.length+1).join(" "),output:String(r.stdout||"").trim().slice(0,3000)});
+      }catch(e){
+        steps.push({ok:false,command:cmd.slice(target.length+1).join(" "),error:String(e?.message||e)});
+      }
+    }
+    const verify=await adbRun([...target,"shell","cmd","package","resolve-activity","--brief","-a","android.intent.action.MAIN","-c","android.intent.category.HOME"],30000).catch(()=>({stdout:""}));
+    return {serial:serial||null,component,navigation:"immersive",resolved_home:String(verify.stdout||"").trim(),steps};
+  }
   if(tool==="android.shell"){
     const command=String(request.command||"").trim();
     if(!command)throw new Error("Android shell command is required.");
