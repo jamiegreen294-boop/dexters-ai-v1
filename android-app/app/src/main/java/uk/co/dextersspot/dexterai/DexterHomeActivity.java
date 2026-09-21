@@ -6,6 +6,8 @@ import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.drawable.Drawable;
+import android.hardware.camera2.CameraManager;
+import android.content.Context;
 import android.net.Uri;
 import android.os.BatteryManager;
 import android.os.Build;
@@ -20,6 +22,7 @@ import java.io.ByteArrayOutputStream;
 
 public class DexterHomeActivity extends Activity {
     private WebView web;
+    private boolean torchOn=false;
 
     @Override protected void onCreate(Bundle b) {
         super.onCreate(b);
@@ -34,7 +37,14 @@ public class DexterHomeActivity extends Activity {
         s.setAllowContentAccess(false);
         s.setBuiltInZoomControls(false);
         s.setDisplayZoomControls(false);
-        web.setWebViewClient(new WebViewClient());
+        web.setWebViewClient(new WebViewClient(){
+            @Override public void onPageFinished(WebView view,String url){
+                String page=getIntent().getStringExtra("page");
+                if(page!=null && page.matches("home|control|settings|store|about")){
+                    view.evaluateJavascript("show('"+page+"')",null);
+                }
+            }
+        });
         web.addJavascriptInterface(new Bridge(), "DexterBridge");
         web.loadUrl("file:///android_asset/launcher.html");
     }
@@ -82,6 +92,21 @@ public class DexterHomeActivity extends Activity {
                 BatteryManager bm=(BatteryManager)getSystemService(BATTERY_SERVICE);
                 return bm==null?-1:bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY);
             } catch(Exception e) { return -1; }
+        }
+        @JavascriptInterface public boolean toggleTorch() {
+            try {
+                CameraManager cm=(CameraManager)getSystemService(Context.CAMERA_SERVICE);
+                if(cm==null)return false;
+                String selected=null;
+                for(String id:cm.getCameraIdList()){
+                    Boolean flash=cm.getCameraCharacteristics(id).get(android.hardware.camera2.CameraCharacteristics.FLASH_INFO_AVAILABLE);
+                    if(Boolean.TRUE.equals(flash)){selected=id;break;}
+                }
+                if(selected==null)return false;
+                torchOn=!torchOn;
+                cm.setTorchMode(selected,torchOn);
+                return torchOn;
+            } catch(Exception e) { torchOn=false; return false; }
         }
         @JavascriptInterface public String getDeviceModel() {
             return Build.MANUFACTURER+" "+Build.MODEL;
