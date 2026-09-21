@@ -1,298 +1,89 @@
 <!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<title>Dexter Business Phone</title>
+<html><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Dexter OS</title>
 <style>
-:root{
-  --bg:#030506;
-  --bg2:#071015;
-  --panel:#0d1419;
-  --panel2:#111c24;
-  --line:rgba(255,255,255,.10);
-  --text:#fff;
-  --muted:#a8b8cc;
-  --gold:#f1bf54;
-  --dock:rgba(226,235,248,.19);
-}
+:root{--bg:#020405;--card:#10171c;--card2:#151e24;--line:#26323a;--text:#fff;--muted:#bbc3c8;--gold:#f4cf71;--blue:#087df5;--green:#16c468}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{width:100%;height:100%;margin:0;background:#030506;color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+html,body{margin:0;width:100%;height:100%;background:#000;color:white;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
 body{overflow:hidden}
 button{font:inherit;color:inherit}
-#app{height:100%;width:100%;position:relative;background:
-radial-gradient(circle at 72% -12%,rgba(64,118,191,.17),transparent 38%),
-linear-gradient(180deg,#030506 0%,#071015 48%,#030506 100%)}
-.page{position:absolute;inset:0;display:none;overflow-y:auto;overflow-x:hidden;padding:12px 18px 24px}
+#app{height:100%;background:radial-gradient(circle at 90% 0,#072131 0,#061018 20%,#020405 48%);overflow:hidden}
+.page{display:none;height:100%;overflow:auto;padding:12px 18px 18px;background:radial-gradient(circle at 100% 0,#0a2639 0,#061019 22%,#020405 52%)}
 .page.active{display:block}
-.safe{padding-top:max(8px,env(safe-area-inset-top));padding-bottom:max(8px,env(safe-area-inset-bottom))}
-.brand{display:flex;align-items:center;gap:10px;margin:3px 4px 13px}
-.brandD{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;font-size:23px;font-weight:900;color:#0b1524;background:linear-gradient(145deg,#f6ce71,#c18b2e);box-shadow:0 6px 18px rgba(0,0,0,.23)}
-.brandText{line-height:1.05}
-.brandText b{font-size:14px;letter-spacing:.12em}
-.brandText span{display:block;font-size:8px;letter-spacing:.18em;color:#c9a65b;margin-top:3px;font-weight:800}
-.hero{position:relative;overflow:hidden;border:1px solid rgba(255,255,255,.08);background:linear-gradient(145deg,#294f80,#1a355d 55%,#16325a);height:139px;border-radius:22px;padding:19px 18px;margin-bottom:22px;box-shadow:0 14px 34px rgba(0,0,0,.27)}
-.hero .eyebrow{font-size:11px;color:#d9e7f8;opacity:.9;margin-bottom:4px}
-.hero h1{font-size:23px;line-height:1.02;margin:0;width:57%;letter-spacing:-.04em}
-.hero .date{position:absolute;right:16px;bottom:13px;font-weight:750;font-size:11px;color:#dce8f6}
-.hero .dot{position:absolute;left:18px;bottom:16px;width:7px;height:7px;border-radius:50%;background:#f2c45f;box-shadow:0 0 10px rgba(242,196,95,.5)}
-.chart{position:absolute;right:18px;top:24px;width:42%;height:79px}
-.grid{display:grid;grid-template-columns:repeat(4,1fr);column-gap:14px;row-gap:22px;padding:0 2px}
-.appTile{border:0;background:transparent;padding:0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:7px}
-.appIcon{width:58px;height:58px;border-radius:16px;display:grid;place-items:center;position:relative;overflow:hidden;border:1px solid rgba(255,255,255,.12);box-shadow:0 8px 18px rgba(0,0,0,.22),inset 0 1px 0 rgba(255,255,255,.16)}
-.appIcon:after{content:"";position:absolute;inset:0;background:linear-gradient(150deg,rgba(255,255,255,.16),transparent 43%);pointer-events:none}
-.appIcon svg{width:31px;height:31px;position:relative;z-index:2}
-.appLabel{font-size:10px;line-height:1.1;white-space:nowrap;max-width:76px;overflow:hidden;text-overflow:ellipsis;text-shadow:0 1px 2px #000}
-.purple{background:linear-gradient(145deg,#4c4b82,#5d4f91)}
-.yellow{background:linear-gradient(145deg,#f4ca56,#d9a82f)}
-.cyan{background:linear-gradient(145deg,#35c4e9,#0e99c6)}
-.blue{background:linear-gradient(145deg,#54bce9,#2385bd)}
-.slate{background:linear-gradient(145deg,#8ca2bf,#647d9e)}
-.aqua{background:linear-gradient(145deg,#1fd4d0,#1594b5)}
-.silver{background:linear-gradient(145deg,#e8edf5,#c8d3e3);color:#1f3552}
-.green{background:linear-gradient(145deg,#32d69b,#16a875)}
-.white{background:#f6f7fa;color:#1775d1}
-.gold{background:linear-gradient(145deg,#f1c15a,#dca032);color:#17243a}
-.camera{background:linear-gradient(145deg,#5c6b89,#283650)}
-.gear{background:linear-gradient(145deg,#9aa7bd,#697b98)}
-.pageDots{height:38px;display:flex;justify-content:center;align-items:center;gap:6px}
-.pageDots i{display:block;width:5px;height:5px;border-radius:50%;background:#5c6c80}.pageDots i.active{background:#fff}
-.dock{margin-top:0;height:80px;border:1px solid rgba(255,255,255,.20);background:var(--dock);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-radius:27px;padding:10px 12px;display:grid;grid-template-columns:repeat(4,1fr);align-items:center;box-shadow:inset 0 1px 1px rgba(255,255,255,.14),0 12px 34px rgba(0,0,0,.28)}
-.dock button{border:0;background:transparent;display:grid;place-items:center}
-.dock .appIcon{width:53px;height:53px;border-radius:15px}
-.footerSpace{height:6px}
-.headerBar{display:flex;align-items:center;gap:11px;margin:6px 2px 16px}
-.back{width:38px;height:38px;border:0;background:rgba(255,255,255,.08);border-radius:50%;display:grid;place-items:center;font-size:27px;line-height:1}
-.headerTitle{font-size:31px;font-weight:760;letter-spacing:-.04em}
-.sectionTitle{font-size:12px;font-weight:800;color:#dbe5f2;margin:14px 4px 7px}
-.settingsList{display:grid;gap:8px}
-.settingsRow{width:100%;min-height:68px;border:1px solid rgba(255,255,255,.08);background:linear-gradient(145deg,#11171c,#0a0f13);border-radius:16px;padding:11px 13px;display:grid;grid-template-columns:38px 1fr 18px;gap:10px;align-items:center;text-align:left;box-shadow:0 7px 18px rgba(0,0,0,.14)}
-.settingsRow .rowIcon{width:34px;height:34px;border-radius:10px;background:rgba(255,255,255,.08);display:grid;place-items:center}
-.settingsRow .rowIcon svg{width:20px;height:20px}
-.settingsRow b{display:block;font-size:14px}
-.settingsRow small{display:block;font-size:10px;color:#b8c8da;margin-top:2px}
-.chev{font-size:25px;color:#eff6ff;text-align:right}
-.card{border:1px solid rgba(255,255,255,.09);background:linear-gradient(145deg,#11171c,#0a0f13);border-radius:18px;padding:15px;margin:8px 0}
-.accountTop{display:flex;align-items:center;gap:12px}
-.accountLogo{width:46px;height:46px;border-radius:14px;background:#fff;display:grid;place-items:center}
-.accountLogo svg{width:30px;height:30px}
-.accountText b{display:block;font-size:15px}.accountText span{font-size:11px;color:#aabbd0}
-.ownerBadge{display:inline-flex;align-items:center;padding:5px 9px;border-radius:999px;background:rgba(241,191,84,.12);border:1px solid rgba(241,191,84,.24);color:#f3cb77;font-size:10px;font-weight:800;margin-top:8px}
-.subcopy{font-size:12px;line-height:1.45;color:#aebfd3;margin:8px 0 2px}
-.businessGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.businessCard{border:1px solid rgba(255,255,255,.08);background:#11171c;border-radius:17px;padding:15px;text-align:left;min-height:105px}
-.businessCard b{display:block;margin-top:9px}.businessCard small{color:#a9bad0}
-.nativeIcon{object-fit:cover}
-#toast{position:fixed;left:50%;bottom:108px;transform:translateX(-50%) translateY(14px);background:rgba(7,15,29,.94);border:1px solid rgba(255,255,255,.14);padding:10px 14px;border-radius:14px;font-size:12px;opacity:0;pointer-events:none;transition:.2s;z-index:99;white-space:nowrap}
-#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-@media(max-width:350px){.page{padding-left:12px;padding-right:12px}.grid{column-gap:9px}.appIcon{width:54px;height:54px}.dock .appIcon{width:49px;height:49px}.hero h1{font-size:21px}}
-</style>
-</head>
-<body>
+.brand{display:flex;align-items:center;justify-content:center;gap:9px;padding:7px 0 14px}
+.logo{width:43px;height:43px;border-radius:9px;display:grid;place-items:center;font-size:31px;font-weight:900;color:#111;background:linear-gradient(145deg,#fff1b6,#d69928);box-shadow:0 0 20px rgba(244,207,113,.18)}
+.brandWords b{font-size:22px;letter-spacing:.08em}.brandWords small{display:block;color:var(--gold);font-size:9px;letter-spacing:.28em;font-weight:800;margin-top:2px}
+.hero{height:171px;border-radius:22px;border:1px solid #42505c;overflow:hidden;position:relative;background:linear-gradient(125deg,#17354f 0,#0f2333 44%,#243d56 100%);margin:0 0 23px;padding:24px 18px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.03)}
+.hero:after{content:"";position:absolute;left:0;right:0;bottom:0;height:46px;background:linear-gradient(transparent,rgba(0,0,0,.72))}
+.hero .hello{font-size:17px;position:relative;z-index:2}.hero h1{font-size:27px;line-height:1.03;letter-spacing:-.035em;margin:6px 0 0;width:57%;position:relative;z-index:2}
+.city{position:absolute;right:0;bottom:34px;width:52%;height:104px}
+.city i{position:absolute;bottom:0;background:linear-gradient(#111d27,#061017);border-radius:2px 2px 0 0;box-shadow:inset 0 0 0 1px rgba(255,255,255,.04)}
+.city i:after{content:"";position:absolute;inset:7px 5px;background:repeating-linear-gradient(180deg,rgba(244,188,73,.9) 0 2px,transparent 2px 9px);opacity:.7}
+.city .a{left:7px;width:20px;height:40px}.city .b{left:34px;width:27px;height:64px}.city .c{left:70px;width:29px;height:82px}.city .d{left:108px;width:25px;height:118px}.city .d:before{content:"";position:absolute;width:2px;height:32px;background:#d3a15f;left:12px;top:-32px}.city .e{left:140px;width:30px;height:70px}
+.weather{position:absolute;left:18px;bottom:14px;z-index:2;font-size:14px;font-weight:650}.weather span{font-size:30px;vertical-align:middle;margin-right:8px}.date{position:absolute;right:18px;bottom:15px;z-index:2;font-size:18px}
+.apps{display:grid;grid-template-columns:repeat(4,1fr);gap:20px 12px}
+.app{border:0;background:none;padding:0;display:flex;flex-direction:column;align-items:center;gap:7px;font-size:11px;white-space:nowrap}
+.ico{width:58px;height:58px;border-radius:15px;display:grid;place-items:center;border:1px solid rgba(255,255,255,.09);box-shadow:0 8px 18px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.13);overflow:hidden}
+.ico svg{width:34px;height:34px}
+.purple{background:linear-gradient(145deg,#2f323b,#11151a)}.gold{background:linear-gradient(145deg,#efb64c,#9d671c)}.teal{background:linear-gradient(145deg,#20d4c6,#087d73)}.blue{background:linear-gradient(145deg,#1997ff,#0753a0)}.slate{background:linear-gradient(145deg,#637d8d,#263944)}.green{background:linear-gradient(145deg,#2edd7a,#079044)}.mail{background:linear-gradient(145deg,#2ca2ff,#0759bf)}.dark{background:linear-gradient(145deg,#59616a,#24292e)}
+.dots{text-align:center;font-size:20px;margin:18px 0 12px}.dots span{opacity:.25}
+.dock{height:80px;border-radius:28px;background:linear-gradient(180deg,rgba(33,43,50,.94),rgba(16,22,26,.94));border:1px solid #35434d;display:grid;grid-template-columns:repeat(4,1fr);align-items:center;padding:10px 11px}
+.dock .ico{width:56px;height:56px;margin:auto}
+.h1{font-size:29px;font-weight:760;margin:12px 0 2px}.sub{font-size:18px;margin-bottom:20px}
+.ccgrid{display:grid;grid-template-columns:1fr 1fr;gap:13px}.cc{background:linear-gradient(180deg,#172128,#0e1519);border:1px solid #2c3942;border-radius:20px;min-height:112px;padding:18px;display:flex;align-items:center;gap:13px}.roundico{width:58px;height:58px;border-radius:50%;display:grid;place-items:center;font-size:30px;background:#087df5}.roundico.green{background:#14bd63}.cc b{font-size:17px;display:block}.cc small{font-size:13px;color:#eef2f4}
+.slider{height:55px;margin:17px 0;border-radius:28px;background:#141d22;border:1px solid #222e35;display:flex;align-items:center;gap:13px;padding:8px 12px;font-size:27px}.bar{height:36px;border-radius:20px;background:#f0f3f5;width:58%}
+.quick{display:grid;grid-template-columns:repeat(4,1fr);gap:20px 12px;margin:22px 0}.quick button{background:none;border:0;font-size:10px}.qcircle{width:64px;height:64px;border-radius:50%;margin:0 auto 8px;background:#151e24;border:1px solid #303b43;display:grid;place-items:center;font-size:28px}
+.storejump{background:linear-gradient(180deg,#121b20,#0b1115);border:1px solid #28343c;border-radius:19px;padding:17px;display:flex;align-items:center;gap:15px}.storejump .grow{flex:1}.storejump b{font-size:20px}.storejump small{display:block;color:#c2c9cd;margin-top:5px;font-size:13px}.arrow{font-size:31px}
+.search{height:47px;border-radius:24px;background:#1b2328;border:1px solid #283239;display:flex;align-items:center;padding:0 15px;font-size:14px;color:#f2f4f5;margin:12px 0 18px}
+.owner{background:linear-gradient(180deg,#121a1f,#0a1013);border:1px solid #263139;border-radius:18px;padding:15px;display:flex;align-items:center;gap:14px;margin-bottom:13px}.owner .roundico{width:48px;height:48px;background:#101418;border:2px solid var(--gold);color:var(--gold);font-size:26px}.owner b{font-size:18px}.owner small{display:block;font-size:13px;margin-top:3px}
+.label{font-size:18px;font-weight:750;margin:14px 4px 6px}
+.group{border:1px solid #253139;border-radius:17px;overflow:hidden;background:linear-gradient(180deg,#10181d,#081014);margin-bottom:14px}
+.row{min-height:55px;display:grid;grid-template-columns:36px 1fr 23px;align-items:center;gap:10px;padding:7px 13px;border-bottom:1px solid #1c272d}.row:last-child{border-bottom:0}.row .rIcon{font-size:22px;color:#fff}.row b{font-size:15px}.row .arrow{font-size:28px}
+.storehero{height:150px;border-radius:17px;border:1px solid #32465a;background:linear-gradient(115deg,#0b1530,#123f7a);padding:23px;position:relative;overflow:hidden;margin-bottom:13px}.storehero .dex{font-size:27px;font-weight:800}.storehero .tag{font-size:11px;color:var(--gold);letter-spacing:.23em;font-weight:700;line-height:1.6;margin-top:12px}
+.tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}.tab{border:0;border-radius:16px;background:#151b1f;padding:11px 5px;font-size:13px}.tab.on{background:linear-gradient(#ffe8a2,#d7a12a);color:#111;font-weight:700}
+.storelist{margin:0 -18px}.srow{min-height:79px;padding:10px 18px;border-bottom:1px solid #172127;display:grid;grid-template-columns:58px 1fr auto;align-items:center;gap:13px}.srow .ico{width:53px;height:53px}.srow b{font-size:18px}.srow small{display:block;color:#aeb7bd;font-size:12px;margin-top:4px}.open{border:0;border-radius:20px;background:#171d21;color:#ffe294;padding:10px 18px;font-size:13px}
+.bottom{position:sticky;bottom:-18px;margin:0 -18px -18px;background:#0b1114;border-top:1px solid #202a30;display:grid;grid-template-columns:repeat(4,1fr);padding:9px 10px 15px;text-align:center;font-size:10px}.bottom b{display:block;font-size:23px;color:#f1d071;margin-bottom:2px}
+.boot{position:fixed;inset:0;z-index:50;background:#000;display:flex;align-items:center;justify-content:center;flex-direction:column}.boot .bigD{font-size:120px;font-weight:900;color:var(--gold);text-shadow:0 0 24px rgba(244,207,113,.35)}.boot h2{font-size:31px;letter-spacing:.13em;margin:0}.boot .biz{letter-spacing:.34em;color:#e4c766;font-size:12px;margin-top:6px}.boot .strap{position:absolute;top:68%;text-align:center;letter-spacing:.35em;color:#e4c766;font-size:11px;line-height:2}.boot .progress{position:absolute;bottom:14%;width:56%;height:4px;background:#596066;border-radius:3px;overflow:hidden}.boot .progress i{display:block;width:58%;height:100%;background:linear-gradient(90deg,#fff,#d5a331)}.boot .pow{position:absolute;bottom:7%;font-size:11px;text-align:center;color:#ddd}
+</style></head><body>
+<div id="boot" class="boot"><div class="bigD">D</div><h2>DEXTERS</h2><div class="biz">BUSINESS PHONE</div><div class="strap">WORK SMARTER<br>GO FURTHER</div><div class="progress"><i></i></div><div class="pow">Powered by<br><b>Dexter OS</b></div></div>
 <div id="app">
-<svg width="0" height="0" style="position:absolute">
-<defs>
-<symbol id="s-ai" viewBox="0 0 48 48"><rect x="7" y="9" width="34" height="27" rx="10" fill="none" stroke="white" stroke-width="3"/><path d="M17 36l-4 6 10-6" fill="none" stroke="white" stroke-width="3" stroke-linecap="round"/><path d="M17 19h14M17 26h10" stroke="white" stroke-width="3" stroke-linecap="round"/></symbol>
-<symbol id="s-star" viewBox="0 0 48 48"><path d="M24 7l5 10 11 2-8 8 2 12-10-6-10 6 2-12-8-8 11-2z" fill="white"/></symbol>
-<symbol id="s-pos" viewBox="0 0 48 48"><rect x="7" y="8" width="34" height="27" rx="4" fill="none" stroke="white" stroke-width="3"/><path d="M13 15h22v13H13zM18 40h12M24 35v5" fill="none" stroke="white" stroke-width="3" stroke-linecap="round"/></symbol>
-<symbol id="s-brief" viewBox="0 0 48 48"><rect x="6" y="14" width="36" height="25" rx="5" fill="white"/><path d="M18 14v-4h12v4M6 24h36" fill="none" stroke="#2775a7" stroke-width="3"/></symbol>
-<symbol id="s-qr" viewBox="0 0 48 48"><g fill="none" stroke="white" stroke-width="4"><path d="M6 6h13v13H6zM29 6h13v13H29zM6 29h13v13H6z"/><path d="M30 30h5v5h7M29 42h7M42 29v7"/></g></symbol>
-<symbol id="s-globe" viewBox="0 0 48 48"><circle cx="24" cy="24" r="17" fill="white"/><path d="M8 24h32M24 7c6 6 6 28 0 34M24 7c-6 6-6 28 0 34" fill="none" stroke="#149cb4" stroke-width="2.6"/></symbol>
-<symbol id="s-web" viewBox="0 0 48 48"><rect x="6" y="8" width="36" height="32" rx="5" fill="#eef3f8"/><path d="M6 16h36M12 12h2M18 12h2" stroke="#58708e" stroke-width="2.5" stroke-linecap="round"/><rect x="12" y="21" width="24" height="12" rx="2" fill="#9fb2c9"/></symbol>
-<symbol id="s-msg" viewBox="0 0 48 48"><path d="M8 10h32v23a7 7 0 0 1-7 7H19l-9 5 3-8a7 7 0 0 1-5-7z" fill="white"/></symbol>
-<symbol id="s-phone" viewBox="0 0 48 48"><path d="M14 8l8 9-5 6c4 7 8 11 15 15l6-5 8 7c-2 6-6 9-12 8C20 45 5 30 3 16 2 11 6 8 14 8z" fill="#1876d2"/></symbol>
-<symbol id="s-mail" viewBox="0 0 48 48"><rect x="5" y="8" width="38" height="32" rx="6" fill="white"/><path d="M8 13l16 13 16-13" fill="none" stroke="#d95040" stroke-width="4"/><path d="M7 37V16l12 10" fill="none" stroke="#3685e5" stroke-width="4"/><path d="M41 37V16L29 26" fill="none" stroke="#47a766" stroke-width="4"/></symbol>
-<symbol id="s-d" viewBox="0 0 48 48"><path d="M14 8h11c11 0 18 7 18 16s-7 16-18 16H14zm9 8v16h3c5 0 9-3 9-8s-4-8-9-8z" fill="#15243a"/></symbol>
-<symbol id="s-camera" viewBox="0 0 48 48"><rect x="5" y="13" width="38" height="28" rx="7" fill="#101722"/><path d="M15 13l3-5h12l3 5" fill="#dce6f4"/><circle cx="24" cy="27" r="9" fill="#5469c7"/><circle cx="24" cy="27" r="5" fill="#55d5cf"/></symbol>
-<symbol id="s-gear" viewBox="0 0 48 48"><path d="M24 7l4 2 4-2 4 4-1 4 3 3 4 1v6l-4 1-3 3 1 4-4 4-4-2-4 2-4-2-4 2-4-4 1-4-3-3-4-1v-6l4-1 3-3-1-4 4-4 4 2z" fill="white"/><circle cx="24" cy="22" r="7" fill="#778aa7"/></symbol>
-<symbol id="s-wifi" viewBox="0 0 48 48"><path d="M6 18c10-9 26-9 36 0M12 25c7-6 17-6 24 0M18 32c3-3 9-3 12 0" fill="none" stroke="white" stroke-width="4" stroke-linecap="round"/><circle cx="24" cy="39" r="3" fill="white"/></symbol>
-<symbol id="s-battery" viewBox="0 0 48 48"><rect x="7" y="14" width="32" height="20" rx="4" fill="none" stroke="white" stroke-width="3"/><path d="M41 20v8" stroke="white" stroke-width="4" stroke-linecap="round"/><rect x="11" y="18" width="16" height="12" rx="2" fill="white"/></symbol>
-<symbol id="s-storage" viewBox="0 0 48 48"><ellipse cx="24" cy="12" rx="16" ry="7" fill="white"/><path d="M8 12v12c0 4 7 7 16 7s16-3 16-7V12M8 24v12c0 4 7 7 16 7s16-3 16-7V24" fill="none" stroke="white" stroke-width="3"/></symbol>
-<symbol id="s-lock" viewBox="0 0 48 48"><rect x="9" y="20" width="30" height="22" rx="5" fill="white"/><path d="M16 20v-6c0-11 16-11 16 0v6" fill="none" stroke="white" stroke-width="4"/><circle cx="24" cy="31" r="3" fill="#42658c"/></symbol>
-<symbol id="s-apps" viewBox="0 0 48 48"><g fill="white"><rect x="7" y="7" width="13" height="13" rx="4"/><rect x="28" y="7" width="13" height="13" rx="4"/><rect x="7" y="28" width="13" height="13" rx="4"/><rect x="28" y="28" width="13" height="13" rx="4"/></g></symbol>
-<symbol id="s-user" viewBox="0 0 48 48"><circle cx="24" cy="17" r="8" fill="white"/><path d="M9 42c1-10 7-15 15-15s14 5 15 15" fill="white"/></symbol>
-<symbol id="s-info" viewBox="0 0 48 48"><circle cx="24" cy="24" r="18" fill="none" stroke="white" stroke-width="4"/><path d="M24 21v13M24 14h.01" stroke="white" stroke-width="4" stroke-linecap="round"/></symbol>
-</defs>
-</svg>
-
-<section id="home" class="page active safe">
-  <div class="brand"><div class="brandD">D</div><div class="brandText"><b>DEXTERS</b><span>BUSINESS PHONE</span></div></div>
-  <div class="hero">
-    <div class="eyebrow">Hello.</div>
-    <h1>Let's make<br>business happen!</h1>
-    <div class="dot"></div>
-    <svg class="chart" viewBox="0 0 180 90">
-      <line x1="0" y1="78" x2="177" y2="78" stroke="#dbe8f6" stroke-width="2" opacity=".8"/>
-      <g fill="#071226" opacity=".92">
-        <rect x="18" y="51" width="18" height="27" rx="2"/>
-        <rect x="52" y="28" width="18" height="50" rx="2"/>
-        <rect x="86" y="38" width="18" height="40" rx="2"/>
-        <rect x="120" y="7" width="18" height="71" rx="2"/>
-        <rect x="154" y="20" width="18" height="58" rx="2"/>
-      </g>
-      <g fill="#e3eef9" opacity=".36">
-        <circle cx="27" cy="47" r="3"/><circle cx="61" cy="24" r="3"/><circle cx="95" cy="34" r="3"/><circle cx="129" cy="3" r="3"/><circle cx="163" cy="16" r="3"/>
-      </g>
-    </svg>
-    <div id="heroDate" class="date">Today</div>
-  </div>
-
-  <div class="grid">
-    <button class="appTile" onclick="shortcut('ai')"><span class="appIcon purple"><svg><use href="#s-ai"/></svg></span><span class="appLabel">Dexter AI</span></button>
-    <button class="appTile" onclick="shortcut('loyalty')"><span class="appIcon yellow"><svg><use href="#s-star"/></svg></span><span class="appLabel">Loyalty</span></button>
-    <button class="appTile" onclick="shortcut('pos')"><span class="appIcon cyan"><svg><use href="#s-pos"/></svg></span><span class="appLabel">POS</span></button>
-    <button class="appTile" onclick="shortcut('backoffice')"><span class="appIcon blue"><svg><use href="#s-brief"/></svg></span><span class="appLabel">Back Office</span></button>
-
-    <button class="appTile" onclick="shortcut('scanner')"><span class="appIcon slate"><svg><use href="#s-qr"/></svg></span><span class="appLabel">Scanner</span></button>
-    <button class="appTile" onclick="shortcut('internet')"><span class="appIcon aqua"><svg><use href="#s-globe"/></svg></span><span class="appLabel">Internet</span></button>
-    <button class="appTile" onclick="shortcut('website')"><span class="appIcon silver"><svg><use href="#s-web"/></svg></span><span class="appLabel">Website</span></button>
-    <button class="appTile" onclick="showPage('business')"><span class="appIcon blue"><svg><use href="#s-brief"/></svg></span><span class="appLabel">Business</span></button>
-
-    <button class="appTile" onclick="shortcut('messages')"><span class="appIcon green" id="messagesIcon"><svg><use href="#s-msg"/></svg></span><span class="appLabel">Messages</span></button>
-    <button class="appTile" onclick="shortcut('phone')"><span class="appIcon white" id="phoneIcon"><svg><use href="#s-phone"/></svg></span><span class="appLabel">Phone</span></button>
-    <button class="appTile" onclick="shortcut('gmail')"><span class="appIcon white" id="gmailIcon"><svg><use href="#s-mail"/></svg></span><span class="appLabel">Gmail</span></button>
-    <button class="appTile" onclick="showPage('store')"><span class="appIcon gold"><svg><use href="#s-d"/></svg></span><span class="appLabel">Dexter Store</span></button>
-  </div>
-
-  <div class="pageDots"><i class="active"></i><i></i></div>
-
-  <div class="dock">
-    <button onclick="shortcut('phone')" aria-label="Phone"><span class="appIcon white"><svg><use href="#s-phone"/></svg></span></button>
-    <button onclick="shortcut('messages')" aria-label="Messages"><span class="appIcon aqua"><svg><use href="#s-msg"/></svg></span></button>
-    <button onclick="shortcut('camera')" aria-label="Camera"><span class="appIcon camera" id="cameraIcon"><svg><use href="#s-camera"/></svg></span></button>
-    <button onclick="showPage('settings')" aria-label="Settings"><span class="appIcon gear"><svg><use href="#s-gear"/></svg></span></button>
-  </div>
-  <div class="footerSpace"></div>
+<section id="home" class="page active">
+<div class="brand"><div class="logo">D</div><div class="brandWords"><b>DEXTERS</b><small>BUSINESS PHONE</small></div></div>
+<div class="hero"><div class="hello">Hello,</div><h1>Let's make<br>business happen.</h1><div class="city"><i class="a"></i><i class="b"></i><i class="c"></i><i class="d"></i><i class="e"></i></div><div class="weather"><span>🌤</span>Glasgow<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;12°C</div><div id="date" class="date">Tue 10 Dec</div></div>
+<div class="apps">
+<button class="app" onclick="url('https://jamiegreen294-boop.github.io/dexters-ai-v1/')"><span class="ico purple"><b style="font-size:26px">🤖</b></span>Dexter AI</button><button class="app" onclick="url('https://app.dextersspot.co.uk')"><span class="ico gold"><b style="font-size:26px">♕</b></span>Loyalty</button><button class="app" onclick="url('https://backoffice.dextersspot.co.uk/pc-pos-test/')"><span class="ico teal"><b style="font-size:26px">▤</b></span>POS</button><button class="app" onclick="url('https://backoffice.dextersspot.co.uk/')"><span class="ico blue"><b style="font-size:26px">♟</b></span>Back Office</button><button class="app" onclick="camera()"><span class="ico slate"><b style="font-size:26px">⌗</b></span>Scanner</button><button class="app" onclick="browser()"><span class="ico blue"><b style="font-size:26px">◎</b></span>Internet</button><button class="app" onclick="url('https://dextersspot.co.uk')"><span class="ico dark"><b style="font-size:26px">◉</b></span>Website</button><button class="app" onclick="show('control')"><span class="ico slate"><b style="font-size:26px">⌂</b></span>Business</button><button class="app" onclick="messages()"><span class="ico green"><b style="font-size:26px">●●●</b></span>Messages</button><button class="app" onclick="phone()"><span class="ico green"><b style="font-size:26px">☎</b></span>Phone</button><button class="app" onclick="launch('com.google.android.gm')"><span class="ico mail"><b style="font-size:26px">✉</b></span>Email</button><button class="app" onclick="show('store')"><span class="ico gold"><b style="font-size:26px">D</b></span>Dexter Store</button>
+</div><div class="dots">• <span>•</span></div><div class="dock"><div class="ico green" onclick="phone()"><b style="font-size:28px">☎</b></div><div class="ico blue" onclick="messages()"><b style="font-size:25px">•••</b></div><div class="ico dark" onclick="camera()"><b style="font-size:27px">◉</b></div><div class="ico dark" onclick="show('settings')"><b style="font-size:27px">⚙</b></div></div>
 </section>
 
-<section id="settings" class="page safe">
-  <div class="headerBar"><button class="back" onclick="showPage('home')">‹</button><div class="headerTitle">Settings</div></div>
-  <div class="sectionTitle">Phone</div>
-  <div class="settingsList">
-    <button class="settingsRow" onclick="nativeSetting('wifi')"><span class="rowIcon"><svg><use href="#s-wifi"/></svg></span><span><b>Network & Internet</b><small>Wi-Fi, mobile network and hotspot</small></span><span class="chev">›</span></button>
-    <button class="settingsRow" onclick="nativeSetting('bluetooth')"><span class="rowIcon"><svg><use href="#s-apps"/></svg></span><span><b>Connected devices</b><small>Bluetooth and paired hardware</small></span><span class="chev">›</span></button>
-    <button class="settingsRow" onclick="nativeSetting('apps')"><span class="rowIcon"><svg><use href="#s-apps"/></svg></span><span><b>Apps & notifications</b><small>Approved business apps</small></span><span class="chev">›</span></button>
-    <button class="settingsRow" onclick="nativeSetting('battery')"><span class="rowIcon"><svg><use href="#s-battery"/></svg></span><span><b>Battery</b><small id="batterySub">Power and battery saver</small></span><span class="chev">›</span></button>
-    <button class="settingsRow" onclick="nativeSetting('storage')"><span class="rowIcon"><svg><use href="#s-storage"/></svg></span><span><b>Storage</b><small>Files and device storage</small></span><span class="chev">›</span></button>
-    <button class="settingsRow" onclick="nativeSetting('security')"><span class="rowIcon"><svg><use href="#s-lock"/></svg></span><span><b>Security & Privacy</b><small>Lock screen and permissions</small></span><span class="chev">›</span></button>
-  </div>
+<section id="control" class="page"><div class="h1">Dexter OS</div><div class="sub">Control Centre</div>
+<div class="ccgrid"><div class="cc" onclick="setting('wifi')"><div class="roundico">⌁</div><div><b>Wi‑Fi</b><small>Connected</small></div></div><div class="cc" onclick="setting('bluetooth')"><div class="roundico">ᛒ</div><div><b>Bluetooth</b><small>On</small></div></div><div class="cc"><div class="roundico green">▥</div><div><b>Mobile Data</b><small>On</small></div></div><div class="cc" onclick="setting('battery')"><div class="roundico green">▣</div><div><b>Battery</b><small id="batt">85%</small></div></div></div>
+<div class="slider">☀ <div class="bar"></div></div><div class="slider">🔊 <div class="bar" style="width:52%"></div></div>
+<div class="quick"><button><div class="qcircle">◐</div>Dark Mode</button><button><div class="qcircle">☾</div>Do Not Disturb</button><button><div class="qcircle">⟳</div>Auto Rotate</button><button><div class="qcircle">🔦</div>Torch</button><button><div class="qcircle">⌖</div>Location</button><button><div class="qcircle">⌁</div>Hotspot</button><button><div class="qcircle">✈</div>Airplane Mode</button><button><div class="qcircle">▣</div>Screen Record</button></div>
+<div class="storejump" onclick="show('store')"><div class="ico gold" style="width:58px;height:58px"><b>▣</b></div><div class="grow"><b>Dexter Store</b><small>Apps, tools and updates</small></div><div class="arrow">›</div></div></section>
 
-  <div class="sectionTitle">Dexter</div>
-  <div class="settingsList">
-    <button class="settingsRow" onclick="shortcut('ai')"><span class="rowIcon"><svg><use href="#s-ai"/></svg></span><span><b>Dexter AI</b><small>Business assistant</small></span><span class="chev">›</span></button>
-    <button class="settingsRow" onclick="showPage('store')"><span class="rowIcon"><svg><use href="#s-apps"/></svg></span><span><b>Dexter Apps</b><small>Approved business apps</small></span><span class="chev">›</span></button>
-    <button class="settingsRow" onclick="showPage('business')"><span class="rowIcon"><svg><use href="#s-brief"/></svg></span><span><b>Business Tools</b><small>POS, scanner and back office</small></span><span class="chev">›</span></button>
-    <button class="settingsRow" onclick="showPage('store')"><span class="rowIcon"><svg><use href="#s-d"/></svg></span><span><b>Dexter Store</b><small>Apps, tools and updates</small></span><span class="chev">›</span></button>
-    <button class="settingsRow" onclick="showPage('about')"><span class="rowIcon"><svg><use href="#s-info"/></svg></span><span><b>About Dexter OS</b><small>Team Preview</small></span><span class="chev">›</span></button>
-  </div>
+<section id="settings" class="page"><div class="h1">Settings</div><div class="search">⌕ &nbsp;&nbsp; Search settings</div><div class="owner"><div class="roundico">D</div><div style="flex:1"><b>Dexters Business</b><small>Owner</small></div><div class="arrow">›</div></div>
+<div class="label">Device</div><div class="group">
+<div class="row" onclick="setting('wifi')"><div class="rIcon">⌁</div><b>Network & Internet</b><div class="arrow">›</div></div><div class="row" onclick="setting('bluetooth')"><div class="rIcon">▣</div><b>Connected Devices</b><div class="arrow">›</div></div><div class="row" onclick="setting('settings')"><div class="rIcon">☀</div><b>Display</b><div class="arrow">›</div></div><div class="row" onclick="setting('settings')"><div class="rIcon">🔊</div><b>Sound & Vibration</b><div class="arrow">›</div></div><div class="row" onclick="setting('battery')"><div class="rIcon">▣</div><b>Battery</b><div class="arrow">›</div></div><div class="row" onclick="setting('storage')"><div class="rIcon">▤</div><b>Storage</b><div class="arrow">›</div></div><div class="row" onclick="setting('security')"><div class="rIcon">⬟</div><b>Security & Privacy</b><div class="arrow">›</div></div></div>
+<div class="label">Dexter</div><div class="group"><div class="row" onclick="url('https://jamiegreen294-boop.github.io/dexters-ai-v1/')"><div class="rIcon">◉</div><b>Dexter AI</b><div class="arrow">›</div></div><div class="row" onclick="show('store')"><div class="rIcon">▦</div><b>Dexter Apps</b><div class="arrow">›</div></div><div class="row" onclick="show('control')"><div class="rIcon">🧰</div><b>Business Tools</b><div class="arrow">›</div></div><div class="row" onclick="show('store')"><div class="rIcon">▣</div><b>Dexter Store</b><div class="arrow">›</div></div><div class="row" onclick="show('about')"><div class="rIcon">●</div><b>About Dexter OS</b><div class="arrow">›</div></div></div>
+<div class="label">Owner</div><div class="group"><div class="row"><div class="rIcon">♙</div><b>Accounts</b><div class="arrow">›</div></div><div class="row" onclick="setting('settings')"><div class="rIcon">⚙</div><b>System</b><div class="arrow">›</div></div></div></section>
 
-  <div class="sectionTitle">Owner</div>
-  <div class="settingsList">
-    <button class="settingsRow" onclick="showPage('accounts')"><span class="rowIcon"><svg><use href="#s-user"/></svg></span><span><b>Accounts</b><small>Managed business accounts</small></span><span class="chev">›</span></button>
-    <button class="settingsRow" onclick="nativeSetting('settings')"><span class="rowIcon"><svg><use href="#s-lock"/></svg></span><span><b>Device management</b><small>Owner-only Android controls</small></span><span class="chev">›</span></button>
-  </div>
-</section>
-
-<section id="accounts" class="page safe">
-  <div class="headerBar"><button class="back" onclick="showPage('settings')">‹</button><div class="headerTitle">Accounts</div></div>
-  <div class="card">
-    <div class="accountTop">
-      <div class="accountLogo"><svg viewBox="0 0 48 48"><path fill="#4285f4" d="M42 24.5c0-1.4-.1-2.8-.4-4H24v8h10.1c-.4 2.1-1.7 3.9-3.6 5.1v6.1h5.8C39.9 36.4 42 31 42 24.5z"/><path fill="#34a853" d="M24 43c5.1 0 9.4-1.7 12.5-4.6l-5.8-4.5c-1.6 1.1-3.7 1.7-6.7 1.7-5.1 0-9.5-3.4-11-8.1H7v5.1C10.1 38.8 16.4 43 24 43z"/><path fill="#fbbc05" d="M13 27.5a11.5 11.5 0 010-7V15.4H7a19 19 0 000 17.2z"/><path fill="#ea4335" d="M24 12.4c2.8 0 5.3 1 7.3 2.9l5.4-5.4C33.4 6.8 29.1 5 24 5 16.4 5 10.1 9.2 7 15.4l6 5.1c1.5-4.7 5.9-8.1 11-8.1z"/></svg></div>
-      <div class="accountText"><b>Google</b><span>Google Password Manager, Play & Wallet</span></div>
-    </div>
-  </div>
-  <div class="sectionTitle">Accounts for Owner</div>
-  <div class="card">
-    <div class="accountTop">
-      <div class="accountLogo"><svg viewBox="0 0 48 48"><use href="#s-mail"/></svg></div>
-      <div class="accountText"><b>casper@dextersspot.co.uk</b><span>Google business account</span><div class="ownerBadge">OWNER</div></div>
-    </div>
-  </div>
-  <div class="card">
-    <b>Dexter-managed account view</b>
-    <p class="subcopy">Normal account management stays inside Dexter OS so the phone keeps the approved design. Android's original account screen is available only from the advanced owner controls.</p>
-  </div>
-</section>
-
-<section id="business" class="page safe">
-  <div class="headerBar"><button class="back" onclick="showPage('home')">‹</button><div class="headerTitle">Business</div></div>
-  <div class="businessGrid">
-    <button class="businessCard" onclick="shortcut('pos')"><span class="appIcon cyan"><svg><use href="#s-pos"/></svg></span><b>POS</b><small>Dexters till</small></button>
-    <button class="businessCard" onclick="shortcut('scanner')"><span class="appIcon slate"><svg><use href="#s-qr"/></svg></span><b>Scanner</b><small>Loyalty scanning</small></button>
-    <button class="businessCard" onclick="shortcut('backoffice')"><span class="appIcon blue"><svg><use href="#s-brief"/></svg></span><b>Back Office</b><small>Admin tools</small></button>
-    <button class="businessCard" onclick="shortcut('loyalty')"><span class="appIcon yellow"><svg><use href="#s-star"/></svg></span><b>Loyalty</b><small>Customer app</small></button>
-  </div>
-</section>
-
-<section id="store" class="page safe">
-  <div class="headerBar"><button class="back" onclick="showPage('home')">‹</button><div class="headerTitle">Dexter Store</div></div>
-  <div class="card"><b>Approved Dexter apps</b><p class="subcopy">The store keeps the dedicated business phone clean. Only approved Dexter and business apps are surfaced here.</p></div>
-  <div class="settingsList">
-    <button class="settingsRow" onclick="shortcut('ai')"><span class="rowIcon"><svg><use href="#s-ai"/></svg></span><span><b>Dexter AI</b><small>Business assistant</small></span><span class="chev">›</span></button>
-    <button class="settingsRow" onclick="shortcut('loyalty')"><span class="rowIcon"><svg><use href="#s-star"/></svg></span><span><b>Loyalty</b><small>Customer rewards and collection</small></span><span class="chev">›</span></button>
-    <button class="settingsRow" onclick="shortcut('pos')"><span class="rowIcon"><svg><use href="#s-pos"/></svg></span><span><b>POS</b><small>Dexters point of sale</small></span><span class="chev">›</span></button>
-    <button class="settingsRow" onclick="shortcut('backoffice')"><span class="rowIcon"><svg><use href="#s-brief"/></svg></span><span><b>Back Office</b><small>Admin and staff tools</small></span><span class="chev">›</span></button>
-  </div>
-</section>
-
-<section id="about" class="page safe">
-  <div class="headerBar"><button class="back" onclick="showPage('settings')">‹</button><div class="headerTitle">About</div></div>
-  <div class="card">
-    <div class="brand" style="margin:0"><div class="brandD">D</div><div class="brandText"><b>DEXTER OS</b><span>TEAM PREVIEW</span></div></div>
-    <p class="subcopy">Dexter OS is the dedicated Dexter's business-phone experience running on Android. This build changes the user-facing launcher and settings experience without changing the live loyalty app, POS, KDS or Back Office projects.</p>
-    <div class="ownerBadge" id="deviceModel">DEXTER BUSINESS PHONE</div>
-  </div>
-</section>
+<section id="store" class="page"><div class="h1">Dexter Store</div><div class="search">⌕ &nbsp;&nbsp; Search apps, tools and updates</div><div class="storehero"><div class="dex"><span style="color:var(--gold)">D</span> DEXTERS</div><div class="tag">TOOLS FOR A<br>STRONGER TOMORROW</div><div class="city" style="bottom:0;height:110px;right:-8px"><i class="a"></i><i class="b"></i><i class="c"></i><i class="d"></i><i class="e"></i></div></div><div class="tabs"><button class="tab on">Featured</button><button class="tab">Business</button><button class="tab">Tools</button><button class="tab">Updates</button></div><div class="storelist">
+<div class="srow"><div class="ico purple"><b style="font-size:24px">✣</b></div><div><b>Dexter AI</b><small>Your AI business assistant</small></div><button class="open" onclick="url('https://jamiegreen294-boop.github.io/dexters-ai-v1/')">Open</button></div><div class="srow"><div class="ico gold"><b style="font-size:24px">♕</b></div><div><b>Loyalty</b><small>Rewards and customer loyalty</small></div><button class="open" onclick="url('https://app.dextersspot.co.uk')">Open</button></div><div class="srow"><div class="ico teal"><b style="font-size:24px">▤</b></div><div><b>POS</b><small>Point of sale made simple</small></div><button class="open" onclick="url('https://backoffice.dextersspot.co.uk/pc-pos-test/')">Open</button></div><div class="srow"><div class="ico teal"><b style="font-size:24px">♟</b></div><div><b>Back Office</b><small>Manage your business</small></div><button class="open" onclick="url('https://backoffice.dextersspot.co.uk/')">Open</button></div><div class="srow"><div class="ico slate"><b style="font-size:24px">⌗</b></div><div><b>Scanner</b><small>Scan and store documents</small></div><button class="open" onclick="camera()">Open</button></div><div class="srow"><div class="ico purple"><b style="font-size:24px">◎</b></div><div><b>Website</b><small>Manage your online presence</small></div><button class="open" onclick="url('https://dextersspot.co.uk')">Open</button></div></div><div class="bottom"><div onclick="show('home')"><b>⌂</b>Home</div><div><b>▦</b>Apps</div><div><b>♧</b>Updates</div><div onclick="show('settings')"><b>♙</b>Account</div></div></section>
+<section id="about" class="page"><div class="h1">About Dexter OS</div><div class="owner"><div class="roundico">D</div><div><b>Dexter OS</b><small id="model">Business Phone</small></div></div><div class="group"><div class="row"><div class="rIcon">●</div><b>Team Preview</b><div></div></div><div class="row"><div class="rIcon">✓</div><b>Managed by Dexters</b><div></div></div></div></section>
 </div>
-<div id="toast"></div>
 <script>
-function bridge(){return window.DexterBridge||null}
-function toast(msg){var t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");clearTimeout(window.__toast);window.__toast=setTimeout(function(){t.classList.remove("show")},1800)}
-function showPage(id){document.querySelectorAll(".page").forEach(function(p){p.classList.remove("active")});var p=document.getElementById(id);if(p){p.classList.add("active");p.scrollTop=0}history.replaceState(null,"","#"+id)}
-function shortcut(key){
-  var b=bridge();
-  if(!b){toast("Dexter phone bridge is not available in this preview.");return}
-  if(key==="ai") b.openUrl("https://jamiegreen294-boop.github.io/dexters-ai-v1/");
-  else if(key==="loyalty") b.openUrl("https://app.dextersspot.co.uk/");
-  else if(key==="pos") b.openUrl("https://backoffice.dextersspot.co.uk/pc-pos-test/");
-  else if(key==="backoffice") b.openUrl("https://backoffice.dextersspot.co.uk/");
-  else if(key==="website") b.openUrl("https://dextersspot.co.uk/");
-  else if(key==="scanner") b.openCamera();
-  else if(key==="internet") b.openBrowser();
-  else if(key==="messages") b.openMessages();
-  else if(key==="phone") b.openPhone();
-  else if(key==="gmail") b.launchPackages("com.google.android.gm");
-  else if(key==="camera") b.openCamera();
-}
-function nativeSetting(key){var b=bridge();if(b)b.openSetting(key);else toast("Android settings are available on the phone build.")}
-function setDate(){
-  var d=new Date();
-  var s=d.toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"});
-  document.getElementById("heroDate").textContent=s;
-}
-function replaceWithNativeIcon(elementId,candidates){
-  var b=bridge(),el=document.getElementById(elementId);if(!b||!el)return;
-  try{
-    var data=b.getAppIcon(candidates);
-    if(data){
-      el.innerHTML="";
-      var img=document.createElement("img");img.className="nativeIcon";img.src=data;img.style.width="100%";img.style.height="100%";img.style.borderRadius="16px";el.appendChild(img);
-    }
-  }catch(e){}
-}
-function hydrate(){
-  setDate();
-  var b=bridge();
-  if(b){
-    try{var battery=b.getBatteryLevel();if(battery>=0)document.getElementById("batterySub").textContent=battery+"% · Power and battery saver"}catch(e){}
-    try{var model=b.getDeviceModel();if(model)document.getElementById("deviceModel").textContent="DEXTER BUSINESS PHONE · "+model}catch(e){}
-    replaceWithNativeIcon("gmailIcon","com.google.android.gm");
-  }
-  var h=location.hash.replace("#","");
-  if(["settings","accounts","business","store","about"].indexOf(h)>=0)showPage(h);
-}
-window.addEventListener("load",hydrate);
-window.addEventListener("popstate",function(){showPage("home")});
-</script>
-</body>
-</html>
+let current='home';
+function show(id){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.getElementById(id).classList.add('active');current=id;window.scrollTo(0,0)}
+function B(){return window.DexterBridge||null}
+function url(u){try{B().openUrl(u)}catch(e){location.href=u}}
+function camera(){try{B().openCamera()}catch(e){}}
+function browser(){try{B().openBrowser()}catch(e){}}
+function messages(){try{B().openMessages()}catch(e){}}
+function phone(){try{B().openPhone()}catch(e){}}
+function launch(p){try{B().launchPackages(p)}catch(e){}}
+function setting(k){try{B().openSetting(k)}catch(e){}}
+function dexterBack(){if(current!=='home'){show('home');return true}return false}
+try{let b=B();let v=b.getBatteryLevel();if(v>=0)document.getElementById('batt').textContent=v+'%';document.getElementById('model').textContent='Business Phone · '+b.getDeviceModel()}catch(e){}
+setTimeout(()=>document.getElementById('boot').style.display='none',1500);
+</script></body></html>
