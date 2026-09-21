@@ -1,0 +1,21 @@
+{
+  "name": "Dexter OS",
+  "edition": "Team",
+  "channel": "preview",
+  "version": "0.1.0",
+  "base": "Android/AOSP compatibility preview",
+  "roles": ["owner", "manager", "staff", "support"],
+  "coreSurfaces": [
+    "Boot Handoff",
+    "Lock Screen",
+    "Dexter Home",
+    "Control Centre",
+    "Notifications",
+    "Dexter Settings",
+    "Managed Internet",
+    "Device Health",
+    "Dexter AI"
+  ],
+  "updateChannels": ["test", "beta", "stable"],
+  "destructiveActionsRequireOwnerApproval": true
+}
