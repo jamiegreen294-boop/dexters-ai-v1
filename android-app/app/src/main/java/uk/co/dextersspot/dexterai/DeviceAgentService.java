@@ -77,11 +77,13 @@ public class DeviceAgentService extends Service {
         while (running) {
             try {
                 heartbeat();
+            } catch (Exception e) {
+                recordAgentError("heartbeat: " + String.valueOf(e.getMessage()));
+            }
+            try {
                 pollJobs();
             } catch (Exception e) {
-                getSharedPreferences("dexter_device",MODE_PRIVATE).edit()
-                    .putString("agent_last_error",String.valueOf(e.getMessage()))
-                    .putLong("agent_last_error_at",System.currentTimeMillis()).apply();
+                recordAgentError("pollJobs: " + String.valueOf(e.getMessage()));
             }
             try { Thread.sleep(30000); } catch (InterruptedException e) { return; }
         }
@@ -89,6 +91,12 @@ public class DeviceAgentService extends Service {
 
     private String token() {
         return readToken(this);
+    }
+
+    private void recordAgentError(String message) {
+        getSharedPreferences("dexter_device",MODE_PRIVATE).edit()
+            .putString("agent_last_error",message == null ? "unknown" : message)
+            .putLong("agent_last_error_at",System.currentTimeMillis()).apply();
     }
 
     private JSONObject post(JSONObject body) throws Exception {
@@ -120,7 +128,14 @@ public class DeviceAgentService extends Service {
         cap.put("remoteWipe",DexterDeviceAdminReceiver.isDeviceOwner(this));
         cap.put("internetPolicy",DexterDeviceAdminReceiver.isDeviceOwner(this));
         cap.put("configSnapshot",true);
-        info.put("capabilities",cap);info.put("management",DeviceOwnerPolicy.status(this));
+        info.put("capabilities",cap);
+        try {
+            info.put("management",DeviceOwnerPolicy.status(this));
+        } catch (Exception e) {
+            info.put("management",new JSONObject()
+                .put("deviceOwner",DexterDeviceAdminReceiver.isDeviceOwner(this))
+                .put("statusError",String.valueOf(e.getMessage())));
+        }
         post(new JSONObject().put("action","device_heartbeat").put("sessionId",UUID.randomUUID().toString()).put("info",info));
         getSharedPreferences("dexter_device",MODE_PRIVATE).edit()
             .putLong("agent_last_success_at",System.currentTimeMillis())
@@ -173,7 +188,13 @@ public class DeviceAgentService extends Service {
         j.put("appVersion",appVersion());
         j.put("securityPatch",Build.VERSION.SECURITY_PATCH);
         j.put("buildDisplay",Build.DISPLAY);
-        j.put("management",DeviceOwnerPolicy.status(this));
+        try {
+            j.put("management",DeviceOwnerPolicy.status(this));
+        } catch (Exception e) {
+            j.put("management",new JSONObject()
+                .put("deviceOwner",DexterDeviceAdminReceiver.isDeviceOwner(this))
+                .put("statusError",String.valueOf(e.getMessage())));
+        }
         return j;
     }
 
