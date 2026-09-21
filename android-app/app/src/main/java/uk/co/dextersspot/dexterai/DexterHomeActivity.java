@@ -135,6 +135,7 @@ public class DexterHomeActivity extends Activity {
         addPackageTile(p1,"Square",new String[]{"com.squareup","com.squareup.pos"},"Square");
         addWebTile(p1,"Website","D",Color.rgb(47,94,79),v->openWeb("https://dextersspot.co.uk"));
         addWebTile(p1,"Business","▦",Color.rgb(83,83,89),v->startActivity(new Intent(this,BusinessAppsActivity.class)));
+        addWebTile(p1,"Messages","✉",Color.rgb(239,139,34),v->startActivity(new Intent(this,DexterInboxActivity.class)));
 
         GridLayout p2=appPage();
         addPackageTile(p2,"Camera",new String[]{"com.android.camera2","com.android.camera","com.meizu.media.camera"},"Camera");
