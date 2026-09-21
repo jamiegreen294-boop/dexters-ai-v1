@@ -39,7 +39,7 @@ public class DexterHomeActivity extends Activity {
         getWindow().setStatusBarColor(Color.rgb(13,18,17));
         getWindow().setNavigationBarColor(Color.rgb(13,18,17));
         gestureDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
-            @Override public boolean onDown(MotionEvent e) { return false; }
+            @Override public boolean onDown(MotionEvent e) { return true; }
             @Override public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
                 if (e1 == null || e2 == null || pages == null) return false;
                 float dx = e2.getX() - e1.getX();
