@@ -178,6 +178,32 @@ public final class DexterLocalAdb extends AbsAdbConnectionManager {
         return out;
     }
 
+    public synchronized JSONObject runShellCommand(String command) {
+        JSONObject out = new JSONObject();
+        try {
+            boolean connected = false;
+            String method = "saved";
+            android.content.SharedPreferences p = context.getSharedPreferences("dexter_local_adb", Context.MODE_PRIVATE);
+            String host = p.getString("host", "127.0.0.1");
+            int port = p.getInt("port", 5555);
+            try { connected = connect(host, port); } catch (Exception ignored) {}
+            if (!connected) {
+                method = "tls-discovery";
+                try { connected = connectTls(context, 8000L); } catch (Exception ignored) {}
+            }
+            if (!connected) {
+                method = "auto-discovery";
+                try { connected = autoConnect(context, 8000L); } catch (Exception ignored) {}
+            }
+            if (!connected) return out.put("connected", false).put("error", "Local ADB connection failed");
+            out.put("connected", true).put("connectionMethod", method);
+            out.put("output", shell(command));
+        } catch (Exception e) {
+            try { out.put("error", safe(e)); } catch (Exception ignored) {}
+        }
+        return out;
+    }
+
     private String shell(String command) throws Exception {
         AdbStream stream = openStream("shell:" + command);
         try {
