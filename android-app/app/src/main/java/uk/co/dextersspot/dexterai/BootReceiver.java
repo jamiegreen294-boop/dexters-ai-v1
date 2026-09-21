@@ -12,9 +12,9 @@ public class BootReceiver extends BroadcastReceiver {
             if (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction()) ||
                 Intent.ACTION_LOCKED_BOOT_COMPLETED.equals(intent.getAction())) {
                 try {
-                    Intent home = new Intent(context, DexterHomeActivity.class);
-                    home.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-                    context.startActivity(home);
+                    Intent splash = new Intent(context, DexterBootSplashActivity.class);
+                    splash.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NO_HISTORY);
+                    context.startActivity(splash);
                 } catch (Exception ignored) {}
             }
         }
