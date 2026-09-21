@@ -8,7 +8,7 @@ android {
         applicationId 'uk.co.dextersspot.dexterai'
         minSdk 26
         targetSdk 35
-        versionCode 17
+        versionCode 18
         versionName '16.0-autonomous-agent'
     }
 
