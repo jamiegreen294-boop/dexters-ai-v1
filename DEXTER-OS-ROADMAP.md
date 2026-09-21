@@ -11,6 +11,7 @@ Deliverables:
 - Dexter Settings
 - Staff / Owner modes
 - managed Internet
+- Dexter Store with approved Google Play apps
 - business app catalogue
 - notifications surface
 - device health panel
