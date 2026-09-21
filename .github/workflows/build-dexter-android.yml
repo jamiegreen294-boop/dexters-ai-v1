@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - build/meizu-dexter-os-v39-verified
+      - build/meizu-dexter-os-v40-buttons
     paths:
       - 'android-app/**'
       - '.github/workflows/build-dexter-android.yml'
@@ -52,7 +52,7 @@ jobs:
       - name: Upload signed managed artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Dexter-Business-Phone-v39
+          name: Dexter-Business-Phone-v40
           path: android-app/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
 
@@ -67,14 +67,14 @@ jobs:
           if [ -f "$RUNNER_TEMP/gh-pages/device/Dexter-Business-Phone-v37.apk" ] && [ ! -f "$RUNNER_TEMP/gh-pages/device/Dexter-Business-Phone-v37-rollback.apk" ]; then
             cp "$RUNNER_TEMP/gh-pages/device/Dexter-Business-Phone-v37.apk" "$RUNNER_TEMP/gh-pages/device/Dexter-Business-Phone-v37-rollback.apk"
           fi
-          cp android-app/app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/gh-pages/device/Dexter-Business-Phone-v39.apk"
+          cp android-app/app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/gh-pages/device/Dexter-Business-Phone-v40.apk"
           cp android-app/app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/gh-pages/device/Dexter-Business-Phone-v37.apk"
           cd "$RUNNER_TEMP/gh-pages"
-          git add device/Dexter-Business-Phone-v39.apk device/Dexter-Business-Phone-v37.apk device/Dexter-Business-Phone-v37-rollback.apk
+          git add device/Dexter-Business-Phone-v40.apk device/Dexter-Business-Phone-v37.apk device/Dexter-Business-Phone-v37-rollback.apk
           if git diff --cached --quiet; then
             echo "Dexter OS managed APK already current"
           else
-            git commit -m "Publish Dexter Business Phone v39 verified navigation and controls"
+            git commit -m "Publish Dexter Business Phone v40 button and navigation fixes"
             for attempt in 1 2 3; do
               if git push origin HEAD:gh-pages; then break; fi
               git fetch origin gh-pages
