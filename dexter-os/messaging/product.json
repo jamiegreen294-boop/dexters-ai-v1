@@ -1,0 +1,29 @@
+{
+  "name": "Dexter Messaging",
+  "version": "0.1.0",
+  "components": {
+    "team": {
+      "name": "Dexter Messages",
+      "transport": "internet",
+      "carrierFeePerMessage": false
+    },
+    "customer": {
+      "name": "Dexter Chat",
+      "surfaces": ["loyalty-app", "website", "future-customer-app"],
+      "aiFirstResponse": true,
+      "staffTakeover": true
+    },
+    "broadcast": {
+      "name": "Dexter Send",
+      "freeChannels": ["in-app", "web-push", "pwa-push", "team-broadcast", "email"],
+      "carrierChannels": ["sms", "mms", "rcs", "whatsapp-business"],
+      "showCostBeforePaidSend": true
+    }
+  },
+  "senderNames": {
+    "app": "Dexter",
+    "push": "Dexter",
+    "email": "Dexter",
+    "smsRequested": "DEXTER"
+  }
+}
