@@ -14,7 +14,7 @@
     <application
         android:allowBackup="false"
         android:usesCleartextTraffic="false"
-        android:label="Dexter Business Phone"
+        android:label="Dexter OS Preview"
         android:icon="@drawable/ic_launcher"
         android:theme="@style/AppTheme">
 
@@ -73,11 +73,14 @@
         <activity android:name=".BusinessAppsActivity" android:exported="false"/>
         <activity android:name=".DexterStoreActivity" android:exported="false"/>
         <activity android:name=".DexterInboxActivity" android:exported="false"/>
+        <activity android:name=".DexterControlCentreActivity" android:exported="false"/>
+        <activity android:name=".DexterSettingsActivity" android:exported="false"/>
         <activity android:name=".QuickStartActivity" android:exported="false"/>
 
         <activity
             android:name=".DexterHomeActivity"
             android:exported="true"
+            android:launchMode="singleTask"
             android:screenOrientation="unspecified">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
