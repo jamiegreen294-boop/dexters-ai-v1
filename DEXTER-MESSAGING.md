@@ -1,73 +1,67 @@
-# Dexter Send — One-Way Notifications
+# Dexter Send — Hybrid Free Messaging + SMS Fallback
 
-Dexter Send is a one-way notification system for Dexter customers and Dexter team devices.
+Dexter Send should feel like SMS to staff, but use a free internet route whenever possible.
 
-## Purpose
-Only two message types are required:
-1. Order notifications
-2. Promotional messages
+## Important technical rule
+A normal SMS sent to an arbitrary mobile number is carried by the mobile network and cannot be made universally free by Dexter. iMessage is free between Apple users because both devices use Apple's internet messaging service rather than SMS.
 
-Customers do not reply inside Dexter Send.
+Dexter Send therefore uses the same model:
 
-## Sender
-Every Dexter-owned notification must visibly identify the sender as **Dexters**.
+### Free Dexter route
+When a customer has the Dexter Loyalty app/PWA or future Dexter customer app:
+- send over Wi-Fi/mobile data
+- show a normal push notification from **Dexters**
+- keep a notification/message history in the Dexter app
+- no SMS carrier fee per message
+- one-way only for order updates and promotions
 
-Examples:
-- Dexters — Your order has been accepted
-- Dexters — Your order is being prepared
-- Dexters — Your order is ready for collection
-- Dexters — Sunday Roast orders are now open
-- Dexters — This week's offer is now live
+### SMS fallback
+When the customer does not have a reachable Dexter app/push subscription:
+- Dexter Send may fall back to SMS
+- sender should request the brand name **DEXTERS** where supported
+- no reply is required
+- SMS provider/carrier charges still apply
+- show the expected cost before bulk promotional sends
 
-## Free delivery channels
-Dexter Send should prefer internet-based delivery so there is no SMS charge per message:
-- Dexter Loyalty app/PWA push notifications
-- Dexter customer app push notifications
-- Dexter OS team-device notifications
-- in-app notification inbox
-- web push where supported
+## Staff experience
+Staff should not have to choose the transport manually.
 
-These channels use Wi-Fi/mobile data. They avoid SMS carrier fees, although backend hosting and push infrastructure can still have normal service costs.
+They choose the customer/message and Dexter Send decides:
+1. Dexter push/data message — free route
+2. in-app inbox
+3. email fallback if enabled
+4. SMS fallback only when needed
 
-## No-reply design
-- No customer reply box
-- No inbound SMS handling
-- No two-way chat requirement
-- No reply phone number required
-- Notifications deep-link to the relevant Dexter page where useful
-- Promotional notifications include the required marketing preference / opt-out controls
+The message composer should display:
+- Free delivery
+- SMS fallback required
+- Estimated paid SMS count/cost
 
-## Order notification events
+## Message types
+### Order notifications
 - order received
-- order accepted
-- order amended
-- order rejected
-- cooking / preparing
+- accepted
+- amended
+- rejected
+- preparing
 - ready for collection
 - collected
-- payment / deposit reminder where appropriate
 
-## Promotions
+### Promotions
 - offers
 - meal deals
 - Sunday Roast
 - seasonal menus
 - loyalty rewards
 - opening-hours announcements
-- events and fundraising
-
-## Delivery priority
-1. Push notification
-2. In-app inbox
-3. Email fallback where enabled
-
-SMS is not part of the free default route.
+- events/fundraising
 
 ## Branding
-App notification title: **Dexters**
-Notification icon: Dexter logo
-Notification deep-link: the relevant Dexter app/order/offer screen
+- App/push sender: **Dexters**
+- Notification icon: Dexter logo
+- SMS sender requested: **DEXTERS** where supported by provider/network
+- No-reply design
 
 ## Consent
 Order notifications are transactional service messages.
-Promotional messages are sent only where the customer has the required marketing preference recorded.
+Promotional messages require the customer's recorded marketing preference and opt-out handling.
