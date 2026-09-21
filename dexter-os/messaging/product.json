@@ -1,31 +1,31 @@
 {
   "name": "Dexter Send",
-  "version": "0.2.0",
-  "mode": "one-way-notifications",
+  "version": "0.3.0",
+  "mode": "hybrid-free-data-with-sms-fallback",
   "sender": "Dexters",
   "replies": false,
   "messageTypes": [
     "order-notification",
     "promotion"
   ],
-  "freeDefaultChannels": [
+  "routingPriority": [
     "loyalty-pwa-push",
     "customer-app-push",
-    "dexter-os-push",
     "in-app-inbox",
-    "web-push"
+    "email-fallback",
+    "sms-fallback"
   ],
-  "paidChannelsDefaultEnabled": false,
-  "smsDefaultEnabled": false,
-  "transactionalEvents": [
-    "order-received",
-    "order-accepted",
-    "order-amended",
-    "order-rejected",
-    "preparing",
-    "ready-for-collection",
-    "collected"
-  ],
+  "sms": {
+    "enabled": true,
+    "fallbackOnly": true,
+    "requestedSenderId": "DEXTERS",
+    "carrierCostPossible": true,
+    "requireCostPreviewForBulk": true
+  },
+  "freeRoute": {
+    "requiresReachableDexterAppOrPushSubscription": true,
+    "carrierSmsFeePerMessage": false
+  },
   "promotionsRequireMarketingPreference": true,
   "notificationBranding": {
     "title": "Dexters",
