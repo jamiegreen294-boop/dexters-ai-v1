@@ -52,3 +52,14 @@ Public Dexter AI tables use RLS. Tables without client policies are intentionall
 ## Legacy API
 
 `/api/chat` no longer has a separate model/personality. It forwards to the Supabase command centre so Dexter has one AI path.
+
+
+## Strict visual completion rule
+
+UI/design/mock-up tasks use the Dexter Visual Verifier before they can be marked complete.
+
+- A commit, deployment, successful build or page load is not visual proof.
+- The rendered target is opened through the browser worker when a verifiable URL is available.
+- Dexter records visual evidence and concrete mismatches as a persistent verification artifact.
+- If evidence is missing, the page has relevant errors, or the requested visual result does not match, the task stops at `needs_verification` instead of `completed`.
+- Only a passing visual verification allows the normal completed state.
