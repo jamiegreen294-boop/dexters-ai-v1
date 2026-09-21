@@ -73,8 +73,9 @@ jobs:
           cp android-app/app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/gh-pages/device/Dexter-Business-Phone-v17.apk"
           cp android-app/app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/gh-pages/device/Dexter-Business-Phone-v18.apk"
           cp android-app/app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/gh-pages/device/Dexter-Business-Phone-v19.apk"
+          cp android-app/app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/gh-pages/device/Dexter-Business-Phone-v20.apk"
           cd "$RUNNER_TEMP/gh-pages"
-          git add device/Dexter-Business-Phone-Release-v6.apk device/Dexter-Business-Phone-v17.apk device/Dexter-Business-Phone-v18.apk device/Dexter-Business-Phone-v19.apk
+          git add device/Dexter-Business-Phone-Release-v6.apk device/Dexter-Business-Phone-v17.apk device/Dexter-Business-Phone-v18.apk device/Dexter-Business-Phone-v19.apk device/Dexter-Business-Phone-v20.apk
           if git diff --cached --quiet; then
             echo "Provisioning APK already current"
           else
