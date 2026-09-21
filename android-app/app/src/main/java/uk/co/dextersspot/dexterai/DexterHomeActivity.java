@@ -137,7 +137,7 @@ public class DexterHomeActivity extends Activity {
         addWebTile(p1,"Business","▦",Color.rgb(83,83,89),v->startActivity(new Intent(this,BusinessAppsActivity.class)));
 
         GridLayout p2=appPage();
-        addPackageTile(p2,"Camera",new String[]{"com.android.camera","com.meizu.media.camera"},"Camera");
+        addPackageTile(p2,"Camera",new String[]{"com.android.camera2","com.android.camera","com.meizu.media.camera"},"Camera");
         addPackageTile(p2,"Calculator",new String[]{"com.google.android.calculator","com.android.calculator2"},"Calculator");
         addWebTile(p2,"Quick Start","i",Color.rgb(69,132,239),v->startActivity(new Intent(this,QuickStartActivity.class)));
         addWebTile(p2,"Wi-Fi","⌁",Color.rgb(57,133,246),v->startActivity(new Intent(Settings.ACTION_WIFI_SETTINGS)));
@@ -343,6 +343,12 @@ public class DexterHomeActivity extends Activity {
                 }
             }
         }catch(Exception ignored){}
+        try{
+            Intent market=new Intent(Intent.ACTION_VIEW,Uri.parse("market://search?q="+Uri.encode(label)+"&c=apps"));
+            startActivity(market);
+        }catch(Exception ignored){
+            try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse("https://play.google.com/store/search?q="+Uri.encode(label)+"&c=apps")));}catch(Exception ignoredToo){}
+        }
     }
 
     private GradientDrawable round(int color,int radius){
