@@ -11,6 +11,9 @@ Deliverables:
 - Dexter Settings
 - Staff / Owner modes
 - managed Internet
+- Dexter Messages team chat
+- Dexter Chat customer messaging
+- Dexter Send notifications and campaigns
 - Dexter Store with approved Google Play apps
 - business app catalogue
 - notifications surface
