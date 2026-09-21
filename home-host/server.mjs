@@ -1083,12 +1083,28 @@ function findAdb(){
     explicit,
     path.join(process.env.LOCALAPPDATA||"","Android","Sdk","platform-tools","adb.exe"),
     path.join(process.env.USERPROFILE||"","AppData","Local","Android","Sdk","platform-tools","adb.exe"),
+    path.join(WORKSPACE,"android-tools","platform-tools","adb.exe"),
     path.join(WORKSPACE,"android-tools","adb.exe")
   ].filter(Boolean);
-  return candidates.find(p=>fs.existsSync(p))||"adb";
+  return candidates.find(p=>fs.existsSync(p))||null;
+}
+async function ensureAdb(){
+  const existing=findAdb(); if(existing)return existing;
+  if(process.platform!=="win32")throw new Error("ADB is not installed and automatic platform-tools setup is only enabled on the Dexter Windows PC.");
+  const root=path.join(WORKSPACE,"android-tools");
+  const zip=path.join(root,"platform-tools-latest-windows.zip");
+  fs.mkdirSync(root,{recursive:true});
+  const url="https://dl.google.com/android/repository/platform-tools-latest-windows.zip";
+  const r=await fetch(url,{cache:"no-store"}); if(!r.ok)throw new Error("Android platform-tools download failed HTTP "+r.status);
+  fs.writeFileSync(zip,Buffer.from(await r.arrayBuffer()));
+  await runHardwarePowerShell("Expand-Archive -Path "+JSON.stringify(zip)+" -DestinationPath "+JSON.stringify(root)+" -Force",120000);
+  try{fs.unlinkSync(zip)}catch{}
+  const adb=findAdb(); if(!adb)throw new Error("Android platform-tools installed but adb.exe was not found.");
+  return adb;
 }
 async function adbRun(args,timeout=60000){
-  const result=await runProcess(findAdb(),args,WORKSPACE,timeout);
+  const adb=await ensureAdb();
+  const result=await runProcess(adb,args,WORKSPACE,timeout);
   if(result.code!==0)throw new Error(String(result.stderr||result.stdout||"ADB command failed").slice(0,3000));
   return result;
 }
