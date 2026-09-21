@@ -58,17 +58,19 @@
   async function ensureNativeAgentEnrollment(){
     if(!nativePhone())return;
     try{
-      if(window.DexterDevice.isPaired())return;
       const deviceId=window.DexterDevice.getDeviceId();
       const info=JSON.parse(window.DexterDevice.getDeviceInfo());
+      // Refresh the device credential from the signed-in owner session even if
+      // an older token exists. This repairs stale/replaced phone-agent tokens
+      // without ADB or reinstalling the Android app.
       const d=await api({action:"device_enroll",deviceId,name:"Dexter Meizu Business Phone",info});
       if(d&&d.deviceToken&&window.DexterDevice.saveDeviceToken(d.deviceToken)){
         const state=document.getElementById("phoneState");
-        if(state)state.textContent="Paired automatically — agent started";
+        if(state)state.textContent="Agent credential refreshed — connected";
       }
     }catch(e){
       const state=document.getElementById("phoneState");
-      if(state)state.textContent="Agent pairing needs owner sign-in";
+      if(state)state.textContent="Agent credential refresh needs owner sign-in";
     }
   }
   function wire(){
