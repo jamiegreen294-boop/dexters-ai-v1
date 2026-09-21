@@ -1,94 +1,73 @@
-# Dexter Messaging Platform
+# Dexter Send — One-Way Notifications
 
-Dexter Messaging is the communications layer for Dexter OS and the wider Dexter customer experience.
+Dexter Send is a one-way notification system for Dexter customers and Dexter team devices.
 
-## 1. Dexter Messages — team messaging
-A private internet-based messaging app for the Dexter team, similar in use to iMessage/WhatsApp but owned by Dexter.
+## Purpose
+Only two message types are required:
+1. Order notifications
+2. Promotional messages
 
-### Core features
-- 1-to-1 staff chat
-- team/group chats
-- manager announcements
-- read receipts
-- typing indicators
-- message reactions
-- photo/file sharing
-- voice notes
-- message search
-- staff directory
-- role-based groups
-- device notifications
-- optional disappearing messages for non-record business chat
-- audit/retention rules for business-critical channels
-- owner/admin moderation tools
+Customers do not reply inside Dexter Send.
 
-### Cost model
-Messages travel over Wi-Fi/mobile data through Dexter's backend. There is no per-message SMS charge for Dexter-to-Dexter messages. Hosting/storage still has infrastructure cost, so "free" means no carrier/SMS fee per message, not zero operating cost forever.
+## Sender
+Every Dexter-owned notification must visibly identify the sender as **Dexters**.
 
-## 2. Dexter Chat — customer messaging
-A customer-facing chat system for the Loyalty app / website / future Dexter customer app.
+Examples:
+- Dexters — Your order has been accepted
+- Dexters — Your order is being prepared
+- Dexters — Your order is ready for collection
+- Dexters — Sunday Roast orders are now open
+- Dexters — This week's offer is now live
 
-### Customer experience
-- message Dexter from the Loyalty app
-- message from the website
-- order/help questions
-- send photos
-- automated Dexter AI first response
-- staff takeover
-- conversation history
-- order/customer context
-- push notifications when the customer has the app/PWA installed
+## Free delivery channels
+Dexter Send should prefer internet-based delivery so there is no SMS charge per message:
+- Dexter Loyalty app/PWA push notifications
+- Dexter customer app push notifications
+- Dexter OS team-device notifications
+- in-app notification inbox
+- web push where supported
 
-### Staff experience
-- unified inbox
-- customer profile beside conversation
-- unread / assigned / waiting / resolved states
-- manager escalation
-- canned replies
-- AI reply suggestions
-- staff takeover from AI
+These channels use Wi-Fi/mobile data. They avoid SMS carrier fees, although backend hosting and push infrastructure can still have normal service costs.
 
-## 3. Dexter Send — outbound communications
-Dexter Send is the Dexter-owned campaign and notification service.
+## No-reply design
+- No customer reply box
+- No inbound SMS handling
+- No two-way chat requirement
+- No reply phone number required
+- Notifications deep-link to the relevant Dexter page where useful
+- Promotional notifications include the required marketing preference / opt-out controls
 
-### Free/no-carrier-cost channels
-- in-app messages
-- web push notifications
-- PWA push notifications
-- Dexter Messages team broadcasts
-- customer app notifications
-- email from Dexter-owned domains (subject to email provider/infrastructure limits)
+## Order notification events
+- order received
+- order accepted
+- order amended
+- order rejected
+- cooking / preparing
+- ready for collection
+- collected
+- payment / deposit reminder where appropriate
 
-### Paid carrier channels
-- SMS
-- MMS
-- RCS where provider billing applies
-- WhatsApp Business messaging outside free service windows / according to provider pricing
+## Promotions
+- offers
+- meal deals
+- Sunday Roast
+- seasonal menus
+- loyalty rewards
+- opening-hours announcements
+- events and fundraising
 
-Dexter Send must always show the true channel cost before a paid-carrier campaign is sent.
+## Delivery priority
+1. Push notification
+2. In-app inbox
+3. Email fallback where enabled
 
-## Sender identity
-For Dexter-owned app, push and email channels, the visible sender can be "Dexter" or "Dexters" because Dexter controls the app/service.
+SMS is not part of the free default route.
 
-For SMS, an alphanumeric sender ID such as "DEXTER" may be possible through an SMS provider in supported destinations, but it is not the same as owning a phone number and usually cannot receive replies. Availability and registration rules depend on the network/provider/country.
+## Branding
+App notification title: **Dexters**
+Notification icon: Dexter logo
+Notification deep-link: the relevant Dexter app/order/offer screen
 
-## Architecture
-- Supabase/Postgres conversation store
-- realtime message delivery
-- push notification service
-- Dexter AI routing
-- owner/admin permissions
-- customer/staff identity mapping
-- attachment storage
-- delivery/read receipts
-- campaign engine
-- templates
-- opt-out/consent handling
-- retention/audit policy
-
-## Safety / permissions
-- customer marketing must respect recorded consent and opt-out
-- transactional and service messages must be distinguishable from marketing
-- staff access is role controlled
-- owner can suspend accounts/devices
-- destructive/admin actions require owner approval
+## Consent
+Order notifications are transactional service messages.
+Promotional messages are sent only where the customer has the required marketing preference recorded.
