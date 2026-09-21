@@ -8,6 +8,7 @@ import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
@@ -16,8 +17,8 @@ import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.Window;
-import android.widget.Button;
 import android.widget.GridLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextClock;
 import android.widget.TextView;
@@ -25,10 +26,8 @@ import android.widget.ViewFlipper;
 import java.util.List;
 
 public class DexterHomeActivity extends Activity {
-    private final int bg = Color.rgb(18,18,20);
     private final int text = Color.WHITE;
-    private final int muted = Color.rgb(190,190,195);
-    private final int glass = Color.argb(205,55,55,60);
+    private final int muted = Color.rgb(205,205,210);
     private ViewFlipper pages;
     private TextView pageDots;
     private float downX;
@@ -36,8 +35,8 @@ public class DexterHomeActivity extends Activity {
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
         requestWindowFeature(Window.FEATURE_NO_TITLE);
-        getWindow().setStatusBarColor(bg);
-        getWindow().setNavigationBarColor(bg);
+        getWindow().setStatusBarColor(Color.rgb(13,18,17));
+        getWindow().setNavigationBarColor(Color.rgb(13,18,17));
         render();
     }
 
@@ -49,90 +48,99 @@ public class DexterHomeActivity extends Activity {
     private void render() {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(14), dp(14), dp(14), dp(12));
-        root.setBackgroundColor(bg);
+        root.setPadding(dp(14), dp(10), dp(14), dp(12));
 
-        LinearLayout clockWrap = new LinearLayout(this);
-        clockWrap.setOrientation(LinearLayout.VERTICAL);
-        clockWrap.setGravity(Gravity.CENTER_HORIZONTAL);
-        clockWrap.setPadding(0, dp(4), 0, dp(8));
-        root.addView(clockWrap, new LinearLayout.LayoutParams(-1, -2));
+        GradientDrawable wallpaper = new GradientDrawable(
+            GradientDrawable.Orientation.TL_BR,
+            new int[]{Color.rgb(11,19,18), Color.rgb(22,29,26), Color.rgb(16,16,18)}
+        );
+        root.setBackground(wallpaper);
+
+        LinearLayout top = new LinearLayout(this);
+        top.setOrientation(LinearLayout.VERTICAL);
+        top.setGravity(Gravity.CENTER_HORIZONTAL);
+        top.setPadding(dp(4), dp(6), dp(4), dp(10));
+        root.addView(top, new LinearLayout.LayoutParams(-1,-2));
 
         TextClock clock = new TextClock(this);
         clock.setFormat24Hour("HH:mm");
         clock.setFormat12Hour("HH:mm");
         clock.setTextColor(text);
-        clock.setTextSize(44);
-        clock.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        clock.setTextSize(46);
+        clock.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
         clock.setGravity(Gravity.CENTER);
-        clockWrap.addView(clock, new LinearLayout.LayoutParams(-1,-2));
+        top.addView(clock,new LinearLayout.LayoutParams(-1,-2));
 
         TextClock date = new TextClock(this);
-        date.setFormat24Hour("EEEE d MMMM");
-        date.setFormat12Hour("EEEE d MMMM");
+        date.setFormat24Hour("EEEE, d MMMM");
+        date.setFormat12Hour("EEEE, d MMMM");
         date.setTextColor(muted);
-        date.setTextSize(15);
+        date.setTextSize(14);
         date.setGravity(Gravity.CENTER);
-        clockWrap.addView(date, new LinearLayout.LayoutParams(-1,-2));
+        top.addView(date,new LinearLayout.LayoutParams(-1,-2));
 
-        TextView managed = new TextView(this);
-        managed.setText("Dexter Business Phone");
-        managed.setTextColor(muted);
-        managed.setTextSize(12);
-        managed.setGravity(Gravity.CENTER);
-        managed.setPadding(0,dp(3),0,0);
-        clockWrap.addView(managed);
+        TextView badge = new TextView(this);
+        badge.setText("DEXTERS");
+        badge.setTextColor(Color.WHITE);
+        badge.setTextSize(10);
+        badge.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
+        badge.setGravity(Gravity.CENTER);
+        badge.setPadding(dp(12),dp(5),dp(12),dp(5));
+        badge.setBackground(round(Color.argb(150,255,255,255),14));
+        LinearLayout.LayoutParams badgeLp=new LinearLayout.LayoutParams(-2,-2);
+        badgeLp.topMargin=dp(7);
+        top.addView(badge,badgeLp);
 
         pages = new ViewFlipper(this);
-        root.addView(pages, new LinearLayout.LayoutParams(-1, 0, 1f));
+        root.addView(pages,new LinearLayout.LayoutParams(-1,0,1f));
 
-        GridLayout page1 = appPage();
-        addTile(page1,"Dexter AI","AI",Color.rgb(50,110,255),v->openWeb("https://jamiegreen294-boop.github.io/dexters-ai-v1/?android-app=1"));
-        addTile(page1,"Loyalty","★",Color.rgb(245,180,35),v->openWeb("https://app.dextersspot.co.uk"));
-        addTile(page1,"Scanner","QR",Color.rgb(40,180,120),v->openWeb("https://backoffice.dextersspot.co.uk/pc-pos-test/scanner/"));
-        addTile(page1,"Back Office","BO",Color.rgb(98,80,190),v->openWeb("https://backoffice.dextersspot.co.uk/"));
-        addTile(page1,"POS","POS",Color.rgb(35,35,38),v->openWeb("https://backoffice.dextersspot.co.uk/pc-pos-test/"));
-        addTile(page1,"WhatsApp","WA",Color.rgb(35,180,90),v->launchPackageOrLabel(new String[]{"com.whatsapp.w4b","com.whatsapp"},"WhatsApp"));
-        addTile(page1,"bOnline","bO",Color.rgb(40,120,210),v->launchPackageOrLabel(new String[]{},"bOnline"));
-        addTile(page1,"Business Apps","APP",Color.rgb(100,100,110),v->startActivity(new Intent(this,BusinessAppsActivity.class)));
-        addTile(page1,"Gmail","M",Color.rgb(220,65,55),v->launchPackageOrLabel(new String[]{"com.google.android.gm"},"Gmail"));
-        addTile(page1,"Square","SQ",Color.rgb(15,15,15),v->launchPackageOrLabel(new String[]{"com.squareup"},"Square"));
-        addTile(page1,"Maps","MAP",Color.rgb(60,145,235),v->launchPackageOrLabel(new String[]{"com.google.android.apps.maps"},"Maps"));
-        addTile(page1,"Website","WEB",Color.rgb(70,70,75),v->openWeb("https://dextersspot.co.uk"));
+        GridLayout p1=appPage();
+        addWebTile(p1,"Dexter AI","D",Color.rgb(34,115,255),v->openWeb("https://jamiegreen294-boop.github.io/dexters-ai-v1/?android-app=1"));
+        addWebTile(p1,"Loyalty","★",Color.rgb(237,177,42),v->openWeb("https://app.dextersspot.co.uk"));
+        addWebTile(p1,"Scanner","⌁",Color.rgb(35,188,117),v->openWeb("https://backoffice.dextersspot.co.uk/pc-pos-test/scanner/"));
+        addWebTile(p1,"Back Office","B",Color.rgb(118,87,201),v->openWeb("https://backoffice.dextersspot.co.uk/"));
+        addWebTile(p1,"POS","£",Color.rgb(35,35,39),v->openWeb("https://backoffice.dextersspot.co.uk/pc-pos-test/"));
+        addPackageTile(p1,"WhatsApp",new String[]{"com.whatsapp.w4b","com.whatsapp"},"WhatsApp");
+        addPackageTile(p1,"Gmail",new String[]{"com.google.android.gm"},"Gmail");
+        addPackageTile(p1,"Maps",new String[]{"com.google.android.apps.maps"},"Maps");
+        addPackageTile(p1,"Chrome",new String[]{"com.android.chrome"},"Chrome");
+        addPackageTile(p1,"Square",new String[]{"com.squareup","com.squareup.pos"},"Square");
+        addWebTile(p1,"Website","D",Color.rgb(47,94,79),v->openWeb("https://dextersspot.co.uk"));
+        addWebTile(p1,"Business","▦",Color.rgb(83,83,89),v->startActivity(new Intent(this,BusinessAppsActivity.class)));
 
-        GridLayout page2 = appPage();
-        addTile(page2,"Camera","CAM",Color.rgb(80,80,86),v->startActivity(new Intent("android.media.action.IMAGE_CAPTURE")));
-        addTile(page2,"Calculator","123",Color.rgb(240,150,35),v->launchPackageOrLabel(new String[]{"com.google.android.calculator","com.android.calculator2"},"Calculator"));
-        addTile(page2,"Quick Start","i",Color.rgb(65,130,230),v->startActivity(new Intent(this,QuickStartActivity.class)));
-        addTile(page2,"Wi-Fi","WiFi",Color.rgb(55,130,245),v->startActivity(new Intent(Settings.ACTION_WIFI_SETTINGS)));
-        addTile(page2,"Bluetooth","BT",Color.rgb(40,100,230),v->startActivity(new Intent(Settings.ACTION_BLUETOOTH_SETTINGS)));
-        addTile(page2,"Dexter Admin","⚙",Color.rgb(105,105,110),v->openAdmin());
-        addTile(page2,"Chrome","CHR",Color.rgb(230,85,60),v->launchPackageOrLabel(new String[]{"com.android.chrome"},"Chrome"));
-        addTile(page2,"Files","FILE",Color.rgb(70,140,245),v->launchPackageOrLabel(new String[]{"com.google.android.documentsui","com.android.documentsui"},"Files"));
+        GridLayout p2=appPage();
+        addPackageTile(p2,"Camera",new String[]{"com.android.camera","com.meizu.media.camera"},"Camera");
+        addPackageTile(p2,"Calculator",new String[]{"com.google.android.calculator","com.android.calculator2"},"Calculator");
+        addWebTile(p2,"Quick Start","i",Color.rgb(69,132,239),v->startActivity(new Intent(this,QuickStartActivity.class)));
+        addWebTile(p2,"Wi-Fi","⌁",Color.rgb(57,133,246),v->startActivity(new Intent(Settings.ACTION_WIFI_SETTINGS)));
+        addWebTile(p2,"Bluetooth","ᛒ",Color.rgb(63,103,232),v->startActivity(new Intent(Settings.ACTION_BLUETOOTH_SETTINGS)));
+        addWebTile(p2,"Dexter Admin","⚙",Color.rgb(112,112,118),v->openAdmin());
+        addPackageTile(p2,"Files",new String[]{"com.google.android.documentsui","com.android.documentsui"},"Files");
+        addWebTile(p2,"bOnline","b",Color.rgb(45,121,212),v->launchPackageOrLabel(new String[]{},"bOnline"));
 
-        pages.addView(page1);
-        pages.addView(page2);
+        pages.addView(p1); pages.addView(p2);
         pages.setOnTouchListener((v,e)->handleSwipe(e));
 
-        pageDots = new TextView(this);
+        pageDots=new TextView(this);
         pageDots.setText("●  ○");
-        pageDots.setTextColor(muted);
-        pageDots.setTextSize(12);
+        pageDots.setTextColor(Color.argb(210,255,255,255));
+        pageDots.setTextSize(11);
         pageDots.setGravity(Gravity.CENTER);
-        pageDots.setPadding(0,dp(4),0,dp(8));
-        root.addView(pageDots, new LinearLayout.LayoutParams(-1,-2));
+        pageDots.setPadding(0,dp(4),0,dp(9));
+        root.addView(pageDots,new LinearLayout.LayoutParams(-1,-2));
 
-        LinearLayout dock = new LinearLayout(this);
+        LinearLayout dock=new LinearLayout(this);
         dock.setOrientation(LinearLayout.HORIZONTAL);
         dock.setGravity(Gravity.CENTER);
-        dock.setPadding(dp(8),dp(8),dp(8),dp(8));
-        dock.setBackground(round(glass, 28));
-        root.addView(dock, new LinearLayout.LayoutParams(-1,dp(86)));
+        dock.setPadding(dp(9),dp(9),dp(9),dp(9));
+        dock.setElevation(dp(10));
+        dock.setBackground(round(Color.argb(175,105,110,108),30));
+        root.addView(dock,new LinearLayout.LayoutParams(-1,dp(84)));
 
-        addDock(dock,"AI","Dexter",Color.rgb(50,110,255),v->openWeb("https://jamiegreen294-boop.github.io/dexters-ai-v1/?android-app=1"));
-        addDock(dock,"QR","Scan",Color.rgb(40,180,120),v->openWeb("https://backoffice.dextersspot.co.uk/pc-pos-test/scanner/"));
-        addDock(dock,"WA","WhatsApp",Color.rgb(35,180,90),v->launchPackageOrLabel(new String[]{"com.whatsapp.w4b","com.whatsapp"},"WhatsApp"));
-        addDock(dock,"POS","POS",Color.rgb(35,35,38),v->openWeb("https://backoffice.dextersspot.co.uk/pc-pos-test/"));
+        addDockWeb(dock,"D",Color.rgb(34,115,255),v->openWeb("https://jamiegreen294-boop.github.io/dexters-ai-v1/?android-app=1"));
+        addDockWeb(dock,"⌁",Color.rgb(35,188,117),v->openWeb("https://backoffice.dextersspot.co.uk/pc-pos-test/scanner/"));
+        addDockPackage(dock,new String[]{"com.whatsapp.w4b","com.whatsapp"},"WhatsApp",Color.rgb(35,188,95),"W");
+        addDockWeb(dock,"£",Color.rgb(35,35,39),v->openWeb("https://backoffice.dextersspot.co.uk/pc-pos-test/"));
 
         setContentView(root);
     }
@@ -140,30 +148,38 @@ public class DexterHomeActivity extends Activity {
     private GridLayout appPage(){
         GridLayout g=new GridLayout(this);
         g.setColumnCount(4);
-        g.setRowCount(5);
-        g.setPadding(0,dp(4),0,0);
+        g.setRowCount(4);
+        g.setPadding(0,dp(3),0,0);
         return g;
     }
 
-    private boolean handleSwipe(MotionEvent e){
-        if(e.getAction()==MotionEvent.ACTION_DOWN){downX=e.getX();return true;}
-        if(e.getAction()==MotionEvent.ACTION_UP){
-            float dx=e.getX()-downX;
-            if(Math.abs(dx)>dp(60)){
-                if(dx<0 && pages.getDisplayedChild()<pages.getChildCount()-1)pages.showNext();
-                else if(dx>0 && pages.getDisplayedChild()>0)pages.showPrevious();
-                updateDots();
-            }
-            return true;
-        }
-        return true;
+    private void addWebTile(GridLayout grid,String label,String glyph,int color,View.OnClickListener click){
+        LinearLayout box=tileShell();
+        TextView icon=new TextView(this);
+        icon.setText(glyph); icon.setTextColor(Color.WHITE); icon.setTextSize(glyph.length()>1?19:25);
+        icon.setGravity(Gravity.CENTER); icon.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
+        icon.setBackground(round(color,18)); icon.setElevation(dp(5)); icon.setOnClickListener(click);
+        box.addView(icon,new LinearLayout.LayoutParams(dp(60),dp(60)));
+        addName(box,label);
+        grid.addView(box);
     }
 
-    private void updateDots(){
-        if(pageDots!=null)pageDots.setText(pages.getDisplayedChild()==0?"●  ○":"○  ●");
+    private void addPackageTile(GridLayout grid,String label,String[] packages,String fallbackLabel){
+        LinearLayout box=tileShell();
+        ImageView icon=new ImageView(this);
+        icon.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        icon.setPadding(dp(4),dp(4),dp(4),dp(4));
+        icon.setElevation(dp(5));
+        Drawable d=findIcon(packages,fallbackLabel);
+        if(d!=null) icon.setImageDrawable(d);
+        else icon.setImageDrawable(letterDrawable(label.substring(0,1)));
+        icon.setOnClickListener(v->launchPackageOrLabel(packages,fallbackLabel));
+        box.addView(icon,new LinearLayout.LayoutParams(dp(60),dp(60)));
+        addName(box,label);
+        grid.addView(box);
     }
 
-    private void addTile(GridLayout grid,String label,String glyph,int iconColor,View.OnClickListener click){
+    private LinearLayout tileShell(){
         LinearLayout box=new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
         box.setGravity(Gravity.TOP|Gravity.CENTER_HORIZONTAL);
@@ -173,45 +189,74 @@ public class DexterHomeActivity extends Activity {
         lp.columnSpec=GridLayout.spec(GridLayout.UNDEFINED,1f);
         lp.rowSpec=GridLayout.spec(GridLayout.UNDEFINED,1f);
         box.setLayoutParams(lp);
-
-        Button icon=new Button(this);
-        icon.setText(glyph);
-        icon.setTextSize(glyph.length()>3?10:14);
-        icon.setTextColor(Color.WHITE);
-        icon.setAllCaps(false);
-        icon.setGravity(Gravity.CENTER);
-        icon.setPadding(0,0,0,0);
-        icon.setBackground(round(iconColor, 17));
-        icon.setOnClickListener(click);
-        box.addView(icon,new LinearLayout.LayoutParams(dp(58),dp(58)));
-
-        TextView name=new TextView(this);
-        name.setText(label);
-        name.setTextColor(text);
-        name.setTextSize(10);
-        name.setGravity(Gravity.CENTER);
-        name.setMaxLines(1);
-        name.setPadding(0,dp(4),0,0);
-        box.addView(name,new LinearLayout.LayoutParams(-1,-2));
-        grid.addView(box);
+        return box;
     }
 
-    private void addDock(LinearLayout dock,String glyph,String label,int iconColor,View.OnClickListener click){
-        LinearLayout box=new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
-        box.setGravity(Gravity.CENTER);
-        box.setLayoutParams(new LinearLayout.LayoutParams(0,-1,1f));
-
-        Button icon=new Button(this);
-        icon.setText(glyph);icon.setTextSize(13);icon.setTextColor(Color.WHITE);icon.setAllCaps(false);
-        icon.setPadding(0,0,0,0);icon.setGravity(Gravity.CENTER);icon.setBackground(round(iconColor,17));icon.setOnClickListener(click);
-        box.addView(icon,new LinearLayout.LayoutParams(dp(56),dp(56)));
-
+    private void addName(LinearLayout box,String label){
         TextView name=new TextView(this);
-        name.setText(label);name.setTextColor(Color.WHITE);name.setTextSize(9);name.setGravity(Gravity.CENTER);
+        name.setText(label); name.setTextColor(Color.WHITE); name.setTextSize(10.5f);
+        name.setGravity(Gravity.CENTER); name.setMaxLines(1);
+        name.setShadowLayer(2,0,1,Color.BLACK);
+        name.setPadding(0,dp(5),0,0);
         box.addView(name,new LinearLayout.LayoutParams(-1,-2));
-        dock.addView(box);
     }
+
+    private void addDockWeb(LinearLayout dock,String glyph,int color,View.OnClickListener click){
+        TextView icon=new TextView(this);
+        icon.setText(glyph);icon.setTextColor(Color.WHITE);icon.setTextSize(22);icon.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
+        icon.setGravity(Gravity.CENTER);icon.setBackground(round(color,18));icon.setElevation(dp(6));icon.setOnClickListener(click);
+        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(dp(60),dp(60));
+        lp.weight=1;lp.gravity=Gravity.CENTER;
+        dock.addView(icon,lp);
+    }
+
+    private void addDockPackage(LinearLayout dock,String[] pkgs,String label,int fallbackColor,String fallbackGlyph){
+        ImageView icon=new ImageView(this);
+        icon.setScaleType(ImageView.ScaleType.CENTER_INSIDE);icon.setPadding(dp(4),dp(4),dp(4),dp(4));icon.setElevation(dp(6));
+        Drawable d=findIcon(pkgs,label);
+        if(d!=null)icon.setImageDrawable(d); else icon.setImageDrawable(letterDrawable(fallbackGlyph));
+        icon.setOnClickListener(v->launchPackageOrLabel(pkgs,label));
+        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(dp(60),dp(60));lp.weight=1;lp.gravity=Gravity.CENTER;
+        dock.addView(icon,lp);
+    }
+
+    private Drawable findIcon(String[] packages,String label){
+        PackageManager pm=getPackageManager();
+        for(String p:packages){
+            try{return pm.getApplicationIcon(p);}catch(Exception ignored){}
+        }
+        try{
+            for(ApplicationInfo ai:pm.getInstalledApplications(0)){
+                String n=String.valueOf(pm.getApplicationLabel(ai));
+                if(n.toLowerCase().contains(label.toLowerCase()))return pm.getApplicationIcon(ai);
+            }
+        }catch(Exception ignored){}
+        return null;
+    }
+
+    private Drawable letterDrawable(String glyph){
+        GradientDrawable d=round(Color.rgb(90,90,95),18);
+        return d;
+    }
+
+    private boolean handleSwipe(MotionEvent e){
+        if(e.getAction()==MotionEvent.ACTION_DOWN){downX=e.getX();return false;}
+        if(e.getAction()==MotionEvent.ACTION_UP){
+            float dx=e.getX()-downX;
+            if(Math.abs(dx)>dp(65)){
+                if(dx<0&&pages.getDisplayedChild()<pages.getChildCount()-1){
+                    pages.setInAnimation(this,android.R.anim.fade_in);pages.setOutAnimation(this,android.R.anim.fade_out);pages.showNext();
+                }else if(dx>0&&pages.getDisplayedChild()>0){
+                    pages.setInAnimation(this,android.R.anim.fade_in);pages.setOutAnimation(this,android.R.anim.fade_out);pages.showPrevious();
+                }
+                updateDots();
+            }
+            return false;
+        }
+        return false;
+    }
+
+    private void updateDots(){if(pageDots!=null)pageDots.setText(pages.getDisplayedChild()==0?"●  ○":"○  ●");}
 
     private void openAdmin(){
         KeyguardManager km=(KeyguardManager)getSystemService(Context.KEYGUARD_SERVICE);
