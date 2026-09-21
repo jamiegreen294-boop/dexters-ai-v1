@@ -10,38 +10,79 @@ import android.provider.Settings;
 import android.view.Gravity;
 import android.widget.GridLayout;
 import android.widget.LinearLayout;
+import android.widget.SeekBar;
 import android.widget.TextView;
 
 public class DexterControlCentreActivity extends Activity {
-    private final int bg=Color.rgb(8,13,12), card=Color.rgb(29,35,32), text=Color.WHITE, muted=Color.rgb(185,190,194), accent=Color.rgb(239,139,34);
+    private final int bg=Color.rgb(6,10,11), panel=Color.rgb(19,27,31), text=Color.WHITE, muted=Color.rgb(176,182,186), gold=Color.rgb(218,170,78);
 
-    @Override protected void onCreate(Bundle b){super.onCreate(b);getWindow().setStatusBarColor(bg);getWindow().setNavigationBarColor(bg);render();}
+    @Override protected void onCreate(Bundle b){
+        super.onCreate(b);
+        getWindow().setStatusBarColor(bg); getWindow().setNavigationBarColor(bg);
+        render();
+    }
 
     private void render(){
-        LinearLayout root=new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setPadding(dp(18),dp(18),dp(18),dp(24)); root.setBackgroundColor(bg);
-        root.addView(title("Control Centre",30,text,true));
-        TextView sub=title("Dexter OS quick controls",13,muted,false); sub.setPadding(0,dp(4),0,dp(18)); root.addView(sub);
+        LinearLayout root=new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setPadding(dp(16),dp(14),dp(16),dp(18));
+        GradientDrawable back=new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{Color.rgb(7,14,18),Color.rgb(7,28,42),Color.rgb(6,10,11)});
+        root.setBackground(back);
 
-        GridLayout grid=new GridLayout(this); grid.setColumnCount(2); root.addView(grid,new LinearLayout.LayoutParams(-1,0,1f));
-        tile(grid,"Wi-Fi","⌁",Color.rgb(47,118,220),v->startActivity(new Intent(Settings.ACTION_WIFI_SETTINGS)));
-        tile(grid,"Bluetooth","B",Color.rgb(63,103,232),v->startActivity(new Intent(Settings.ACTION_BLUETOOTH_SETTINGS)));
-        tile(grid,"Notifications","●",Color.rgb(43,126,110),v->startActivity(new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE,getPackageName())));
-        tile(grid,"Display","☀",Color.rgb(225,160,45),v->startActivity(new Intent(Settings.ACTION_DISPLAY_SETTINGS)));
-        tile(grid,"Sound","♪",Color.rgb(155,87,190),v->startActivity(new Intent(Settings.ACTION_SOUND_SETTINGS)));
-        tile(grid,"Battery","⚡",Color.rgb(45,160,93),v->startActivity(new Intent(Settings.ACTION_BATTERY_SAVER_SETTINGS)));
-        tile(grid,"Dexter Store","D",accent,v->startActivity(new Intent(this,DexterStoreActivity.class)));
-        tile(grid,"Settings","⚙",Color.rgb(78,83,89),v->startActivity(new Intent(this,DexterSettingsActivity.class)));
+        root.addView(txt("Dexter OS",26,text,true));
+        TextView sub=txt("Control Centre",17,Color.rgb(224,224,226),false); sub.setPadding(0,0,0,dp(14)); root.addView(sub);
+
+        GridLayout top=new GridLayout(this); top.setColumnCount(2); root.addView(top,new LinearLayout.LayoutParams(-1,-2));
+        quick(top,"Wi-Fi","Connected","⌁",Color.rgb(26,115,231),v->startActivity(new Intent(Settings.ACTION_WIFI_SETTINGS)));
+        quick(top,"Bluetooth","On","B",Color.rgb(33,107,238),v->startActivity(new Intent(Settings.ACTION_BLUETOOTH_SETTINGS)));
+        quick(top,"Mobile Data","On","▮",Color.rgb(25,181,92),v->startActivity(new Intent(Settings.ACTION_DATA_ROAMING_SETTINGS)));
+        quick(top,"Battery","86%","▣",Color.rgb(34,177,95),v->startActivity(new Intent(Settings.ACTION_BATTERY_SAVER_SETTINGS)));
+
+        slider(root,"☀",72);
+        slider(root,"♪",66);
+
+        GridLayout roundGrid=new GridLayout(this); roundGrid.setColumnCount(4);
+        LinearLayout.LayoutParams rgp=new LinearLayout.LayoutParams(-1,-2); rgp.topMargin=dp(10); root.addView(roundGrid,rgp);
+        roundQuick(roundGrid,"Dark Mode","◐",v->{});
+        roundQuick(roundGrid,"Do Not Disturb","☾",v->startActivity(new Intent(Settings.ACTION_ZEN_MODE_SETTINGS)));
+        roundQuick(roundGrid,"Auto Rotate","↻",v->startActivity(new Intent(Settings.ACTION_DISPLAY_SETTINGS)));
+        roundQuick(roundGrid,"Torch","✦",v->{});
+        roundQuick(roundGrid,"Location","●",v->startActivity(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)));
+        roundQuick(roundGrid,"Hotspot","⌁",v->startActivity(new Intent(Settings.ACTION_WIRELESS_SETTINGS)));
+        roundQuick(roundGrid,"Airplane Mode","✈",v->startActivity(new Intent(Settings.ACTION_AIRPLANE_MODE_SETTINGS)));
+        roundQuick(roundGrid,"Screen Record","◉",v->{});
+
+        LinearLayout store=new LinearLayout(this); store.setGravity(Gravity.CENTER_VERTICAL); store.setPadding(dp(14),dp(13),dp(14),dp(13)); store.setBackground(round(panel,18));
+        TextView icon=txt("D",20,Color.WHITE,true); icon.setGravity(Gravity.CENTER); icon.setBackground(round(Color.rgb(216,115,75),13));
+        store.addView(icon,new LinearLayout.LayoutParams(dp(46),dp(46)));
+        LinearLayout words=new LinearLayout(this); words.setOrientation(LinearLayout.VERTICAL); words.setPadding(dp(10),0,0,0);
+        words.addView(txt("Dexter Store",15,text,true)); words.addView(txt("Apps, tools and updates",11,muted,false)); store.addView(words,new LinearLayout.LayoutParams(0,-2,1f));
+        TextView arrow=txt("›",25,text,false); store.addView(arrow); store.setOnClickListener(v->startActivity(new Intent(this,DexterStoreActivity.class)));
+        LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(-1,-2); sp.topMargin=dp(14); root.addView(store,sp);
+
         setContentView(root);
     }
 
-    private void tile(GridLayout g,String label,String glyph,int color,android.view.View.OnClickListener click){
-        LinearLayout box=new LinearLayout(this); box.setOrientation(LinearLayout.VERTICAL); box.setGravity(Gravity.CENTER); box.setPadding(dp(12),dp(18),dp(12),dp(18)); box.setBackground(round(card,22)); box.setOnClickListener(click);
-        TextView icon=title(glyph,26,Color.WHITE,true); icon.setGravity(Gravity.CENTER); icon.setBackground(round(color,18)); box.addView(icon,new LinearLayout.LayoutParams(dp(58),dp(58)));
-        TextView name=title(label,13,text,true); name.setGravity(Gravity.CENTER); name.setPadding(0,dp(10),0,0); box.addView(name);
-        GridLayout.LayoutParams lp=new GridLayout.LayoutParams(); lp.width=0; lp.height=dp(126); lp.columnSpec=GridLayout.spec(GridLayout.UNDEFINED,1f); lp.setMargins(dp(5),dp(5),dp(5),dp(5)); box.setLayoutParams(lp); g.addView(box);
+    private void quick(GridLayout g,String name,String status,String glyph,int color,android.view.View.OnClickListener click){
+        LinearLayout r=new LinearLayout(this); r.setGravity(Gravity.CENTER_VERTICAL); r.setPadding(dp(10),dp(10),dp(10),dp(10)); r.setBackground(round(panel,17)); r.setOnClickListener(click);
+        TextView i=txt(glyph,21,Color.WHITE,true); i.setGravity(Gravity.CENTER); i.setBackground(round(color,30)); r.addView(i,new LinearLayout.LayoutParams(dp(46),dp(46)));
+        LinearLayout w=new LinearLayout(this); w.setOrientation(LinearLayout.VERTICAL); w.setPadding(dp(8),0,0,0); w.addView(txt(name,13,text,true)); w.addView(txt(status,11,muted,false)); r.addView(w);
+        GridLayout.LayoutParams lp=new GridLayout.LayoutParams(); lp.width=0; lp.height=dp(78); lp.columnSpec=GridLayout.spec(GridLayout.UNDEFINED,1f); lp.setMargins(dp(4),dp(4),dp(4),dp(4)); r.setLayoutParams(lp); g.addView(r);
     }
 
-    private TextView title(String v,float size,int color,boolean bold){TextView x=new TextView(this);x.setText(v);x.setTextSize(size);x.setTextColor(color);if(bold)x.setTypeface(Typeface.DEFAULT_BOLD);return x;}
+    private void slider(LinearLayout root,String glyph,int progress){
+        LinearLayout r=new LinearLayout(this); r.setGravity(Gravity.CENTER_VERTICAL); r.setPadding(dp(10),dp(7),dp(10),dp(7)); r.setBackground(round(panel,20));
+        TextView i=txt(glyph,20,text,false); i.setGravity(Gravity.CENTER); r.addView(i,new LinearLayout.LayoutParams(dp(38),dp(38)));
+        SeekBar bar=new SeekBar(this); bar.setMax(100); bar.setProgress(progress); r.addView(bar,new LinearLayout.LayoutParams(0,dp(44),1f));
+        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(56)); lp.topMargin=dp(8); root.addView(r,lp);
+    }
+
+    private void roundQuick(GridLayout g,String name,String glyph,android.view.View.OnClickListener click){
+        LinearLayout r=new LinearLayout(this); r.setOrientation(LinearLayout.VERTICAL); r.setGravity(Gravity.TOP|Gravity.CENTER_HORIZONTAL); r.setPadding(dp(2),dp(7),dp(2),dp(5)); r.setOnClickListener(click);
+        TextView i=txt(glyph,19,text,true); i.setGravity(Gravity.CENTER); i.setBackground(round(Color.rgb(28,34,38),30)); r.addView(i,new LinearLayout.LayoutParams(dp(52),dp(52)));
+        TextView n=txt(name,8.5f,text,false); n.setGravity(Gravity.CENTER); n.setMaxLines(1); n.setPadding(0,dp(5),0,0); r.addView(n,new LinearLayout.LayoutParams(-1,-2));
+        GridLayout.LayoutParams lp=new GridLayout.LayoutParams(); lp.width=0; lp.height=dp(84); lp.columnSpec=GridLayout.spec(GridLayout.UNDEFINED,1f); r.setLayoutParams(lp); g.addView(r);
+    }
+
+    private TextView txt(String v,float s,int c,boolean b){TextView x=new TextView(this);x.setText(v);x.setTextSize(s);x.setTextColor(c);if(b)x.setTypeface(Typeface.create("sans-serif-medium",Typeface.BOLD));return x;}
     private GradientDrawable round(int c,int r){GradientDrawable d=new GradientDrawable();d.setColor(c);d.setCornerRadius(dp(r));return d;}
     private int dp(int v){return (int)(v*getResources().getDisplayMetrics().density+0.5f);}
 }
