@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - build/meizu-dexter-os-exact-v35
+      - build/meizu-dexter-os-exact-v36
     paths:
       - 'android-app/**'
       - '.github/workflows/build-dexter-android.yml'
@@ -52,7 +52,7 @@ jobs:
       - name: Upload signed managed artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Dexter-Business-Phone-v35
+          name: Dexter-Business-Phone-v36
           path: android-app/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
 
@@ -64,13 +64,13 @@ jobs:
           git fetch origin gh-pages
           git worktree add "$RUNNER_TEMP/gh-pages" origin/gh-pages
           mkdir -p "$RUNNER_TEMP/gh-pages/device"
-          cp android-app/app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/gh-pages/device/Dexter-Business-Phone-v35.apk"
+          cp android-app/app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/gh-pages/device/Dexter-Business-Phone-v36.apk"
           cd "$RUNNER_TEMP/gh-pages"
-          git add device/Dexter-Business-Phone-v35.apk
+          git add device/Dexter-Business-Phone-v36.apk
           if git diff --cached --quiet; then
             echo "Dexter OS managed APK already current"
           else
-            git commit -m "Publish Dexter Business Phone v34 managed OS"
+            git commit -m "Publish Dexter Business Phone v36 approved mockup"
             for attempt in 1 2 3; do
               if git push origin HEAD:gh-pages; then break; fi
               git fetch origin gh-pages
