@@ -131,7 +131,7 @@ public class DexterHomeActivity extends Activity {
         addPackageTile(p1,"WhatsApp",new String[]{"com.whatsapp.w4b","com.whatsapp"},"WhatsApp");
         addPackageTile(p1,"Gmail",new String[]{"com.google.android.gm"},"Gmail");
         addPackageTile(p1,"Maps",new String[]{"com.google.android.apps.maps"},"Maps");
-        addPackageTile(p1,"Chrome",new String[]{"com.android.chrome"},"Chrome");
+        addWebTile(p1,"Internet","🌐",Color.rgb(58,116,201),v->openWeb("https://www.google.com/"));
         addPackageTile(p1,"Square",new String[]{"com.squareup","com.squareup.pos"},"Square");
         addWebTile(p1,"Website","D",Color.rgb(47,94,79),v->openWeb("https://dextersspot.co.uk"));
         addWebTile(p1,"Business","▦",Color.rgb(83,83,89),v->startActivity(new Intent(this,BusinessAppsActivity.class)));
@@ -144,6 +144,7 @@ public class DexterHomeActivity extends Activity {
         addWebTile(p2,"Bluetooth","ᛒ",Color.rgb(63,103,232),v->startActivity(new Intent(Settings.ACTION_BLUETOOTH_SETTINGS)));
         addWebTile(p2,"Dexter Admin","⚙",Color.rgb(112,112,118),v->openAdmin());
         addPackageTile(p2,"Files",new String[]{"com.google.android.documentsui","com.android.documentsui"},"Files");
+        addPackageTile(p2,"Chrome",new String[]{"com.android.chrome"},"Chrome");
         addWebTile(p2,"bOnline","b",Color.rgb(45,121,212),v->launchPackageOrLabel(new String[]{},"bOnline"));
 
         pages.addView(p1); pages.addView(p2);
