@@ -52,7 +52,7 @@ jobs:
       - name: Upload signed preview artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Dexter-OS-Preview-v31
+          name: Dexter-OS-Preview-v32
           path: android-app/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
 
@@ -64,13 +64,13 @@ jobs:
           git fetch origin gh-pages
           git worktree add "$RUNNER_TEMP/gh-pages" origin/gh-pages
           mkdir -p "$RUNNER_TEMP/gh-pages/device"
-          cp android-app/app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/gh-pages/device/Dexter-OS-Preview-v31.apk"
+          cp android-app/app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/gh-pages/device/Dexter-OS-Preview-v32.apk"
           cd "$RUNNER_TEMP/gh-pages"
-          git add device/Dexter-OS-Preview-v31.apk
+          git add device/Dexter-OS-Preview-v32.apk
           if git diff --cached --quiet; then
             echo "Dexter OS preview APK already current"
           else
-            git commit -m "Publish Dexter OS Preview v31"
+            git commit -m "Publish Dexter OS Preview v32"
             for attempt in 1 2 3; do
               if git push origin HEAD:gh-pages; then break; fi
               git fetch origin gh-pages
