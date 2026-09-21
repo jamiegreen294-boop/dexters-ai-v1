@@ -120,7 +120,7 @@ public class DexterHomeActivity extends Activity {
         root.addView(pages,new LinearLayout.LayoutParams(-1,0,1f));
 
         GridLayout p1=appPage();
-        addWebTile(p1,"Dexter AI","D",Color.rgb(34,115,255),v->openWeb("https://jamiegreen294-boop.github.io/dexters-ai-v1/?android-app=1"));
+        addWebTile(p1,"Dexter AI","D",Color.rgb(34,115,255),v->startActivity(new Intent(this,MainActivity.class)));
         addWebTile(p1,"Loyalty","★",Color.rgb(237,177,42),v->openWeb("https://app.dextersspot.co.uk"));
         addWebTile(p1,"Scanner","⌁",Color.rgb(35,188,117),v->openWeb("https://backoffice.dextersspot.co.uk/pc-pos-test/scanner/"));
         addWebTile(p1,"Back Office","B",Color.rgb(118,87,201),v->openWeb("https://backoffice.dextersspot.co.uk/"));
@@ -161,7 +161,7 @@ public class DexterHomeActivity extends Activity {
         dock.setBackground(round(Color.argb(175,105,110,108),30));
         root.addView(dock,new LinearLayout.LayoutParams(-1,dp(84)));
 
-        addDockWeb(dock,"D",Color.rgb(34,115,255),v->openWeb("https://jamiegreen294-boop.github.io/dexters-ai-v1/?android-app=1"));
+        addDockWeb(dock,"D",Color.rgb(34,115,255),v->startActivity(new Intent(this,MainActivity.class)));
         addDockWeb(dock,"⌁",Color.rgb(35,188,117),v->openWeb("https://backoffice.dextersspot.co.uk/pc-pos-test/scanner/"));
         addDockPackage(dock,new String[]{"com.whatsapp.w4b","com.whatsapp"},"WhatsApp",Color.rgb(35,188,95),"W");
         addDockWeb(dock,"£",Color.rgb(35,35,39),v->openWeb("https://backoffice.dextersspot.co.uk/pc-pos-test/"));
