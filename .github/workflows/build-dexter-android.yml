@@ -57,7 +57,7 @@ jobs:
       - name: Upload signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Dexter-Business-Phone-v6
+          name: Dexter-Business-Phone-v26
           path: android-app/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
 
@@ -69,16 +69,12 @@ jobs:
           git fetch origin gh-pages
           git worktree add "$RUNNER_TEMP/gh-pages" origin/gh-pages
           mkdir -p "$RUNNER_TEMP/gh-pages/device"
-          cp android-app/app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/gh-pages/device/Dexter-Business-Phone-Release-v6.apk"
-          cp android-app/app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/gh-pages/device/Dexter-Business-Phone-v21.apk"
-          cp android-app/app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/gh-pages/device/Dexter-Business-Phone-v22.apk"
-          cp android-app/app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/gh-pages/device/Dexter-Business-Phone-v23.apk"
-          cp android-app/app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/gh-pages/device/Dexter-Business-Phone-v24.apk"
+          cp android-app/app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/gh-pages/device/Dexter-Business-Phone-v26.apk"
           cd "$RUNNER_TEMP/gh-pages"
-          git add device/Dexter-Business-Phone-Release-v6.apk device/Dexter-Business-Phone-v21.apk device/Dexter-Business-Phone-v22.apk device/Dexter-Business-Phone-v23.apk device/Dexter-Business-Phone-v24.apk
+          git add device/Dexter-Business-Phone-v26.apk
           if git diff --cached --quiet; then
             echo "Provisioning APK already current"
           else
-            git commit -m "Publish Dexter Business Phone v6 local admin bridge"
+            git commit -m "Publish Dexter Business Phone v26 premium home"
             git push origin HEAD:gh-pages
           fi
