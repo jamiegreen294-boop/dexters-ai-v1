@@ -106,14 +106,25 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface public boolean saveDeviceToken(String token) {
             if (token == null || token.length() < 32) return false;
-            SharedPreferences p = context.getSharedPreferences("dexter_device", MODE_PRIVATE);
-            p.edit().putString("device_token", token).apply();
+            DeviceAgentService.saveToken(context, token);
             DeviceAgentService.start(context);
             return true;
         }
 
         @JavascriptInterface public boolean isPaired() {
             return DeviceAgentService.hasToken(context);
+        }
+
+        @JavascriptInterface public String getAgentState() {
+            try {
+                SharedPreferences p = context.getSharedPreferences("dexter_device", MODE_PRIVATE);
+                JSONObject j = new JSONObject();
+                j.put("tokenPresent", DeviceAgentService.hasToken(context));
+                j.put("lastSuccessAt", p.getLong("agent_last_success_at", 0L));
+                j.put("lastErrorAt", p.getLong("agent_last_error_at", 0L));
+                j.put("lastError", p.getString("agent_last_error", ""));
+                return j.toString();
+            } catch (Exception e) { return "{}"; }
         }
 
         @JavascriptInterface public String getManagementStatus() {
