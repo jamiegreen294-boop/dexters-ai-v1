@@ -19,7 +19,30 @@ public class DeviceAgentService extends Service {
     private volatile boolean running = false;
 
     public static boolean hasToken(Context c) {
-        return c.getSharedPreferences("dexter_device", MODE_PRIVATE).getString("device_token", "").length() >= 32;
+        return readToken(c).length() >= 32;
+    }
+
+    public static void saveToken(Context c, String token) {
+        if (token == null || token.length() < 32) return;
+        c.getSharedPreferences("dexter_device", MODE_PRIVATE).edit().putString("device_token", token).apply();
+        try {
+            Context dps = c.createDeviceProtectedStorageContext();
+            dps.getSharedPreferences("dexter_device", MODE_PRIVATE).edit().putString("device_token", token).apply();
+        } catch (Exception ignored) {}
+    }
+
+    private static String readToken(Context c) {
+        String t = c.getSharedPreferences("dexter_device", MODE_PRIVATE).getString("device_token", "");
+        if (t != null && t.length() >= 32) return t;
+        try {
+            Context dps = c.createDeviceProtectedStorageContext();
+            t = dps.getSharedPreferences("dexter_device", MODE_PRIVATE).getString("device_token", "");
+            if (t != null && t.length() >= 32) {
+                c.getSharedPreferences("dexter_device", MODE_PRIVATE).edit().putString("device_token", t).apply();
+                return t;
+            }
+        } catch (Exception ignored) {}
+        return "";
     }
     public static void start(Context c) {
         Intent i = new Intent(c, DeviceAgentService.class);
@@ -65,7 +88,7 @@ public class DeviceAgentService extends Service {
     }
 
     private String token() {
-        return getSharedPreferences("dexter_device", MODE_PRIVATE).getString("device_token", "");
+        return readToken(this);
     }
 
     private JSONObject post(JSONObject body) throws Exception {
