@@ -1,4 +1,5 @@
 (function(){
+  let nativeCredentialRefreshComplete=false;
   const nativePhone=()=>typeof window.DexterDevice!=="undefined";
   const esc=v=>typeof escapeHtml==="function"?escapeHtml(String(v??"")):String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   function ensurePhonePage(){
@@ -56,7 +57,7 @@
     if(!phones.length)list.innerHTML='<div class="task"><p>No Dexter business phones paired yet.</p></div>';
   }
   async function ensureNativeAgentEnrollment(){
-    if(!nativePhone())return;
+    if(!nativePhone()||nativeCredentialRefreshComplete)return;
     try{
       const deviceId=window.DexterDevice.getDeviceId();
       const info=JSON.parse(window.DexterDevice.getDeviceInfo());
@@ -65,6 +66,7 @@
       // without ADB or reinstalling the Android app.
       const d=await api({action:"device_enroll",deviceId,name:"Dexter Meizu Business Phone",info});
       if(d&&d.deviceToken&&window.DexterDevice.saveDeviceToken(d.deviceToken)){
+        nativeCredentialRefreshComplete=true;
         const state=document.getElementById("phoneState");
         if(state)state.textContent="Agent credential refreshed — connected";
       }
@@ -82,6 +84,7 @@
         const deviceId=window.DexterDevice.getDeviceId(),info=JSON.parse(window.DexterDevice.getDeviceInfo());
         const d=await api({action:"device_enroll",deviceId,name:"Dexter Meizu Business Phone",info});
         if(!window.DexterDevice.saveDeviceToken(d.deviceToken))throw new Error("Phone rejected the device token.");
+        nativeCredentialRefreshComplete=true;
         state.textContent="Paired and agent started";await renderPhone();
       }catch(e){state.textContent=e.message}
     };
