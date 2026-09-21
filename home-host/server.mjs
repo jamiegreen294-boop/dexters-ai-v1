@@ -1127,7 +1127,9 @@ async function androidDeviceInfo(serial){
   return {serial:serial||null,model,brand,android_version:version,battery,storage};
 }
 async function androidInstallApproved(request={}){
-  requireApprovedLive({...request,approved_live:true},"Android app installation");
+  if(request?.approval_granted!==true)throw new Error("Android app installation requires owner approval.");
+  const approvedDexterTest=/^https:\/\/jamiegreen294-boop\.github\.io\/dexters-ai-v1\/device\/Dexter-Business-Phone-v\d+\.apk$/i.test(String(request.url||"").trim());
+  if(!LIVE_ACTIONS&&!approvedDexterTest)throw new Error("Only owner-approved Dexter Business Phone test APKs may be installed while Dexter is in TEST mode.");
   const serial=String(request.serial||"").trim();
   const url=String(request.url||"").trim();
   if(!/^https:\/\//i.test(url))throw new Error("Approved APK URL must use HTTPS.");
