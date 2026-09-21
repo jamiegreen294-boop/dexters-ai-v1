@@ -37,6 +37,16 @@ public class DeviceAgentService extends Service {
         return START_STICKY;
     }
 
+    @Override public void onTaskRemoved(Intent rootIntent) {
+        try {
+            Intent restart=new Intent(getApplicationContext(),DeviceAgentService.class);
+            PendingIntent pi=PendingIntent.getService(getApplicationContext(),295,restart,PendingIntent.FLAG_ONE_SHOT|PendingIntent.FLAG_IMMUTABLE);
+            AlarmManager am=(AlarmManager)getSystemService(ALARM_SERVICE);
+            if(am!=null) am.setAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP,SystemClock.elapsedRealtime()+5000,pi);
+        } catch(Exception ignored){}
+        super.onTaskRemoved(rootIntent);
+    }
+
     @Override public void onDestroy() { running = false; super.onDestroy(); }
     @Override public android.os.IBinder onBind(Intent intent) { return null; }
 
@@ -45,7 +55,11 @@ public class DeviceAgentService extends Service {
             try {
                 heartbeat();
                 pollJobs();
-            } catch (Exception ignored) {}
+            } catch (Exception e) {
+                getSharedPreferences("dexter_device",MODE_PRIVATE).edit()
+                    .putString("agent_last_error",String.valueOf(e.getMessage()))
+                    .putLong("agent_last_error_at",System.currentTimeMillis()).apply();
+            }
             try { Thread.sleep(30000); } catch (InterruptedException e) { return; }
         }
     }
@@ -85,6 +99,9 @@ public class DeviceAgentService extends Service {
         cap.put("configSnapshot",true);
         info.put("capabilities",cap);info.put("management",DeviceOwnerPolicy.status(this));
         post(new JSONObject().put("action","device_heartbeat").put("sessionId",UUID.randomUUID().toString()).put("info",info));
+        getSharedPreferences("dexter_device",MODE_PRIVATE).edit()
+            .putLong("agent_last_success_at",System.currentTimeMillis())
+            .remove("agent_last_error").apply();
     }
 
     private void pollJobs() throws Exception {
@@ -116,8 +133,8 @@ public class DeviceAgentService extends Service {
             case "device.config.restore": return DeviceOwnerPolicy.restoreStandardConfiguration(this);
             case "apps.inventory": return appInventory();
             case "app.launch": return launchApp(req.getString("packageName"));
-            case "app.install":
-            case "dexter.self_update": return installApk(req);
+            case "app.install": return installApk(req,false);
+            case "dexter.self_update": return installApk(req,true);
             case "app.uninstall": return requestUninstall(req.getString("packageName"));
             default: throw new IllegalArgumentException("Unsupported job: "+type);
         }
@@ -164,7 +181,7 @@ public class DeviceAgentService extends Service {
         return new JSONObject().put("launched",pkg);
     }
 
-    private JSONObject installApk(JSONObject req) throws Exception {
+    private JSONObject installApk(JSONObject req, boolean selfUpdate) throws Exception {
         String url=req.optString("url","");
         if(url.length()==0)throw new Exception("APK URL is required.");
         boolean deviceOwner = DexterDeviceAdminReceiver.isDeviceOwner(this);
@@ -175,6 +192,7 @@ public class DeviceAgentService extends Service {
         }
         File apk=new File(getExternalCacheDir(),"dexter-install-"+System.currentTimeMillis()+".apk");
         download(url,apk);
+        if(selfUpdate) verifySelfUpdateApk(apk);
         PackageInstaller installer=getPackageManager().getPackageInstaller();
         PackageInstaller.SessionParams params=new PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL);
         int sid=installer.createSession(params);
@@ -191,6 +209,35 @@ public class DeviceAgentService extends Service {
             .put("installSessionId",sid)
             .put("deviceOwnerPath",deviceOwner)
             .put("confirmationMayBeRequired",!deviceOwner);
+    }
+
+    private void verifySelfUpdateApk(File apk) throws Exception {
+        PackageManager pm=getPackageManager();
+        PackageInfo incoming;
+        if(Build.VERSION.SDK_INT>=28) incoming=pm.getPackageArchiveInfo(apk.getAbsolutePath(),PackageManager.GET_SIGNING_CERTIFICATES);
+        else incoming=pm.getPackageArchiveInfo(apk.getAbsolutePath(),PackageManager.GET_SIGNATURES);
+        if(incoming==null) throw new Exception("Downloaded APK could not be verified.");
+        if(!getPackageName().equals(incoming.packageName)) throw new Exception("Self-update package name mismatch.");
+        PackageInfo current;
+        if(Build.VERSION.SDK_INT>=28) current=pm.getPackageInfo(getPackageName(),PackageManager.GET_SIGNING_CERTIFICATES);
+        else current=pm.getPackageInfo(getPackageName(),PackageManager.GET_SIGNATURES);
+        android.content.pm.Signature[] a;
+        android.content.pm.Signature[] b;
+        if(Build.VERSION.SDK_INT>=28){
+            a=current.signingInfo.getApkContentsSigners();
+            b=incoming.signingInfo.getApkContentsSigners();
+        }else{
+            a=current.signatures;
+            b=incoming.signatures;
+        }
+        if(a==null||b==null||a.length!=b.length) throw new Exception("Self-update signing certificate mismatch.");
+        java.util.HashSet<String> sa=new java.util.HashSet<>(),sb=new java.util.HashSet<>();
+        for(android.content.pm.Signature s:a)sa.add(s.toCharsString());
+        for(android.content.pm.Signature s:b)sb.add(s.toCharsString());
+        if(!sa.equals(sb)) throw new Exception("Self-update signing certificate mismatch.");
+        long incomingCode=Build.VERSION.SDK_INT>=28?incoming.getLongVersionCode():incoming.versionCode;
+        long currentCode=Build.VERSION.SDK_INT>=28?current.getLongVersionCode():current.versionCode;
+        if(incomingCode<=currentCode) throw new Exception("Self-update is not newer than the installed Dexter build.");
     }
 
     private JSONObject requestUninstall(String pkg) throws Exception {
