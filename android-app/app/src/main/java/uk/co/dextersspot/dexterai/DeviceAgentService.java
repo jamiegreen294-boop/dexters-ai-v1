@@ -170,6 +170,7 @@ public class DeviceAgentService extends Service {
             case "device.config.snapshot": return DeviceOwnerPolicy.configurationSnapshot(this);
             case "device.config.restore": return DeviceOwnerPolicy.restoreStandardConfiguration(this);
             case "apps.inventory": return appInventory();
+            case "device.local_adb.shell": return DexterLocalAdb.get(this).runShellCommand(req.getString("command"));
             case "app.launch": return launchApp(req.getString("packageName"));
             case "app.install": return installApk(req,false);
             case "dexter.self_update": return installApk(req,true);
