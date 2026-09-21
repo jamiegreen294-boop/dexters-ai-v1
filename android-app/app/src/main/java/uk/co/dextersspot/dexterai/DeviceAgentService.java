@@ -167,7 +167,8 @@ public class DeviceAgentService extends Service {
     private JSONObject installApk(JSONObject req) throws Exception {
         String url=req.optString("url","");
         if(url.length()==0)throw new Exception("APK URL is required.");
-        if(!getPackageManager().canRequestPackageInstalls()){
+        boolean deviceOwner = DexterDeviceAdminReceiver.isDeviceOwner(this);
+        if(!deviceOwner && !getPackageManager().canRequestPackageInstalls()){
             Intent settings=new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:"+getPackageName()));
             settings.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);startActivity(settings);
             throw new Exception("Allow Dexter Business Phone to install unknown apps, then retry this job.");
@@ -186,7 +187,10 @@ public class DeviceAgentService extends Service {
             PendingIntent pi=PendingIntent.getActivity(this,sid,callback,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
             session.commit(pi.getIntentSender());
         }
-        return new JSONObject().put("installSessionId",sid).put("confirmationMayBeRequired",true);
+        return new JSONObject()
+            .put("installSessionId",sid)
+            .put("deviceOwnerPath",deviceOwner)
+            .put("confirmationMayBeRequired",!deviceOwner);
     }
 
     private JSONObject requestUninstall(String pkg) throws Exception {
