@@ -45,7 +45,7 @@ public class DexterStoreActivity extends Activity {
         root.addView(title);
 
         TextView sub=new TextView(this);
-        sub.setText("Approved apps for Dexter team phones. Installed apps open here; missing apps open their Google Play listing or search.");
+        sub.setText("Approved apps for Dexter team phones. Staff can install approved apps from Google Play and request anything else for owner approval.");
         sub.setTextColor(muted);
         sub.setTextSize(14);
         sub.setPadding(0,dp(6),0,dp(18));
@@ -73,6 +73,9 @@ public class DexterStoreActivity extends Activity {
         search(root,"bOnline","bOnline");
         search(root,"Microsoft Authenticator","Microsoft Authenticator");
         search(root,"Google Authenticator","Google Authenticator");
+
+        section(root,"Request an app");
+        request(root,"Ask for a new app");
 
         section(root,"Dexter");
         web(root,"Dexter AI","https://jamiegreen294-boop.github.io/dexters-ai-v1/");
@@ -109,6 +112,16 @@ public class DexterStoreActivity extends Activity {
     private void search(LinearLayout root,String label,String query){
         Button b=button(label+"  ·  VIEW");
         b.setOnClickListener(v->openSearch(query));
+        root.addView(b,lp());
+    }
+
+    private void request(LinearLayout root,String label){
+        Button b=button(label+"  ·  REQUEST");
+        b.setOnClickListener(v->{
+            Intent i=new Intent(this,MainActivity.class);
+            i.putExtra("dexterStoreRequest",true);
+            startActivity(i);
+        });
         root.addView(b,lp());
     }
 
