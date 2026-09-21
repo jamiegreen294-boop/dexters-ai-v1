@@ -1,0 +1,48 @@
+{
+  "store": "Dexter Store",
+  "channel": "preview",
+  "policy": {
+    "staff_can_install_approved": true,
+    "staff_can_search_unapproved": false,
+    "staff_can_request_apps": true,
+    "owner_approval_required_for_unapproved": true,
+    "source": "Google Play"
+  },
+  "categories": [
+    {
+      "name": "Core",
+      "apps": [
+        {"name":"WhatsApp Business","package":"com.whatsapp.w4b","approved":true},
+        {"name":"Gmail","package":"com.google.android.gm","approved":true},
+        {"name":"Google Chrome","package":"com.android.chrome","approved":true},
+        {"name":"Google Maps","package":"com.google.android.apps.maps","approved":true},
+        {"name":"Google Drive","package":"com.google.android.apps.docs","approved":true},
+        {"name":"Google Photos","package":"com.google.android.apps.photos","approved":true},
+        {"name":"Files by Google","package":"com.google.android.apps.nbu.files","approved":true},
+        {"name":"Google Calendar","package":"com.google.android.calendar","approved":true}
+      ]
+    },
+    {
+      "name": "Payments",
+      "apps": [
+        {"name":"Square Point of Sale","query":"Square Point of Sale","approved":true}
+      ]
+    },
+    {
+      "name": "Delivery & Orders",
+      "apps": [
+        {"name":"Just Eat Partner","query":"Just Eat Partner","approved":true},
+        {"name":"Uber Eats Orders","query":"Uber Eats Orders","approved":true},
+        {"name":"Foodhub","query":"Foodhub","approved":true}
+      ]
+    },
+    {
+      "name": "Business",
+      "apps": [
+        {"name":"bOnline","query":"bOnline","approved":true},
+        {"name":"Microsoft Authenticator","query":"Microsoft Authenticator","approved":true},
+        {"name":"Google Authenticator","query":"Google Authenticator","approved":true}
+      ]
+    }
+  ]
+}
