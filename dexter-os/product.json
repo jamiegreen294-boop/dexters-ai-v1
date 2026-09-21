@@ -1,0 +1,42 @@
+{
+  "name": "Dexter OS",
+  "edition": "Team",
+  "channel": "preview",
+  "version": "0.1.0",
+  "base": "Android/AOSP compatibility preview",
+  "roles": [
+    "owner",
+    "manager",
+    "staff",
+    "support"
+  ],
+  "coreSurfaces": [
+    "Boot Handoff",
+    "Lock Screen",
+    "Dexter Home",
+    "Control Centre",
+    "Notifications",
+    "Dexter Settings",
+    "Managed Internet",
+    "Device Health",
+    "Dexter AI",
+    "Dexter Store"
+  ],
+  "updateChannels": [
+    "test",
+    "beta",
+    "stable"
+  ],
+  "destructiveActionsRequireOwnerApproval": true,
+  "store": {
+    "name": "Dexter Store",
+    "mode": "approved-catalogue",
+    "source": "Google Play plus Dexter web apps",
+    "roles": [
+      "owner",
+      "manager",
+      "staff"
+    ],
+    "policy": "Only approved business apps are surfaced to staff"
+  }
+}

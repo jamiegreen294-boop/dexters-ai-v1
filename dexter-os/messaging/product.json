@@ -1,0 +1,34 @@
+{
+  "name": "Dexter Send",
+  "version": "0.3.0",
+  "mode": "hybrid-free-data-with-sms-fallback",
+  "sender": "Dexters",
+  "replies": false,
+  "messageTypes": [
+    "order-notification",
+    "promotion"
+  ],
+  "routingPriority": [
+    "loyalty-pwa-push",
+    "customer-app-push",
+    "in-app-inbox",
+    "email-fallback",
+    "sms-fallback"
+  ],
+  "sms": {
+    "enabled": true,
+    "fallbackOnly": true,
+    "requestedSenderId": "DEXTERS",
+    "carrierCostPossible": true,
+    "requireCostPreviewForBulk": true
+  },
+  "freeRoute": {
+    "requiresReachableDexterAppOrPushSubscription": true,
+    "carrierSmsFeePerMessage": false
+  },
+  "promotionsRequireMarketingPreference": true,
+  "notificationBranding": {
+    "title": "Dexters",
+    "icon": "Dexter logo"
+  }
+}

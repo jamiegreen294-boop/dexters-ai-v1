@@ -15,12 +15,16 @@ public class DeviceAgentService extends Service {
     private static final String CHANNEL = "dexter_device_agent";
     private static final int NOTIFICATION_ID = 294;
     private static final String API = "https://eikruaxxzzxmfjvsmwwo.supabase.co/functions/v1/ai-command-centre";
+    private static final String SEND_API = "https://eikruaxxzzxmfjvsmwwo.supabase.co/functions/v1/dexter-send-preview";
+    private static final String SEND_CHANNEL = "dexter_send";
     private final Handler handler = new Handler(Looper.getMainLooper());
     private volatile boolean running = false;
 
     public static boolean hasToken(Context c) {
         return readToken(c).length() >= 32;
     }
+
+    public static String getDeviceToken(Context c) { return readToken(c); }
 
     public static void saveToken(Context c, String token) {
         if (token == null || token.length() < 32) return;
@@ -53,7 +57,6 @@ public class DeviceAgentService extends Service {
         super.onCreate();
         createChannel();
         startForeground(NOTIFICATION_ID, buildNotification("Dexter device agent connected"));
-        AgentWatchdogReceiver.schedule(this);
     }
 
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
@@ -71,11 +74,7 @@ public class DeviceAgentService extends Service {
         super.onTaskRemoved(rootIntent);
     }
 
-    @Override public void onDestroy() {
-        running = false;
-        AgentWatchdogReceiver.schedule(this);
-        super.onDestroy();
-    }
+    @Override public void onDestroy() { running = false; super.onDestroy(); }
     @Override public android.os.IBinder onBind(Intent intent) { return null; }
 
     private void loop() {
@@ -89,6 +88,11 @@ public class DeviceAgentService extends Service {
                 pollJobs();
             } catch (Exception e) {
                 recordAgentError("pollJobs: " + String.valueOf(e.getMessage()));
+            }
+            try {
+                pollDexterSend();
+            } catch (Exception e) {
+                recordAgentError("dexterSend: " + String.valueOf(e.getMessage()));
             }
             try { Thread.sleep(30000); } catch (InterruptedException e) { return; }
         }
@@ -319,11 +323,50 @@ public class DeviceAgentService extends Service {
         try(InputStream in=c.getInputStream();OutputStream out=new FileOutputStream(f)){byte[] b=new byte[65536];int n;while((n=in.read(b))>0)out.write(b,0,n);}
     }
 
+    private void pollDexterSend() throws Exception {
+        HttpURLConnection c=(HttpURLConnection)new URL(SEND_API).openConnection();
+        c.setConnectTimeout(10000); c.setReadTimeout(20000); c.setRequestMethod("POST"); c.setDoOutput(true);
+        c.setRequestProperty("Content-Type","application/json");
+        c.setRequestProperty("x-dexter-device-token",token());
+        try(OutputStream os=c.getOutputStream()){os.write("{\"action\":\"list\"}".getBytes("UTF-8"));}
+        InputStream is=(c.getResponseCode()>=200&&c.getResponseCode()<300)?c.getInputStream():c.getErrorStream();
+        String raw=readAll(is);
+        if(c.getResponseCode()<200||c.getResponseCode()>=300) throw new IOException("Dexter Send HTTP "+c.getResponseCode());
+        JSONObject data=new JSONObject(raw.length()==0?"{}":raw);
+        JSONArray messages=data.optJSONArray("messages"); if(messages==null)return;
+        SharedPreferences prefs=getSharedPreferences("dexter_send",MODE_PRIVATE);
+        for(int i=messages.length()-1;i>=0;i--){
+            JSONObject m=messages.optJSONObject(i); if(m==null)continue;
+            String id=m.optString("id",""); if(id.isEmpty()||!m.isNull("read_at"))continue;
+            if(prefs.getBoolean("seen_"+id,false))continue;
+            showDexterNotice(id,m.optString("body","New message from Dexters"));
+            prefs.edit().putBoolean("seen_"+id,true).apply();
+        }
+    }
+
+    private void showDexterNotice(String id,String body){
+        Intent open=new Intent(this,DexterInboxActivity.class);
+        open.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        PendingIntent pi=PendingIntent.getActivity(this,id.hashCode(),open,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
+        Notification.Builder b=Build.VERSION.SDK_INT>=26?new Notification.Builder(this,SEND_CHANNEL):new Notification.Builder(this);
+        b.setContentTitle("Dexters")
+            .setContentText(body)
+            .setStyle(new Notification.BigTextStyle().bigText(body))
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setAutoCancel(true)
+            .setContentIntent(pi);
+        getSystemService(NotificationManager.class).notify(Math.abs(id.hashCode()),b.build());
+    }
+
     private void createChannel(){
         if(Build.VERSION.SDK_INT>=26){
             NotificationChannel ch=new NotificationChannel(CHANNEL,"Dexter Business Phone",NotificationManager.IMPORTANCE_LOW);
             ch.setDescription("Keeps the Dexter device-management agent connected.");
             getSystemService(NotificationManager.class).createNotificationChannel(ch);
+
+            NotificationChannel send=new NotificationChannel(SEND_CHANNEL,"Dexters Messages",NotificationManager.IMPORTANCE_HIGH);
+            send.setDescription("Order updates and offers from Dexters.");
+            getSystemService(NotificationManager.class).createNotificationChannel(send);
         }
     }
     private Notification buildNotification(String text){

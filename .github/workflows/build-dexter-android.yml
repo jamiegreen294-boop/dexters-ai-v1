@@ -1,14 +1,9 @@
-name: Build Dexter Android APK
+name: Build Dexter OS Managed Phone APK
 
 on:
   workflow_dispatch:
-  pull_request:
-    paths:
-      - 'android-app/**'
-      - '.github/workflows/build-dexter-android.yml'
   push:
     branches:
-      - build/real-dexter-ai
       - upgrade/meizu-v6-local-admin-bridge
     paths:
       - 'android-app/**'
@@ -46,7 +41,7 @@ jobs:
           test -n "$DEXTER_ANDROID_KEYSTORE_B64"
           printf '%s' "$DEXTER_ANDROID_KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/dexter-business-phone.jks"
 
-      - name: Build signed release APK
+      - name: Build signed managed APK
         env:
           DEXTER_ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/dexter-business-phone.jks
           DEXTER_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.DEXTER_ANDROID_KEYSTORE_PASSWORD }}
@@ -54,14 +49,14 @@ jobs:
           DEXTER_ANDROID_KEY_PASSWORD: ${{ secrets.DEXTER_ANDROID_KEY_PASSWORD }}
         run: gradle :app:assembleRelease --stacktrace
 
-      - name: Upload signed APK artifact
+      - name: Upload signed managed artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Dexter-Business-Phone-v30
+          name: Dexter-Business-Phone-v34
           path: android-app/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
 
-      - name: Publish provisioning APK to GitHub Pages
+      - name: Publish immutable managed APK to GitHub Pages
         working-directory: .
         run: |
           git config user.name "Dexter Build"
@@ -69,22 +64,17 @@ jobs:
           git fetch origin gh-pages
           git worktree add "$RUNNER_TEMP/gh-pages" origin/gh-pages
           mkdir -p "$RUNNER_TEMP/gh-pages/device"
-          cp android-app/app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/gh-pages/device/Dexter-Business-Phone-v30.apk"
+          cp android-app/app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/gh-pages/device/Dexter-Business-Phone-v34.apk"
           cd "$RUNNER_TEMP/gh-pages"
-          git add device/Dexter-Business-Phone-v30.apk
+          git add device/Dexter-Business-Phone-v34.apk
           if git diff --cached --quiet; then
-            echo "Provisioning APK already current"
+            echo "Dexter OS managed APK already current"
           else
-            git commit -m "Publish Dexter Business Phone v30 premium home"
+            git commit -m "Publish Dexter Business Phone v34 managed OS"
             for attempt in 1 2 3; do
-              if git push origin HEAD:gh-pages; then
-                break
-              fi
+              if git push origin HEAD:gh-pages; then break; fi
               git fetch origin gh-pages
               git rebase origin/gh-pages
-              if [ "$attempt" = "3" ]; then
-                echo "Failed to publish v30 after retries"
-                exit 1
-              fi
+              if [ "$attempt" = "3" ]; then exit 1; fi
             done
           fi
