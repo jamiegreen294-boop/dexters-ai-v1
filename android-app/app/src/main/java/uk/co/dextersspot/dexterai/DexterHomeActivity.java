@@ -71,6 +71,11 @@ public class DexterHomeActivity extends Activity {
         if (DeviceAgentService.hasToken(this)) DeviceAgentService.start(this);
     }
 
+    @Override public void onBackPressed() {
+        // Dexter Home is the device home screen. Back should never dismiss,
+        // slide, recreate or refresh the launcher.
+    }
+
     private void render() {
         FrameLayout shell = new FrameLayout(this);
 
@@ -80,7 +85,7 @@ public class DexterHomeActivity extends Activity {
 
         GradientDrawable wallpaper = new GradientDrawable(
             GradientDrawable.Orientation.TL_BR,
-            new int[]{Color.rgb(11,19,18), Color.rgb(22,29,26), Color.rgb(16,16,18)}
+            new int[]{Color.rgb(7,14,13), Color.rgb(18,27,24), Color.rgb(12,13,15)}
         );
         root.setBackground(wallpaper);
 
@@ -107,35 +112,56 @@ public class DexterHomeActivity extends Activity {
         date.setGravity(Gravity.CENTER);
         top.addView(date,new LinearLayout.LayoutParams(-1,-2));
 
-        TextView badge = new TextView(this);
-        badge.setText("DEXTERS BUSINESS PHONE");
-        badge.setTextColor(Color.WHITE);
-        badge.setTextSize(9);
-        badge.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
-        badge.setGravity(Gravity.CENTER);
-        badge.setPadding(dp(12),dp(5),dp(12),dp(5));
-        badge.setBackground(round(Color.argb(55,255,255,255),14));
-        LinearLayout.LayoutParams badgeLp=new LinearLayout.LayoutParams(-2,-2);
-        badgeLp.topMargin=dp(7);
-        top.addView(badge,badgeLp);
+        LinearLayout brandCard=new LinearLayout(this);
+        brandCard.setOrientation(LinearLayout.HORIZONTAL);
+        brandCard.setGravity(Gravity.CENTER_VERTICAL);
+        brandCard.setPadding(dp(12),dp(8),dp(14),dp(8));
+        brandCard.setBackground(round(Color.argb(36,255,255,255),22));
+        brandCard.setElevation(dp(3));
+
+        ImageView brandLogo = new ImageView(this);
+        brandLogo.setImageResource(uk.co.dextersspot.dexterai.R.drawable.ic_launcher);
+        brandLogo.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        brandCard.addView(brandLogo,new LinearLayout.LayoutParams(dp(38),dp(38)));
+
+        LinearLayout brandWords=new LinearLayout(this);
+        brandWords.setOrientation(LinearLayout.VERTICAL);
+        brandWords.setPadding(dp(9),0,0,0);
+
+        TextView brandTitle=new TextView(this);
+        brandTitle.setText("DEXTERS");
+        brandTitle.setTextColor(Color.WHITE);
+        brandTitle.setTextSize(14);
+        brandTitle.setTypeface(Typeface.create("sans-serif-medium",Typeface.BOLD));
+        brandWords.addView(brandTitle,new LinearLayout.LayoutParams(-2,-2));
+
+        TextView brandSub=new TextView(this);
+        brandSub.setText("Business Phone");
+        brandSub.setTextColor(Color.rgb(196,199,202));
+        brandSub.setTextSize(10);
+        brandWords.addView(brandSub,new LinearLayout.LayoutParams(-2,-2));
+
+        brandCard.addView(brandWords,new LinearLayout.LayoutParams(-2,-2));
+        LinearLayout.LayoutParams brandLp=new LinearLayout.LayoutParams(-2,-2);
+        brandLp.topMargin=dp(10);
+        top.addView(brandCard,brandLp);
 
         pages = new ViewFlipper(this);
         root.addView(pages,new LinearLayout.LayoutParams(-1,0,1f));
 
         GridLayout p1=appPage();
-        addWebTile(p1,"Dexter AI","D",Color.rgb(239,139,34),v->startActivity(new Intent(this,MainActivity.class)));
-        addWebTile(p1,"Loyalty","★",Color.rgb(237,177,42),v->openWeb("https://app.dextersspot.co.uk"));
-        addWebTile(p1,"POS","£",Color.rgb(35,35,39),v->openWeb("https://backoffice.dextersspot.co.uk/pc-pos-test/"));
-        addWebTile(p1,"Back Office","B",Color.rgb(118,87,201),v->openWeb("https://backoffice.dextersspot.co.uk/"));
-        addWebTile(p1,"Scanner","⌁",Color.rgb(35,188,117),v->openWeb("https://backoffice.dextersspot.co.uk/pc-pos-test/scanner/"));
+        addPremiumTile(p1,"Dexter AI",R.drawable.ic_dexter_ai,Color.rgb(239,139,34),v->startActivity(new Intent(this,MainActivity.class)));
+        addPremiumTile(p1,"Loyalty",R.drawable.ic_loyalty,Color.rgb(227,166,30),v->openWeb("https://app.dextersspot.co.uk"));
+        addPremiumTile(p1,"POS",R.drawable.ic_pos,Color.rgb(39,42,46),v->openWeb("https://backoffice.dextersspot.co.uk/pc-pos-test/"));
+        addPremiumTile(p1,"Back Office",R.drawable.ic_backoffice,Color.rgb(103,83,183),v->openWeb("https://backoffice.dextersspot.co.uk/"));
+        addPremiumTile(p1,"Scanner",R.drawable.ic_scanner,Color.rgb(35,188,117),v->openWeb("https://backoffice.dextersspot.co.uk/pc-pos-test/scanner/"));
         addPackageTile(p1,"WhatsApp",new String[]{"com.whatsapp.w4b","com.whatsapp"},"WhatsApp");
         addPackageTile(p1,"Gmail",new String[]{"com.google.android.gm"},"Gmail");
         addPackageTile(p1,"Maps",new String[]{"com.google.android.apps.maps"},"Maps");
-        addWebTile(p1,"Internet","🌐",Color.rgb(58,116,201),v->openWeb("https://www.google.com/"));
+        addPremiumTile(p1,"Internet",R.drawable.ic_internet,Color.rgb(58,116,201),v->openWeb("https://www.google.com/"));
         addPackageTile(p1,"Square",new String[]{"com.squareup","com.squareup.pos"},"Square");
-        addWebTile(p1,"Website","D",Color.rgb(47,94,79),v->openWeb("https://dextersspot.co.uk"));
-        addWebTile(p1,"Business","▦",Color.rgb(83,83,89),v->startActivity(new Intent(this,BusinessAppsActivity.class)));
-        addWebTile(p1,"Messages","✉",Color.rgb(239,139,34),v->startActivity(new Intent(this,DexterInboxActivity.class)));
+        addPremiumTile(p1,"Website",R.drawable.ic_website,Color.rgb(47,94,79),v->openWeb("https://dextersspot.co.uk"));
+        addPremiumTile(p1,"Business",R.drawable.ic_business,Color.rgb(71,76,80),v->startActivity(new Intent(this,BusinessAppsActivity.class)));
 
         GridLayout p2=appPage();
         addPackageTile(p2,"Camera",new String[]{"com.android.camera2","com.android.camera","com.meizu.media.camera"},"Camera");
@@ -143,8 +169,7 @@ public class DexterHomeActivity extends Activity {
         addWebTile(p2,"Quick Start","i",Color.rgb(69,132,239),v->startActivity(new Intent(this,QuickStartActivity.class)));
         addWebTile(p2,"Wi-Fi","⌁",Color.rgb(57,133,246),v->startActivity(new Intent(Settings.ACTION_WIFI_SETTINGS)));
         addWebTile(p2,"Bluetooth","ᛒ",Color.rgb(63,103,232),v->startActivity(new Intent(Settings.ACTION_BLUETOOTH_SETTINGS)));
-        addWebTile(p2,"Dexter Admin","⚙",Color.rgb(112,112,118),v->openAdmin());
-        addWebTile(p2,"Dexter Store","D",Color.rgb(239,139,34),v->startActivity(new Intent(this,DexterStoreActivity.class)));
+        addWebTile(p2,"Dexter Admin","⚙",Color.rgb(92,97,104),v->openAdmin());
         addPackageTile(p2,"Files",new String[]{"com.google.android.documentsui","com.android.documentsui"},"Files");
         addPackageTile(p2,"Chrome",new String[]{"com.android.chrome"},"Chrome");
         addWebTile(p2,"bOnline","b",Color.rgb(45,121,212),v->launchPackageOrLabel(new String[]{},"bOnline"));
@@ -154,9 +179,9 @@ public class DexterHomeActivity extends Activity {
         pageDots=new TextView(this);
         pageDots.setText("●  ○");
         pageDots.setTextColor(Color.argb(210,255,255,255));
-        pageDots.setTextSize(11);
+        pageDots.setTextSize(9);
         pageDots.setGravity(Gravity.CENTER);
-        pageDots.setPadding(0,dp(4),0,dp(9));
+        pageDots.setPadding(0,dp(3),0,dp(10));
         root.addView(pageDots,new LinearLayout.LayoutParams(-1,-2));
 
         LinearLayout dock=new LinearLayout(this);
@@ -164,7 +189,7 @@ public class DexterHomeActivity extends Activity {
         dock.setGravity(Gravity.CENTER);
         dock.setPadding(dp(10),dp(10),dp(10),dp(10));
         dock.setElevation(dp(12));
-        dock.setBackground(round(Color.argb(120,255,255,255),30));
+        dock.setBackground(round(Color.argb(46,255,255,255),30));
         root.addView(dock,new LinearLayout.LayoutParams(-1,dp(86)));
 
         addDockWeb(dock,"D",Color.rgb(239,139,34),v->startActivity(new Intent(this,MainActivity.class)));
@@ -188,12 +213,12 @@ public class DexterHomeActivity extends Activity {
         ImageView logo=new ImageView(this);
         logo.setImageResource(uk.co.dextersspot.dexterai.R.drawable.ic_launcher);
         logo.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-        splash.addView(logo,new LinearLayout.LayoutParams(dp(118),dp(118)));
+        splash.addView(logo,new LinearLayout.LayoutParams(dp(144),dp(144)));
 
         TextView brand=new TextView(this);
         brand.setText("DEXTERS");
         brand.setTextColor(Color.WHITE);
-        brand.setTextSize(24);
+        brand.setTextSize(28);
         brand.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
         brand.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams brandLp=new LinearLayout.LayoutParams(-1,-2);
@@ -201,7 +226,7 @@ public class DexterHomeActivity extends Activity {
         splash.addView(brand,brandLp);
 
         TextView sub=new TextView(this);
-        sub.setText("Business Phone");
+        sub.setText("Dexter Business Phone");
         sub.setTextColor(Color.rgb(190,190,195));
         sub.setTextSize(13);
         sub.setGravity(Gravity.CENTER);
@@ -211,7 +236,7 @@ public class DexterHomeActivity extends Activity {
 
         shell.addView(splash,new FrameLayout.LayoutParams(-1,-1));
         splash.bringToFront();
-        splash.postDelayed(()->splash.animate().alpha(0f).setDuration(280).withEndAction(()->shell.removeView(splash)).start(),900);
+        splash.postDelayed(()->splash.animate().alpha(0f).setDuration(320).withEndAction(()->shell.removeView(splash)).start(),1500);
     }
 
     private GridLayout appPage(){
@@ -222,13 +247,33 @@ public class DexterHomeActivity extends Activity {
         return g;
     }
 
+    private void addPremiumTile(GridLayout grid,String label,int drawableRes,int color,View.OnClickListener click){
+        LinearLayout box=tileShell();
+        FrameLayout iconShell=new FrameLayout(this);
+        iconShell.setBackground(round(color,20));
+        iconShell.setElevation(dp(8));
+        iconShell.setOnClickListener(click);
+
+        ImageView icon=new ImageView(this);
+        icon.setImageResource(drawableRes);
+        icon.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        icon.setPadding(dp(15),dp(15),dp(15),dp(15));
+        FrameLayout.LayoutParams ip=new FrameLayout.LayoutParams(-1,-1);
+        ip.gravity=Gravity.CENTER;
+        iconShell.addView(icon,ip);
+
+        box.addView(iconShell,new LinearLayout.LayoutParams(dp(64),dp(64)));
+        addName(box,label);
+        grid.addView(box);
+    }
+
     private void addWebTile(GridLayout grid,String label,String glyph,int color,View.OnClickListener click){
         LinearLayout box=tileShell();
         TextView icon=new TextView(this);
-        icon.setText(glyph); icon.setTextColor(Color.WHITE); icon.setTextSize(glyph.length()>1?19:25);
-        icon.setGravity(Gravity.CENTER); icon.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
-        icon.setBackground(round(color,18)); icon.setElevation(dp(5)); icon.setOnClickListener(click);
-        box.addView(icon,new LinearLayout.LayoutParams(dp(60),dp(60)));
+        icon.setText(glyph); icon.setTextColor(Color.WHITE); icon.setTextSize(glyph.length()>2?13:glyph.length()>1?17:25);
+        icon.setGravity(Gravity.CENTER); icon.setTypeface(Typeface.create("sans-serif-medium",Typeface.BOLD));
+        icon.setBackground(round(color,20)); icon.setElevation(dp(7)); icon.setOnClickListener(click);
+        box.addView(icon,new LinearLayout.LayoutParams(dp(64),dp(64)));
         addName(box,label);
         grid.addView(box);
     }
@@ -237,13 +282,13 @@ public class DexterHomeActivity extends Activity {
         LinearLayout box=tileShell();
         ImageView icon=new ImageView(this);
         icon.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-        icon.setPadding(dp(4),dp(4),dp(4),dp(4));
-        icon.setElevation(dp(5));
+        icon.setPadding(dp(3),dp(3),dp(3),dp(3));
+        icon.setElevation(dp(7));
         Drawable d=findIcon(packages,fallbackLabel);
         if(d!=null) icon.setImageDrawable(d);
         else icon.setImageDrawable(letterDrawable(label.substring(0,1)));
         icon.setOnClickListener(v->launchPackageOrLabel(packages,fallbackLabel));
-        box.addView(icon,new LinearLayout.LayoutParams(dp(60),dp(60)));
+        box.addView(icon,new LinearLayout.LayoutParams(dp(64),dp(64)));
         addName(box,label);
         grid.addView(box);
     }
@@ -252,7 +297,7 @@ public class DexterHomeActivity extends Activity {
         LinearLayout box=new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
         box.setGravity(Gravity.TOP|Gravity.CENTER_HORIZONTAL);
-        box.setPadding(dp(2),dp(8),dp(2),dp(2));
+        box.setPadding(dp(2),dp(7),dp(2),dp(3));
         GridLayout.LayoutParams lp=new GridLayout.LayoutParams();
         lp.width=0;lp.height=0;
         lp.columnSpec=GridLayout.spec(GridLayout.UNDEFINED,1f);
@@ -263,10 +308,11 @@ public class DexterHomeActivity extends Activity {
 
     private void addName(LinearLayout box,String label){
         TextView name=new TextView(this);
-        name.setText(label); name.setTextColor(Color.WHITE); name.setTextSize(10.5f);
+        name.setText(label); name.setTextColor(Color.rgb(245,245,247)); name.setTextSize(10.2f);
+        name.setTypeface(Typeface.create("sans-serif",Typeface.NORMAL));
         name.setGravity(Gravity.CENTER); name.setMaxLines(1);
-        name.setShadowLayer(2,0,1,Color.BLACK);
-        name.setPadding(0,dp(5),0,0);
+        name.setShadowLayer(2.4f,0,1,Color.BLACK);
+        name.setPadding(0,dp(6),0,0);
         box.addView(name,new LinearLayout.LayoutParams(-1,-2));
     }
 
