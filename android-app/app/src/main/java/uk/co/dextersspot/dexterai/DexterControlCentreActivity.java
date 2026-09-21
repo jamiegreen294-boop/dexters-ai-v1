@@ -42,7 +42,7 @@ public class DexterControlCentreActivity extends Activity {
         GridLayout roundGrid=new GridLayout(this); roundGrid.setColumnCount(4);
         LinearLayout.LayoutParams rgp=new LinearLayout.LayoutParams(-1,-2); rgp.topMargin=dp(10); root.addView(roundGrid,rgp);
         roundQuick(roundGrid,"Dark Mode","◐",v->{});
-        roundQuick(roundGrid,"Do Not Disturb","☾",v->startActivity(new Intent(Settings.ACTION_ZEN_MODE_SETTINGS)));
+        roundQuick(roundGrid,"Do Not Disturb","☾",v->startActivity(new Intent("android.settings.ZEN_MODE_SETTINGS")));
         roundQuick(roundGrid,"Auto Rotate","↻",v->startActivity(new Intent(Settings.ACTION_DISPLAY_SETTINGS)));
         roundQuick(roundGrid,"Torch","✦",v->{});
         roundQuick(roundGrid,"Location","●",v->startActivity(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)));
