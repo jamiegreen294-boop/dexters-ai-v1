@@ -1,29 +1,34 @@
 {
-  "name": "Dexter Messaging",
-  "version": "0.1.0",
-  "components": {
-    "team": {
-      "name": "Dexter Messages",
-      "transport": "internet",
-      "carrierFeePerMessage": false
-    },
-    "customer": {
-      "name": "Dexter Chat",
-      "surfaces": ["loyalty-app", "website", "future-customer-app"],
-      "aiFirstResponse": true,
-      "staffTakeover": true
-    },
-    "broadcast": {
-      "name": "Dexter Send",
-      "freeChannels": ["in-app", "web-push", "pwa-push", "team-broadcast", "email"],
-      "carrierChannels": ["sms", "mms", "rcs", "whatsapp-business"],
-      "showCostBeforePaidSend": true
-    }
-  },
-  "senderNames": {
-    "app": "Dexter",
-    "push": "Dexter",
-    "email": "Dexter",
-    "smsRequested": "DEXTER"
+  "name": "Dexter Send",
+  "version": "0.2.0",
+  "mode": "one-way-notifications",
+  "sender": "Dexters",
+  "replies": false,
+  "messageTypes": [
+    "order-notification",
+    "promotion"
+  ],
+  "freeDefaultChannels": [
+    "loyalty-pwa-push",
+    "customer-app-push",
+    "dexter-os-push",
+    "in-app-inbox",
+    "web-push"
+  ],
+  "paidChannelsDefaultEnabled": false,
+  "smsDefaultEnabled": false,
+  "transactionalEvents": [
+    "order-received",
+    "order-accepted",
+    "order-amended",
+    "order-rejected",
+    "preparing",
+    "ready-for-collection",
+    "collected"
+  ],
+  "promotionsRequireMarketingPreference": true,
+  "notificationBranding": {
+    "title": "Dexters",
+    "icon": "Dexter logo"
   }
 }
