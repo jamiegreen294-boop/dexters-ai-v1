@@ -80,6 +80,22 @@
     });
     if(!phones.length)list.innerHTML='<div class="task"><p>No Dexter business phones paired yet.</p></div>';
   }
+  async function ensureNativeAgentEnrollment(){
+    if(!nativePhone())return;
+    try{
+      if(window.DexterDevice.isPaired())return;
+      const deviceId=window.DexterDevice.getDeviceId();
+      const info=JSON.parse(window.DexterDevice.getDeviceInfo());
+      const d=await api({action:"device_enroll",deviceId,name:"Dexter Meizu Business Phone",info});
+      if(d&&d.deviceToken&&window.DexterDevice.saveDeviceToken(d.deviceToken)){
+        const state=document.getElementById("phoneState");
+        if(state)state.textContent="Paired automatically — agent started";
+      }
+    }catch(e){
+      const state=document.getElementById("phoneState");
+      if(state)state.textContent="Agent pairing needs owner sign-in";
+    }
+  }
   function wire(){
     const pair=document.getElementById("pairThisPhone");
     if(pair)pair.onclick=async()=>{
@@ -129,5 +145,5 @@
       }catch(e){out.textContent=e.message}
     };
   }
-  ensurePhonePage();wire();
+  ensurePhonePage();wire();setTimeout(ensureNativeAgentEnrollment,800);
 })();
