@@ -51,8 +51,10 @@ public final class DeviceOwnerPolicy {
         DevicePolicyManager d=dpm(c);
         boolean owner=isOwner(c);
         j.put("deviceOwner", owner);
-        j.put("activeAdmin", d!=null && d.isAdminActive(admin(c)));
-        j.put("organization", owner ? String.valueOf(d.getOrganizationName(admin(c))) : "");
+        try { j.put("activeAdmin", d!=null && d.isAdminActive(admin(c))); }
+        catch(Exception e) { j.put("activeAdmin", owner).put("activeAdminError", safeMessage(e)); }
+        try { j.put("organization", owner ? String.valueOf(d.getOrganizationName(admin(c))) : ""); }
+        catch(Exception e) { j.put("organization", "Dexters").put("organizationStatusError", safeMessage(e)); }
         j.put("silentManagementAvailable", owner);
         j.put("securityPatch", Build.VERSION.SECURITY_PATCH);
         j.put("sdk", Build.VERSION.SDK_INT);
