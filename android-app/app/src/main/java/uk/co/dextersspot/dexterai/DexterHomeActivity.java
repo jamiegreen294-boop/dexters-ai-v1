@@ -15,6 +15,7 @@ import android.os.Bundle;
 import android.provider.Settings;
 import android.view.Gravity;
 import android.view.MotionEvent;
+import android.view.GestureDetector;
 import android.view.View;
 import android.view.Window;
 import android.widget.GridLayout;
@@ -30,13 +31,37 @@ public class DexterHomeActivity extends Activity {
     private final int muted = Color.rgb(205,205,210);
     private ViewFlipper pages;
     private TextView pageDots;
-    private float downX;
+    private GestureDetector gestureDetector;
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         getWindow().setStatusBarColor(Color.rgb(13,18,17));
         getWindow().setNavigationBarColor(Color.rgb(13,18,17));
+        gestureDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
+            @Override public boolean onDown(MotionEvent e) { return false; }
+            @Override public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
+                if (e1 == null || e2 == null || pages == null) return false;
+                float dx = e2.getX() - e1.getX();
+                float dy = e2.getY() - e1.getY();
+                if (Math.abs(dx) < dp(70) || Math.abs(dx) <= Math.abs(dy)) return false;
+                if (dx < 0 && pages.getDisplayedChild() < pages.getChildCount() - 1) {
+                    pages.setInAnimation(DexterHomeActivity.this, android.R.anim.fade_in);
+                    pages.setOutAnimation(DexterHomeActivity.this, android.R.anim.fade_out);
+                    pages.showNext();
+                    updateDots();
+                    return true;
+                }
+                if (dx > 0 && pages.getDisplayedChild() > 0) {
+                    pages.setInAnimation(DexterHomeActivity.this, android.R.anim.fade_in);
+                    pages.setOutAnimation(DexterHomeActivity.this, android.R.anim.fade_out);
+                    pages.showPrevious();
+                    updateDots();
+                    return true;
+                }
+                return false;
+            }
+        });
         render();
     }
 
@@ -119,7 +144,6 @@ public class DexterHomeActivity extends Activity {
         addWebTile(p2,"bOnline","b",Color.rgb(45,121,212),v->launchPackageOrLabel(new String[]{},"bOnline"));
 
         pages.addView(p1); pages.addView(p2);
-        pages.setOnTouchListener((v,e)->handleSwipe(e));
 
         pageDots=new TextView(this);
         pageDots.setText("●  ○");
@@ -239,21 +263,9 @@ public class DexterHomeActivity extends Activity {
         return d;
     }
 
-    private boolean handleSwipe(MotionEvent e){
-        if(e.getAction()==MotionEvent.ACTION_DOWN){downX=e.getX();return false;}
-        if(e.getAction()==MotionEvent.ACTION_UP){
-            float dx=e.getX()-downX;
-            if(Math.abs(dx)>dp(65)){
-                if(dx<0&&pages.getDisplayedChild()<pages.getChildCount()-1){
-                    pages.setInAnimation(this,android.R.anim.fade_in);pages.setOutAnimation(this,android.R.anim.fade_out);pages.showNext();
-                }else if(dx>0&&pages.getDisplayedChild()>0){
-                    pages.setInAnimation(this,android.R.anim.fade_in);pages.setOutAnimation(this,android.R.anim.fade_out);pages.showPrevious();
-                }
-                updateDots();
-            }
-            return false;
-        }
-        return false;
+    @Override public boolean dispatchTouchEvent(MotionEvent ev) {
+        if (gestureDetector != null) gestureDetector.onTouchEvent(ev);
+        return super.dispatchTouchEvent(ev);
     }
 
     private void updateDots(){if(pageDots!=null)pageDots.setText(pages.getDisplayedChild()==0?"●  ○":"○  ●");}
