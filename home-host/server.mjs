@@ -1129,7 +1129,8 @@ async function androidDeviceInfo(serial){
 async function androidInstallApproved(request={}){
   if(request?.approval_granted!==true)throw new Error("Android app installation requires owner approval.");
   const approvedDexterTest=/^https:\/\/jamiegreen294-boop\.github\.io\/dexters-ai-v1\/device\/Dexter-Business-Phone-v\d+\.apk$/i.test(String(request.url||"").trim());
-  if(!LIVE_ACTIONS&&!approvedDexterTest)throw new Error("Only owner-approved Dexter Business Phone test APKs may be installed while Dexter is in TEST mode.");
+  const approvedDexterOsPreview=/^https:\/\/jamiegreen294-boop\.github\.io\/dexters-ai-v1\/device\/Dexter-OS-Preview-v\d+\.apk$/i.test(String(request.url||"").trim());
+  if(!LIVE_ACTIONS&&!approvedDexterTest&&!approvedDexterOsPreview)throw new Error("Only owner-approved Dexter Business Phone or Dexter OS Preview test APKs may be installed while Dexter is in TEST mode.");
   const serial=String(request.serial||"").trim();
   const url=String(request.url||"").trim();
   if(!/^https:\/\//i.test(url))throw new Error("Approved APK URL must use HTTPS.");
@@ -1140,7 +1141,7 @@ async function androidInstallApproved(request={}){
   await downloadFile(url,dest);
   const actual=String(await sha256File(dest)).toLowerCase();
   if(expectedSha&&actual!==expectedSha)throw new Error("APK checksum mismatch; install blocked.");
-  const args=[];if(serial)args.push("-s",serial);args.push("install","-r","-d",dest);
+  const args=[];if(serial)args.push("-s",serial);args.push("install","-r",dest);
   const result=await adbRun(args,180000);
   return {ok:true,serial:serial||null,name:safeName,sha256:actual,output:result.stdout.slice(-4000)};
 }
