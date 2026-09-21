@@ -143,6 +143,7 @@ public class DexterHomeActivity extends Activity {
         addWebTile(p2,"Wi-Fi","⌁",Color.rgb(57,133,246),v->startActivity(new Intent(Settings.ACTION_WIFI_SETTINGS)));
         addWebTile(p2,"Bluetooth","ᛒ",Color.rgb(63,103,232),v->startActivity(new Intent(Settings.ACTION_BLUETOOTH_SETTINGS)));
         addWebTile(p2,"Dexter Admin","⚙",Color.rgb(112,112,118),v->openAdmin());
+        addWebTile(p2,"Dexter Store","D",Color.rgb(239,139,34),v->startActivity(new Intent(this,DexterStoreActivity.class)));
         addPackageTile(p2,"Files",new String[]{"com.google.android.documentsui","com.android.documentsui"},"Files");
         addPackageTile(p2,"Chrome",new String[]{"com.android.chrome"},"Chrome");
         addWebTile(p2,"bOnline","b",Color.rgb(45,121,212),v->launchPackageOrLabel(new String[]{},"bOnline"));
