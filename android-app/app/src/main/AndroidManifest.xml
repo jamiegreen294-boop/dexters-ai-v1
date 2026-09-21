@@ -12,6 +12,7 @@
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
 
     <application
+        android:directBootAware="true"
         android:allowBackup="false"
         android:usesCleartextTraffic="false"
         android:label="Dexter Business Phone"
@@ -40,6 +41,7 @@
         <receiver
             android:name=".BootReceiver"
             android:enabled="true"
+            android:directBootAware="true"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED"/>
@@ -51,6 +53,7 @@
         <service
             android:name=".DeviceAgentService"
             android:exported="false"
+            android:directBootAware="true"
             android:foregroundServiceType="dataSync"/>
 
         <activity
@@ -75,6 +78,12 @@
         </activity>
 
 
+        <activity
+            android:name=".DexterBootSplashActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:directBootAware="true"/>
         <activity android:name=".BusinessAppsActivity" android:exported="false"/>
         <activity android:name=".QuickStartActivity" android:exported="false"/>
 
