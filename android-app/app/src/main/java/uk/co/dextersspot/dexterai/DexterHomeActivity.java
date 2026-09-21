@@ -3,6 +3,12 @@ package uk.co.dextersspot.dexterai;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.Context;
+import android.hardware.camera2.CameraManager;
+import android.media.AudioManager;
+import android.net.wifi.WifiManager;
+import android.bluetooth.BluetoothAdapter;
+import android.Manifest;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.drawable.Drawable;
@@ -41,7 +47,7 @@ public class DexterHomeActivity extends Activity {
 
     @Override public void onBackPressed() {
         if (web != null) {
-            web.evaluateJavascript("(function(){var a=document.querySelector('.page.active');if(a&&a.id!=='home'){showPage('home');return 'home';}return 'stay';})()", null);
+            web.evaluateJavascript("(function(){var a=document.querySelector('.page.active');if(a&&a.id!=='home'){if(window.dexterBack){dexterBack()}else if(window.show){show('home')}return 'home';}return 'stay';})()", null);
         }
     }
 
@@ -63,6 +69,47 @@ public class DexterHomeActivity extends Activity {
         }
         @JavascriptInterface public void launchPackages(String packages) {
             launchAny(packages == null ? new String[]{} : packages.split(","));
+        }
+        @JavascriptInterface public boolean toggleTorch(boolean on) {
+            try {
+                if (Build.VERSION.SDK_INT >= 23 && checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                    requestPermissions(new String[]{Manifest.permission.CAMERA}, 401);
+                    return false;
+                }
+                CameraManager cm=(CameraManager)getSystemService(Context.CAMERA_SERVICE);
+                if(cm==null)return false;
+                for(String id:cm.getCameraIdList()){
+                    android.hardware.camera2.CameraCharacteristics cc=cm.getCameraCharacteristics(id);
+                    Boolean flash=cc.get(android.hardware.camera2.CameraCharacteristics.FLASH_INFO_AVAILABLE);
+                    Integer facing=cc.get(android.hardware.camera2.CameraCharacteristics.LENS_FACING);
+                    if(Boolean.TRUE.equals(flash) && (facing==null || facing==android.hardware.camera2.CameraCharacteristics.LENS_FACING_BACK)){
+                        cm.setTorchMode(id,on); return true;
+                    }
+                }
+            } catch(Exception ignored) {}
+            return false;
+        }
+        @JavascriptInterface public boolean toggleWifi(boolean on) {
+            try {
+                WifiManager wm=(WifiManager)getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+                return wm!=null && wm.setWifiEnabled(on);
+            } catch(Exception ignored){ return false; }
+        }
+        @JavascriptInterface public boolean toggleBluetooth(boolean on) {
+            try {
+                BluetoothAdapter a=BluetoothAdapter.getDefaultAdapter();
+                if(a==null)return false;
+                return on ? a.enable() : a.disable();
+            } catch(Exception ignored){ return false; }
+        }
+        @JavascriptInterface public void setMediaVolume(int percent) {
+            try {
+                AudioManager am=(AudioManager)getSystemService(Context.AUDIO_SERVICE);
+                if(am==null)return;
+                int max=am.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
+                int v=Math.max(0,Math.min(max,Math.round(max*(percent/100f))));
+                am.setStreamVolume(AudioManager.STREAM_MUSIC,v,0);
+            } catch(Exception ignored){}
         }
         @JavascriptInterface public void openSetting(String key) {
             try {
