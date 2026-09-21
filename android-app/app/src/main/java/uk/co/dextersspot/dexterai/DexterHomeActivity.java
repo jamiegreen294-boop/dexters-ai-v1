@@ -18,6 +18,7 @@ import android.view.MotionEvent;
 import android.view.GestureDetector;
 import android.view.View;
 import android.view.Window;
+import android.widget.FrameLayout;
 import android.widget.GridLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -71,9 +72,11 @@ public class DexterHomeActivity extends Activity {
     }
 
     private void render() {
+        FrameLayout shell = new FrameLayout(this);
+
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(14), dp(10), dp(14), dp(12));
+        root.setPadding(dp(18), dp(12), dp(18), dp(14));
 
         GradientDrawable wallpaper = new GradientDrawable(
             GradientDrawable.Orientation.TL_BR,
@@ -84,14 +87,14 @@ public class DexterHomeActivity extends Activity {
         LinearLayout top = new LinearLayout(this);
         top.setOrientation(LinearLayout.VERTICAL);
         top.setGravity(Gravity.CENTER_HORIZONTAL);
-        top.setPadding(dp(4), dp(6), dp(4), dp(10));
+        top.setPadding(dp(4), dp(10), dp(4), dp(14));
         root.addView(top, new LinearLayout.LayoutParams(-1,-2));
 
         TextClock clock = new TextClock(this);
         clock.setFormat24Hour("HH:mm");
         clock.setFormat12Hour("HH:mm");
         clock.setTextColor(text);
-        clock.setTextSize(46);
+        clock.setTextSize(50);
         clock.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
         clock.setGravity(Gravity.CENTER);
         top.addView(clock,new LinearLayout.LayoutParams(-1,-2));
@@ -105,13 +108,13 @@ public class DexterHomeActivity extends Activity {
         top.addView(date,new LinearLayout.LayoutParams(-1,-2));
 
         TextView badge = new TextView(this);
-        badge.setText("DEXTERS");
+        badge.setText("DEXTERS BUSINESS PHONE");
         badge.setTextColor(Color.WHITE);
-        badge.setTextSize(10);
+        badge.setTextSize(9);
         badge.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
         badge.setGravity(Gravity.CENTER);
         badge.setPadding(dp(12),dp(5),dp(12),dp(5));
-        badge.setBackground(round(Color.argb(150,255,255,255),14));
+        badge.setBackground(round(Color.argb(55,255,255,255),14));
         LinearLayout.LayoutParams badgeLp=new LinearLayout.LayoutParams(-2,-2);
         badgeLp.topMargin=dp(7);
         top.addView(badge,badgeLp);
@@ -120,11 +123,11 @@ public class DexterHomeActivity extends Activity {
         root.addView(pages,new LinearLayout.LayoutParams(-1,0,1f));
 
         GridLayout p1=appPage();
-        addWebTile(p1,"Dexter AI","D",Color.rgb(34,115,255),v->startActivity(new Intent(this,MainActivity.class)));
+        addWebTile(p1,"Dexter AI","D",Color.rgb(239,139,34),v->startActivity(new Intent(this,MainActivity.class)));
         addWebTile(p1,"Loyalty","★",Color.rgb(237,177,42),v->openWeb("https://app.dextersspot.co.uk"));
-        addWebTile(p1,"Scanner","⌁",Color.rgb(35,188,117),v->openWeb("https://backoffice.dextersspot.co.uk/pc-pos-test/scanner/"));
-        addWebTile(p1,"Back Office","B",Color.rgb(118,87,201),v->openWeb("https://backoffice.dextersspot.co.uk/"));
         addWebTile(p1,"POS","£",Color.rgb(35,35,39),v->openWeb("https://backoffice.dextersspot.co.uk/pc-pos-test/"));
+        addWebTile(p1,"Back Office","B",Color.rgb(118,87,201),v->openWeb("https://backoffice.dextersspot.co.uk/"));
+        addWebTile(p1,"Scanner","⌁",Color.rgb(35,188,117),v->openWeb("https://backoffice.dextersspot.co.uk/pc-pos-test/scanner/"));
         addPackageTile(p1,"WhatsApp",new String[]{"com.whatsapp.w4b","com.whatsapp"},"WhatsApp");
         addPackageTile(p1,"Gmail",new String[]{"com.google.android.gm"},"Gmail");
         addPackageTile(p1,"Maps",new String[]{"com.google.android.apps.maps"},"Maps");
@@ -156,17 +159,56 @@ public class DexterHomeActivity extends Activity {
         LinearLayout dock=new LinearLayout(this);
         dock.setOrientation(LinearLayout.HORIZONTAL);
         dock.setGravity(Gravity.CENTER);
-        dock.setPadding(dp(9),dp(9),dp(9),dp(9));
-        dock.setElevation(dp(10));
-        dock.setBackground(round(Color.argb(175,105,110,108),30));
-        root.addView(dock,new LinearLayout.LayoutParams(-1,dp(84)));
+        dock.setPadding(dp(10),dp(10),dp(10),dp(10));
+        dock.setElevation(dp(12));
+        dock.setBackground(round(Color.argb(120,255,255,255),30));
+        root.addView(dock,new LinearLayout.LayoutParams(-1,dp(86)));
 
-        addDockWeb(dock,"D",Color.rgb(34,115,255),v->startActivity(new Intent(this,MainActivity.class)));
+        addDockWeb(dock,"D",Color.rgb(239,139,34),v->startActivity(new Intent(this,MainActivity.class)));
         addDockWeb(dock,"⌁",Color.rgb(35,188,117),v->openWeb("https://backoffice.dextersspot.co.uk/pc-pos-test/scanner/"));
         addDockPackage(dock,new String[]{"com.whatsapp.w4b","com.whatsapp"},"WhatsApp",Color.rgb(35,188,95),"W");
         addDockWeb(dock,"£",Color.rgb(35,35,39),v->openWeb("https://backoffice.dextersspot.co.uk/pc-pos-test/"));
 
-        setContentView(root);
+        shell.addView(root,new FrameLayout.LayoutParams(-1,-1));
+        setContentView(shell);
+        showStartupBrand(shell);
+    }
+
+    private void showStartupBrand(FrameLayout shell){
+        if(getIntent()!=null && getIntent().getBooleanExtra("skipDexterSplash",false)) return;
+        LinearLayout splash=new LinearLayout(this);
+        splash.setOrientation(LinearLayout.VERTICAL);
+        splash.setGravity(Gravity.CENTER);
+        splash.setBackgroundColor(Color.rgb(9,9,9));
+        splash.setAlpha(1f);
+
+        ImageView logo=new ImageView(this);
+        logo.setImageResource(uk.co.dextersspot.dexterai.R.drawable.ic_launcher);
+        logo.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        splash.addView(logo,new LinearLayout.LayoutParams(dp(118),dp(118)));
+
+        TextView brand=new TextView(this);
+        brand.setText("DEXTERS");
+        brand.setTextColor(Color.WHITE);
+        brand.setTextSize(24);
+        brand.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
+        brand.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams brandLp=new LinearLayout.LayoutParams(-1,-2);
+        brandLp.topMargin=dp(18);
+        splash.addView(brand,brandLp);
+
+        TextView sub=new TextView(this);
+        sub.setText("Business Phone");
+        sub.setTextColor(Color.rgb(190,190,195));
+        sub.setTextSize(13);
+        sub.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams subLp=new LinearLayout.LayoutParams(-1,-2);
+        subLp.topMargin=dp(4);
+        splash.addView(sub,subLp);
+
+        shell.addView(splash,new FrameLayout.LayoutParams(-1,-1));
+        splash.bringToFront();
+        splash.postDelayed(()->splash.animate().alpha(0f).setDuration(280).withEndAction(()->shell.removeView(splash)).start(),900);
     }
 
     private GridLayout appPage(){
