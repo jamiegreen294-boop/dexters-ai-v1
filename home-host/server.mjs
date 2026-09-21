@@ -1164,6 +1164,14 @@ async function androidTool(tool,request={}){
     return {address,paired:/success/i.test(r.stdout+r.stderr),output:(r.stdout+r.stderr).trim().slice(0,2000)};
   }
   if(tool==="android.info")return await androidDeviceInfo(String(request.serial||"").trim());
+  if(tool==="android.shell"){
+    const command=String(request.command||"").trim();
+    if(!command)throw new Error("Android shell command is required.");
+    const serial=String(request.serial||"").trim();
+    const args=[];if(serial)args.push("-s",serial);args.push("shell","sh","-c",command);
+    const r=await adbRun(args,60000);
+    return {serial:serial||null,output:String(r.stdout||"").slice(0,12000)};
+  }
   if(tool==="android.package_info"){
     const pkg=String(request.package||"uk.co.dextersspot.dexterai").trim();
     if(!/^[A-Za-z0-9_.]+$/.test(pkg))throw new Error("Invalid Android package name.");
