@@ -325,6 +325,18 @@ function runProcess(command,args,cwd,timeout=120000){
       const commandLine=[command,...runArgs].map(quoteCmdArg).join(" ");
       runArgs=["/d","/s","/c",commandLine];
     }
+    if(process.platform==="win32"&&command==="git"){
+      const candidates=[
+        String(process.env.DEXTER_GIT||"").trim(),
+        path.join(process.env.ProgramFiles||"C:\\Program Files","Git","cmd","git.exe"),
+        path.join(process.env.ProgramFiles||"C:\\Program Files","Git","bin","git.exe"),
+        path.join(process.env["ProgramFiles(x86)"]||"C:\\Program Files (x86)","Git","cmd","git.exe"),
+        path.join(process.env.LOCALAPPDATA||"","Programs","Git","cmd","git.exe"),
+        path.join(process.env.USERPROFILE||"","AppData","Local","Programs","Git","cmd","git.exe")
+      ].filter(Boolean);
+      const found=candidates.find(p=>p&&fs.existsSync(p));
+      if(found)executable=found;
+    }
     if(process.platform==="win32"&&command==="ollama"){
       const candidates=[
         path.join(process.env.LOCALAPPDATA||"","Programs","Ollama","ollama.exe"),
