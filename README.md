@@ -23,7 +23,9 @@ This repository is TEST only.
 - No direct live Back Office write access
 - Live business data is read only where explicitly enabled
 - Consequential connector tools require owner approval
-- Owner approval currently permits TEST execution/preview only
+- Approved external-website actions (such as registrations, applications and form submissions) may execute live only after explicit owner approval
+- Live Dexters POS, KDS, Loyalty App and Back Office writes remain protected unless separately enabled
+- Payments, purchases, refunds, destructive actions and account-security changes remain separately approval-gated or blocked
 - Secrets are stored server-side and must never be placed in frontend code
 
 ## Workspace areas
