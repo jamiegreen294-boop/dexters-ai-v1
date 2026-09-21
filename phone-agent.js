@@ -98,5 +98,13 @@
     };
     const unknown=document.getElementById("unknownSources");if(unknown)unknown.onclick=()=>{if(nativePhone())window.DexterDevice.openUnknownSourcesSettings();else alert("Open inside the Android app.");};
   }
-  ensurePhonePage();wire();setTimeout(ensureNativeAgentEnrollment,800);
+  ensurePhonePage();wire();
+  // The native WebView can restore the owner session slightly after page scripts run.
+  // Retry credential repair after auth has had time to initialise so the phone can
+  // recover itself without ADB/Samsung intervention.
+  [800,3000,8000,15000].forEach(ms=>setTimeout(ensureNativeAgentEnrollment,ms));
+  window.addEventListener("focus",()=>setTimeout(ensureNativeAgentEnrollment,500));
+  document.addEventListener("visibilitychange",()=>{
+    if(document.visibilityState==="visible")setTimeout(ensureNativeAgentEnrollment,500);
+  });
 })();
