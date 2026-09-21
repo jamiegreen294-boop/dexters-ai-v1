@@ -76,5 +76,15 @@ jobs:
             echo "Provisioning APK already current"
           else
             git commit -m "Publish Dexter Business Phone v30 premium home"
-            git push origin HEAD:gh-pages
+            for attempt in 1 2 3; do
+              if git push origin HEAD:gh-pages; then
+                break
+              fi
+              git fetch origin gh-pages
+              git rebase origin/gh-pages
+              if [ "$attempt" = "3" ]; then
+                echo "Failed to publish v30 after retries"
+                exit 1
+              fi
+            done
           fi
