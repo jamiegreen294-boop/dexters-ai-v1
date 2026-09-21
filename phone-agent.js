@@ -56,6 +56,13 @@
     });
     if(!phones.length)list.innerHTML='<div class="task"><p>No Dexter business phones paired yet.</p></div>';
   }
+  async function reportNativeAgentState(deviceId){
+    if(!nativePhone()||!window.DexterDevice.getAgentState)return;
+    try{
+      const state=JSON.parse(window.DexterDevice.getAgentState());
+      await api({action:"device_agent_diagnostic",deviceId,state});
+    }catch{}
+  }
   async function ensureNativeAgentEnrollment(){
     if(!nativePhone()||nativeCredentialRefreshComplete)return;
     try{
@@ -69,7 +76,10 @@
         nativeCredentialRefreshComplete=true;
         const state=document.getElementById("phoneState");
         if(state)state.textContent="Agent credential refreshed — connected";
+      }else if(d&&d.reused){
+        nativeCredentialRefreshComplete=true;
       }
+      await reportNativeAgentState(deviceId);
     }catch(e){
       const state=document.getElementById("phoneState");
       if(state)state.textContent="Agent credential refresh needs owner sign-in";
