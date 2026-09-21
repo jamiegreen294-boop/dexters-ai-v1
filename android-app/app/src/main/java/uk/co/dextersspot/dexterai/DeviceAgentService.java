@@ -53,6 +53,7 @@ public class DeviceAgentService extends Service {
         super.onCreate();
         createChannel();
         startForeground(NOTIFICATION_ID, buildNotification("Dexter device agent connected"));
+        AgentWatchdogReceiver.schedule(this);
     }
 
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
@@ -70,7 +71,11 @@ public class DeviceAgentService extends Service {
         super.onTaskRemoved(rootIntent);
     }
 
-    @Override public void onDestroy() { running = false; super.onDestroy(); }
+    @Override public void onDestroy() {
+        running = false;
+        AgentWatchdogReceiver.schedule(this);
+        super.onDestroy();
+    }
     @Override public android.os.IBinder onBind(Intent intent) { return null; }
 
     private void loop() {
