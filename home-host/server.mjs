@@ -1163,6 +1163,16 @@ async function androidTool(tool,request={}){
     return {address,paired:/success/i.test(r.stdout+r.stderr),output:(r.stdout+r.stderr).trim().slice(0,2000)};
   }
   if(tool==="android.info")return await androidDeviceInfo(String(request.serial||"").trim());
+  if(tool==="android.package_info"){
+    const pkg=String(request.package||"uk.co.dextersspot.dexterai").trim();
+    if(!/^[A-Za-z0-9_.]+$/.test(pkg))throw new Error("Invalid Android package name.");
+    const args=[];if(request.serial)args.push("-s",String(request.serial));args.push("shell","dumpsys","package",pkg);
+    const r=await adbRun(args,30000);
+    const out=String(r.stdout||"");
+    const vc=(out.match(/versionCode=(\d+)/)||[])[1]||null;
+    const vn=(out.match(/versionName=([^\r\n]+)/)||[])[1]?.trim()||null;
+    return {package:pkg,versionCode:vc?Number(vc):null,versionName:vn,raw:out.slice(0,12000)};
+  }
   if(tool==="android.packages"){
     const args=[];if(request.serial)args.push("-s",String(request.serial));args.push("shell","pm","list","packages","-3");
     const r=await adbRun(args,30000);
