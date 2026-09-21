@@ -240,14 +240,18 @@ public class DeviceAgentService extends Service {
         PackageInstaller installer=getPackageManager().getPackageInstaller();
         PackageInstaller.SessionParams params=new PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL);
         int sid=installer.createSession(params);
-        try(PackageInstaller.Session session=installer.openSession(sid);
-            OutputStream out=session.openWrite("base.apk",0,apk.length());
-            InputStream in=new FileInputStream(apk)){
-            byte[] buf=new byte[65536];int n;while((n=in.read(buf))>0)out.write(buf,0,n);
-            session.fsync(out);
+        PackageInstaller.Session session=installer.openSession(sid);
+        try {
+            try(OutputStream out=session.openWrite("base.apk",0,apk.length());
+                InputStream in=new FileInputStream(apk)){
+                byte[] buf=new byte[65536];int n;while((n=in.read(buf))>0)out.write(buf,0,n);
+                session.fsync(out);
+            }
             Intent callback=new Intent(this,MainActivity.class);
             PendingIntent pi=PendingIntent.getActivity(this,sid,callback,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
             session.commit(pi.getIntentSender());
+        } finally {
+            session.close();
         }
         return new JSONObject()
             .put("installSessionId",sid)
