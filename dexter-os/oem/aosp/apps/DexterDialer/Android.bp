@@ -1,0 +1,9 @@
+android_app {
+    name: "DexterDialer",
+    srcs: ["src/**/*.java"],
+    manifest: "AndroidManifest.xml",
+    certificate: "platform",
+    privileged: true,
+    platform_apis: true,
+    product_specific: true,
+}
