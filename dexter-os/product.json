@@ -45,5 +45,16 @@
       "mode": "role-gated",
       "package": "com.android.vending"
     }
+  },
+  "connectivity": {
+    "esim": {
+      "requiredForRetail": true,
+      "euiccRequired": true,
+      "dexterUi": "DexterEsim",
+      "physicalSim": "nano-SIM preferred for v1",
+      "dualSim": "DSDS preferred",
+      "mep": "preferred",
+      "stockAndroidEsimUi": false
+    }
   }
 }
