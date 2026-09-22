@@ -146,6 +146,7 @@ public class DeviceAgentService extends Service {
         cap.put("remoteScreen",true);
         cap.put("remoteInput",true);
         cap.put("uiInspection",true);
+        cap.put("persistentRemoteControl",DexterRemoteAccessibilityService.isReady());
         info.put("capabilities",cap);
         try {
             info.put("management",DeviceOwnerPolicy.status(this));
@@ -192,18 +193,72 @@ public class DeviceAgentService extends Service {
             case "device.pos.register": return registerPos();
             case "apps.inventory": return appInventory();
             case "device.local_adb.shell": return DexterLocalAdb.get(this).runShellCommand(req.getString("command"));
-            case "device.screen.capture": return DexterLocalAdb.get(this).captureScreen();
-            case "device.screen.ui_dump": return DexterLocalAdb.get(this).dumpUi();
-            case "device.input.tap": return DexterLocalAdb.get(this).inputTap(req.getInt("x"),req.getInt("y"));
-            case "device.input.swipe": return DexterLocalAdb.get(this).inputSwipe(req.getInt("x1"),req.getInt("y1"),req.getInt("x2"),req.getInt("y2"),req.optInt("durationMs",300));
-            case "device.input.key": return DexterLocalAdb.get(this).inputKey(req.getString("key"));
-            case "device.input.text": return DexterLocalAdb.get(this).inputText(req.getString("text"));
+            case "device.screen.capture": return remoteCapture();
+            case "device.screen.ui_dump": return remoteUiDump();
+            case "device.input.tap": return remoteTap(req.getInt("x"),req.getInt("y"));
+            case "device.input.swipe": return remoteSwipe(req.getInt("x1"),req.getInt("y1"),req.getInt("x2"),req.getInt("y2"),req.optInt("durationMs",300));
+            case "device.input.key": return remoteKey(req.getString("key"));
+            case "device.input.text": return remoteText(req.getString("text"));
             case "app.launch": return launchApp(req.getString("packageName"));
             case "app.install": return installApk(req,false);
             case "dexter.self_update": return installApk(req,true);
             case "app.uninstall": return requestUninstall(req.getString("packageName"));
             default: throw new IllegalArgumentException("Unsupported job: "+type);
         }
+    }
+
+    private JSONObject remoteCapture() throws Exception {
+        DexterRemoteAccessibilityService s=DexterRemoteAccessibilityService.get();
+        if(s!=null){
+            JSONObject r=s.captureScreen();
+            if(r.optBoolean("connected",false)) return r;
+        }
+        return DexterLocalAdb.get(this).captureScreen();
+    }
+
+    private JSONObject remoteUiDump() throws Exception {
+        DexterRemoteAccessibilityService s=DexterRemoteAccessibilityService.get();
+        if(s!=null){
+            JSONObject r=s.dumpUi();
+            if(r.optBoolean("connected",false)) return r;
+        }
+        return DexterLocalAdb.get(this).dumpUi();
+    }
+
+    private JSONObject remoteTap(int x,int y) throws Exception {
+        DexterRemoteAccessibilityService s=DexterRemoteAccessibilityService.get();
+        if(s!=null){
+            JSONObject r=s.tap(x,y);
+            if(r.optBoolean("connected",false)) return r;
+        }
+        return DexterLocalAdb.get(this).inputTap(x,y);
+    }
+
+    private JSONObject remoteSwipe(int x1,int y1,int x2,int y2,int durationMs) throws Exception {
+        DexterRemoteAccessibilityService s=DexterRemoteAccessibilityService.get();
+        if(s!=null){
+            JSONObject r=s.swipe(x1,y1,x2,y2,durationMs);
+            if(r.optBoolean("connected",false)) return r;
+        }
+        return DexterLocalAdb.get(this).inputSwipe(x1,y1,x2,y2,durationMs);
+    }
+
+    private JSONObject remoteKey(String key) throws Exception {
+        DexterRemoteAccessibilityService s=DexterRemoteAccessibilityService.get();
+        if(s!=null){
+            JSONObject r=s.key(key);
+            if(r.optBoolean("connected",false)) return r;
+        }
+        return DexterLocalAdb.get(this).inputKey(key);
+    }
+
+    private JSONObject remoteText(String text) throws Exception {
+        DexterRemoteAccessibilityService s=DexterRemoteAccessibilityService.get();
+        if(s!=null){
+            JSONObject r=s.inputText(text);
+            if(r.optBoolean("connected",false)) return r;
+        }
+        return DexterLocalAdb.get(this).inputText(text);
     }
 
     private JSONObject registerPos() throws Exception {
