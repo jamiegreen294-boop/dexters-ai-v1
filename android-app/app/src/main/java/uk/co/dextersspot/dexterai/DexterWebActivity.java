@@ -56,6 +56,8 @@ public class DexterWebActivity extends Activity {
     public final class PosBridge {
         @JavascriptInterface public String getPosCredentials(){
             try{
+                String current=web==null?"":String.valueOf(web.getUrl());
+                if(!current.startsWith("https://backoffice.dextersspot.co.uk/")) return "{}";
                 android.content.SharedPreferences p=getSharedPreferences("dexter_pos",MODE_PRIVATE);
                 String id=p.getString("device_id","");
                 String secret=p.getString("device_secret","");
