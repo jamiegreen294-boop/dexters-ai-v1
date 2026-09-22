@@ -239,10 +239,8 @@ public class DeviceAgentService extends Service {
         String url=req.optString("url","");
         if(url.length()==0)throw new Exception("APK URL is required.");
         boolean deviceOwner = DexterDeviceAdminReceiver.isDeviceOwner(this);
-        if(!deviceOwner && !getPackageManager().canRequestPackageInstalls()){
-            Intent settings=new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:"+getPackageName()));
-            settings.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);startActivity(settings);
-            throw new Exception("Allow Dexter Business Phone to install unknown apps, then retry this job.");
+        if(!deviceOwner){
+            throw new Exception("Dexter commercial shell requires Device Owner for managed installs.");
         }
         File apk=new File(getExternalCacheDir(),"dexter-install-"+System.currentTimeMillis()+".apk");
         download(url,apk);
@@ -299,9 +297,12 @@ public class DeviceAgentService extends Service {
     }
 
     private JSONObject requestUninstall(String pkg) throws Exception {
-        Intent i=new Intent(Intent.ACTION_DELETE,Uri.parse("package:"+pkg));
-        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);startActivity(i);
-        return new JSONObject().put("uninstallRequested",pkg).put("confirmationRequired",true);
+        if(!DexterDeviceAdminReceiver.isDeviceOwner(this)) throw new Exception("Managed uninstall requires Device Owner.");
+        PackageInstaller installer=getPackageManager().getPackageInstaller();
+        Intent callback=new Intent(this,MainActivity.class);
+        PendingIntent pi=PendingIntent.getActivity(this,pkg.hashCode(),callback,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
+        installer.uninstall(pkg,pi.getIntentSender());
+        return new JSONObject().put("uninstallRequested",pkg).put("confirmationRequired",false);
     }
 
     private void complete(String id,boolean ok,JSONObject result,String error){
