@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<exceptions>
+    <exception package="uk.co.dextersspot.dexterai">
+        <permission name="android.permission.CAMERA" fixed="true"/>
+        <permission name="android.permission.POST_NOTIFICATIONS" fixed="true"/>
+    </exception>
+</exceptions>
