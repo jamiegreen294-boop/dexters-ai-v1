@@ -253,12 +253,12 @@ public class DexterHomeActivity extends Activity {
                         if(web!=null)web.evaluateJavascript("window.dexterAccessResult("+org.json.JSONObject.quote(payload)+")",null);
                     });
                 }catch(DeviceAccessClient.AccessException e){
-                    final String payload=e.payload!=null?e.payload.toString():new org.json.JSONObject().put("error",String.valueOf(e.getMessage())).toString();
+                    final String payload=e.payload!=null?e.payload.toString():"{\"error\":"+org.json.JSONObject.quote(String.valueOf(e.getMessage()))+"}";
                     runOnUiThread(()->{
                         if(web!=null)web.evaluateJavascript("window.dexterAccessResult("+org.json.JSONObject.quote(payload)+")",null);
                     });
                 }catch(Exception e){
-                    final String payload=new org.json.JSONObject().put("error",String.valueOf(e.getMessage())).toString();
+                    final String payload="{\"error\":"+org.json.JSONObject.quote(String.valueOf(e.getMessage()))+"}";
                     runOnUiThread(()->{
                         if(web!=null)web.evaluateJavascript("window.dexterAccessResult("+org.json.JSONObject.quote(payload)+")",null);
                     });
