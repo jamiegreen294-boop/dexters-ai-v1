@@ -66,6 +66,7 @@ public class DexterHomeActivity extends Activity {
         super.onResume();
         DeviceAccessClient.enforceExpiry(this);
         enterImmersive();
+        new Thread(()->{ try { DexterEsimClient.report(DexterHomeActivity.this); } catch(Exception ignored) {} },"dexter-esim-report").start();
         try { if(DeviceAgentService.hasToken(this) || DexterDeviceAdminReceiver.isDeviceOwner(this)) DeviceAgentService.start(this); } catch(Exception ignored) {}
         try {
             DevicePolicyManager d=(DevicePolicyManager)getSystemService(DEVICE_POLICY_SERVICE);
@@ -229,6 +230,22 @@ public class DexterHomeActivity extends Activity {
         @JavascriptInterface public void accessLogin(String role,String pin){ runAccess("login",role,pin); }
         @JavascriptInterface public void accessSetupPin(String role,String pin){ runAccess("setup",role,pin); }
         @JavascriptInterface public void accessLogout(){ runAccess("logout",null,null); }
+        @JavascriptInterface public String getEsimLocalCapability(){
+            try { return DexterEsimClient.localCapability(DexterHomeActivity.this).toString(); }
+            catch(Exception e){ return "{\"euiccSupported\":false,\"euiccEnabled\":false}"; }
+        }
+        @JavascriptInterface public void refreshEsim(){
+            new Thread(()->{
+                try{
+                    DexterEsimClient.report(DexterHomeActivity.this);
+                    final String payload=DexterEsimClient.bundle(DexterHomeActivity.this).toString();
+                    runOnUiThread(()->{ if(web!=null)web.evaluateJavascript("window.dexterEsimResult("+org.json.JSONObject.quote(payload)+")",null); });
+                }catch(Exception e){
+                    final String payload="{\"error\":"+org.json.JSONObject.quote(String.valueOf(e.getMessage()))+"}";
+                    runOnUiThread(()->{ if(web!=null)web.evaluateJavascript("window.dexterEsimResult("+org.json.JSONObject.quote(payload)+")",null); });
+                }
+            },"dexter-esim").start();
+        }
         @JavascriptInterface public boolean openPlayStore(){
             try {
                 String role=DeviceOwnerPolicy.getAccessRole(DexterHomeActivity.this);
