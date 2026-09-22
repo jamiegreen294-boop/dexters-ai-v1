@@ -7,6 +7,11 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
 import android.os.Build;
 import android.os.UserManager;
 import org.json.JSONArray;
@@ -112,8 +117,32 @@ public final class DeviceOwnerPolicy {
     private static void applyCommercialShellPolicy(Context c, JSONObject applied, JSONObject skipped){
         DevicePolicyManager d=dpm(c); ComponentName a=admin(c);
         try {
-            d.setLockTaskPackages(a,new String[]{c.getPackageName()});
+            LinkedHashSet<String> allowed=new LinkedHashSet<>();
+            allowed.add(c.getPackageName());
+            PackageManager pm=c.getPackageManager();
+
+            // Resolve the actual system handlers on this handset so core phone
+            // functions remain usable while Android Settings stays excluded.
+            addResolvedPackage(pm,allowed,new Intent(Intent.ACTION_DIAL));
+            addResolvedPackage(pm,allowed,new Intent(Intent.ACTION_SENDTO,android.net.Uri.parse("smsto:")));
+            addResolvedPackage(pm,allowed,new Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE));
+
+            String[] approvedBusinessApps={
+                "com.google.android.gm",
+                "com.whatsapp.w4b",
+                "com.android.chrome",
+                "com.google.android.apps.maps"
+            };
+            for(String pkg:approvedBusinessApps){
+                if(isInstalled(pm,pkg)) allowed.add(pkg);
+            }
+
+            // Never allow the stock Settings package into the customer shell.
+            allowed.remove("com.android.settings");
+            String[] lockPackages=allowed.toArray(new String[0]);
+            d.setLockTaskPackages(a,lockPackages);
             applied.put("lockTaskPackage",true);
+            applied.put("lockTaskPackages",new JSONArray(lockPackages));
         } catch(Exception e){ try{skipped.put("lockTaskPackage",safeMessage(e));}catch(Exception ignored){} }
         if(Build.VERSION.SDK_INT>=28){
             try {
@@ -137,6 +166,20 @@ public final class DeviceOwnerPolicy {
                 applied.put("notificationPermissionManaged",true);
             } catch(Exception e){ try{skipped.put("notificationPermissionManaged",safeMessage(e));}catch(Exception ignored){} }
         }
+    }
+
+    private static void addResolvedPackage(PackageManager pm,LinkedHashSet<String> allowed,Intent intent){
+        try{
+            ResolveInfo ri=pm.resolveActivity(intent,PackageManager.MATCH_DEFAULT_ONLY);
+            if(ri!=null && ri.activityInfo!=null){
+                String pkg=ri.activityInfo.packageName;
+                if(pkg!=null && !pkg.trim().isEmpty()) allowed.add(pkg);
+            }
+        }catch(Exception ignored){}
+    }
+
+    private static boolean isInstalled(PackageManager pm,String pkg){
+        try{pm.getPackageInfo(pkg,0);return true;}catch(Exception e){return false;}
     }
 
     private static void applyRestriction(DevicePolicyManager d,ComponentName a,String restriction,String label,JSONObject applied,JSONObject skipped){
