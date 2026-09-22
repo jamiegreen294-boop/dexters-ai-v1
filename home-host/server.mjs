@@ -1546,7 +1546,8 @@ async function workspaceTool(tool,request={}){
   if(tool==="desktop.chrome_snapshot")return await desktopChromeSnapshot(request);
   if(tool==="desktop.secret.public_key")return await desktopSecretPublicKey();
   if(tool==="desktop.chrome_fill_secret")return await desktopChromeFillSecret(request);
-  if(tool==="desktop.chrome_select")return await desktopChromeSelect(request);\n  if(tool==="desktop.chrome_fill")return await desktopChromeFill(request);
+  if(tool==="desktop.chrome_select")return await desktopChromeSelect(request);
+  if(tool==="desktop.chrome_fill")return await desktopChromeFill(request);
   if(tool==="desktop.chrome_click")return await desktopChromeClick(request);
   if(tool==="desktop.chrome_focus")return await desktopChromeFocus(request);
   if(tool==="desktop.screenshot")return await desktopScreenshot(request);
