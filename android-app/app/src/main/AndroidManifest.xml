@@ -84,6 +84,7 @@
         <activity
             android:name=".DexterBootSplashActivity"
             android:exported="true"
+            android:screenOrientation="portrait"
             android:excludeFromRecents="true"
             android:noHistory="true"
             android:directBootAware="true">
@@ -105,6 +106,6 @@
             </intent-filter>
         </activity>
 
-        <activity android:name=".MainActivity" android:exported="false" android:screenOrientation="unspecified"/>
+        <activity android:name=".MainActivity" android:exported="false" android:screenOrientation="portrait"/>
     </application>
 </manifest>
