@@ -1,0 +1,57 @@
+name: Package Dexter OS OEM Release
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - build/dexter-os-oem-foundation-v1
+    paths:
+      - 'dexter-os/oem/**'
+      - '.github/workflows/package-dexter-oem.yml'
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate source data
+        run: |
+          python3 - <<'PY'
+          import json, pathlib, xml.etree.ElementTree as ET
+          root=pathlib.Path("dexter-os/oem")
+          for p in root.rglob("*.json"): json.loads(p.read_text())
+          for p in root.rglob("*.xml"): ET.parse(p)
+          print("Dexter OEM JSON/XML valid")
+          PY
+
+      - name: Reject private signing material
+        run: |
+          if find dexter-os/oem -type f \( -iname '*.jks' -o -iname '*.keystore' -o -iname '*.pem' -o -iname '*.pk8' -o -iname '*.x509.pem' \) | grep -q .; then
+            echo "Signing material must stay outside source control"
+            exit 1
+          fi
+
+      - name: Require complete common modules
+        run: |
+          for m in DexterOS DexterDialer DexterMessaging DexterFiles DexterEsim DexterSetup DexterUpdater DexterCamera; do
+            grep -q "$m" dexter-os/oem/aosp/dexter_os_common.mk || exit 1
+          done
+          test -s dexter-os/oem/factory/FACTORY-ACCEPTANCE.sh
+          test -s dexter-os/oem/device-port-template/dexter_device.mk
+          test -s dexter-os/oem/ota/release-manifest.schema.json
+
+      - name: Build manufacturer handoff archive
+        run: |
+          mkdir -p dist
+          cp -a dexter-os/oem dist/Dexter-OS-OEM
+          printf '%s\n' "${GITHUB_SHA}" > dist/Dexter-OS-OEM/SOURCE-COMMIT.txt
+          (cd dist && zip -qr Dexter-OS-OEM-Handoff.zip Dexter-OS-OEM)
+          sha256sum dist/Dexter-OS-OEM-Handoff.zip > dist/Dexter-OS-OEM-Handoff.zip.sha256
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Dexter-OS-OEM-Handoff
+          path: |
+            dist/Dexter-OS-OEM-Handoff.zip
+            dist/Dexter-OS-OEM-Handoff.zip.sha256
