@@ -57,6 +57,10 @@ New-Item -ItemType Directory -Force -Path ".\jobs" | Out-Null
 New-Item -ItemType Directory -Force -Path ".\browser-profile" | Out-Null
 
 Write-Host ""
+Write-Host "Registering Dexter AI auto-start and self-healing watchdog..."
+powershell -ExecutionPolicy Bypass -File .\REGISTER-AUTOSTART.ps1
+
+Write-Host ""
 Write-Host "Dexter AI Home Host install complete."
 Write-Host "Live actions are OFF."
 Write-Host "For GitHub write access later, run: gh auth login"
