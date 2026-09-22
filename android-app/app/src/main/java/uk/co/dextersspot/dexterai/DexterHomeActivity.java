@@ -119,7 +119,10 @@ public class DexterHomeActivity extends Activity {
             } catch(Exception ignored) {}
         }
         @JavascriptInterface public void openCamera(){
-            launchAny(new String[]{"com.android.camera2","com.android.camera","com.meizu.media.camera"});
+            try {
+                Intent i=new Intent(DexterHomeActivity.this,DexterCameraActivity.class);
+                startActivity(i);
+            } catch(Exception ignored) {}
         }
         @JavascriptInterface public void openBrowser(){
             openUrl("https://www.google.com/");
@@ -253,6 +256,12 @@ public class DexterHomeActivity extends Activity {
                 DeviceOwnerPolicy.enforcePlayStoreRole(DexterHomeActivity.this);
                 Intent i=getPackageManager().getLaunchIntentForPackage("com.android.vending");
                 if(i==null)return false;
+                try { stopLockTask(); } catch(Exception ignored) {}
+                try {
+                    getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_VISIBLE);
+                    getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+                } catch(Exception ignored) {}
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 startActivity(i);
                 return true;
             } catch(Exception e){ return false; }
