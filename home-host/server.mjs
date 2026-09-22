@@ -1278,7 +1278,130 @@ async function androidTool(tool,request={}){
   throw new Error("Unsupported Android device tool: "+tool);
 }
 
+function desktopRequireWindows(){
+  if(process.platform!=="win32")throw new Error("Desktop controls require Windows.");
+}
+function desktopChromeCandidates(){
+  return [
+    path.join(process.env.ProgramFiles||"C:\\Program Files","Google","Chrome","Application","chrome.exe"),
+    path.join(process.env["ProgramFiles(x86)"]||"C:\\Program Files (x86)","Google","Chrome","Application","chrome.exe"),
+    path.join(process.env.LOCALAPPDATA||"","Google","Chrome","Application","chrome.exe")
+  ].filter(Boolean);
+}
+function desktopChromePath(){
+  const found=desktopChromeCandidates().find(p=>fs.existsSync(p));
+  if(!found)throw new Error("Google Chrome was not found on the Home PC.");
+  return found;
+}
+function desktopProfileDir(){
+  const dir=path.join(WORKSPACE,"desktop","chrome-profile");
+  fs.mkdirSync(dir,{recursive:true});
+  return dir;
+}
+async function desktopPowershell(script,timeout=30000){
+  desktopRequireWindows();
+  return await runProcess("powershell.exe",["-NoProfile","-NonInteractive","-ExecutionPolicy","Bypass","-Command",String(script)],WORKSPACE,timeout);
+}
+async function desktopProfileSetup(request={}){
+  desktopRequireWindows();
+  const profileDir=desktopProfileDir();
+  const workspaceDir=path.join(WORKSPACE,"desktop","DexterAI");
+  fs.mkdirSync(workspaceDir,{recursive:true});
+  let windowsUser={requested:request.create_windows_user!==false,created:false,exists:false,requires_elevation:false};
+  if(request.create_windows_user!==false){
+    const ps=[
+      "$ErrorActionPreference='Stop'",
+      "$name='DexterAI'",
+      "$existing=Get-LocalUser -Name $name -ErrorAction SilentlyContinue",
+      "if(-not $existing){New-LocalUser -Name $name -NoPassword -AccountNeverExpires -Description 'Dexter AI standard workstation profile' | Out-Null}",
+      "$isAdmin=$false",
+      "try{$isAdmin=[bool](Get-LocalGroupMember -Group 'Administrators' -Member $name -ErrorAction Stop)}catch{}",
+      "if($isAdmin){Remove-LocalGroupMember -Group 'Administrators' -Member $name -ErrorAction Stop}",
+      "try{Add-LocalGroupMember -Group 'Users' -Member $name -ErrorAction SilentlyContinue}catch{}",
+      "$u=Get-LocalUser -Name $name",
+      "[pscustomobject]@{Name=$u.Name;Enabled=$u.Enabled;Description=$u.Description}|ConvertTo-Json -Compress"
+    ].join(";");
+    const r=await desktopPowershell(ps,30000);
+    if(r.code===0){windowsUser.exists=true;windowsUser.created=true;windowsUser.details=String(r.stdout||"").trim().slice(0,1000);}
+    else{windowsUser.requires_elevation=/access.*denied|administrator|privilege|not authorized/i.test(String(r.stderr||"")+" "+String(r.stdout||""));windowsUser.error=String(r.stderr||r.stdout||"Windows user creation failed").trim().slice(0,1200);}
+  }
+  return {ok:true,windows_user:windowsUser,chrome_profile:profileDir,workspace:workspaceDir,chrome:desktopChromePath(),isolation:"Dedicated Chrome user-data directory; no owner cookies/passwords are copied."};
+}
+async function desktopChromeOpenUrl(request={}){
+  desktopRequireWindows();
+  const url=safeUrl(request.url||"https://www.google.com/");
+  const chrome=desktopChromePath(),profile=desktopProfileDir();
+  const child=spawn(chrome,["--user-data-dir="+profile,"--profile-directory=Default","--new-window",url],{detached:true,stdio:"ignore",windowsHide:false});
+  child.unref();
+  await new Promise(r=>setTimeout(r,1200));
+  return {ok:true,url,chrome,profile,pid:child.pid||null};
+}
+async function desktopChromeFocus(){
+  desktopRequireWindows();
+  const ps="$p=Get-Process chrome -ErrorAction SilentlyContinue|Where-Object {$_.MainWindowHandle -ne 0}|Sort-Object StartTime -Descending|Select-Object -First 1;if(-not $p){throw 'No visible Chrome window found'};Add-Type -AssemblyName Microsoft.VisualBasic;[Microsoft.VisualBasic.Interaction]::AppActivate($p.Id)|Out-Null;[pscustomobject]@{Pid=$p.Id;Title=$p.MainWindowTitle}|ConvertTo-Json -Compress";
+  const r=await desktopPowershell(ps,15000);
+  if(r.code!==0)throw new Error(String(r.stderr||r.stdout||"Could not focus Chrome"));
+  return {ok:true,window:String(r.stdout||"").trim().slice(0,2000)};
+}
+async function desktopForegroundIsChrome(){
+  const ps="Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public class Dfg { [DllImport(\"user32.dll\")] public static extern IntPtr GetForegroundWindow(); [DllImport(\"user32.dll\")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd,out uint pid); }';$h=[Dfg]::GetForegroundWindow();$pid2=0;[Dfg]::GetWindowThreadProcessId($h,[ref]$pid2)|Out-Null;$p=Get-Process -Id $pid2 -ErrorAction Stop;[pscustomobject]@{Name=$p.ProcessName;Title=$p.MainWindowTitle;Pid=$p.Id}|ConvertTo-Json -Compress";
+  const r=await desktopPowershell(ps,10000);
+  if(r.code!==0)throw new Error("Could not inspect foreground window.");
+  let info={};try{info=JSON.parse(String(r.stdout||"").trim())}catch{}
+  if(String(info.Name||"").toLowerCase()!=="chrome")throw new Error("Desktop action blocked because Google Chrome is not the foreground app.");
+  return info;
+}
+async function desktopScreenshot(){
+  desktopRequireWindows();
+  const out=path.join(WORKSPACE,"desktop","screenshots","desktop-"+Date.now()+".png");
+  fs.mkdirSync(path.dirname(out),{recursive:true});
+  const p=out.replace(/\x27/g,"\x27\x27");
+  const ps="Add-Type -AssemblyName System.Windows.Forms;Add-Type -AssemblyName System.Drawing;$b=[System.Windows.Forms.SystemInformation]::VirtualScreen;$bmp=New-Object System.Drawing.Bitmap $b.Width,$b.Height;$g=[System.Drawing.Graphics]::FromImage($bmp);$g.CopyFromScreen($b.Left,$b.Top,0,0,$bmp.Size);$bmp.Save('"+p+"',[System.Drawing.Imaging.ImageFormat]::Png);$g.Dispose();$bmp.Dispose()";
+  const r=await desktopPowershell(ps,20000);
+  if(r.code!==0)throw new Error(String(r.stderr||"Screenshot failed"));
+  return {ok:true,path:path.relative(WORKSPACE,out),image_base64:fs.readFileSync(out).toString("base64")};
+}
+async function desktopClick(request={}){
+  desktopRequireWindows();
+  await desktopForegroundIsChrome();
+  const x=Number(request.x),y=Number(request.y);
+  if(!Number.isFinite(x)||!Number.isFinite(y)||x<0||y<0||x>10000||y>10000)throw new Error("Desktop click requires valid x and y.");
+  const ps="Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public class DClick { [DllImport(\"user32.dll\")] public static extern bool SetCursorPos(int X,int Y); [DllImport(\"user32.dll\")] public static extern void mouse_event(uint f,uint dx,uint dy,uint data,UIntPtr extra); }';[DClick]::SetCursorPos("+Math.round(x)+","+Math.round(y)+")|Out-Null;[DClick]::mouse_event(2,0,0,0,[UIntPtr]::Zero);Start-Sleep -Milliseconds 50;[DClick]::mouse_event(4,0,0,0,[UIntPtr]::Zero)";
+  const r=await desktopPowershell(ps,10000);
+  if(r.code!==0)throw new Error(String(r.stderr||"Desktop click failed"));
+  return {ok:true,x:Math.round(x),y:Math.round(y)};
+}
+async function desktopTypeText(request={}){
+  desktopRequireWindows();
+  await desktopForegroundIsChrome();
+  const value=String(request.value??"");
+  if(value.length>4000)throw new Error("Desktop text is too long.");
+  const b64=Buffer.from(value,"utf8").toString("base64");
+  const ps="Add-Type -AssemblyName System.Windows.Forms;$t=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('"+b64+"'));Set-Clipboard -Value $t;[System.Windows.Forms.SendKeys]::SendWait('^v')";
+  const r=await desktopPowershell(ps,15000);
+  if(r.code!==0)throw new Error(String(r.stderr||"Desktop typing failed"));
+  return {ok:true,characters:value.length};
+}
+async function desktopPressKey(request={}){
+  desktopRequireWindows();
+  await desktopForegroundIsChrome();
+  const key=String(request.key||"").toLowerCase();
+  const map={enter:"{ENTER}",tab:"{TAB}",escape:"{ESC}",esc:"{ESC}",backspace:"{BACKSPACE}",left:"{LEFT}",right:"{RIGHT}",up:"{UP}",down:"{DOWN}"};
+  if(!map[key])throw new Error("Unsupported desktop key.");
+  const ps="Add-Type -AssemblyName System.Windows.Forms;[System.Windows.Forms.SendKeys]::SendWait('"+map[key]+"')";
+  const r=await desktopPowershell(ps,10000);
+  if(r.code!==0)throw new Error(String(r.stderr||"Desktop keypress failed"));
+  return {ok:true,key};
+}
 async function workspaceTool(tool,request={}){
+  if(tool==="desktop.profile.setup")return await desktopProfileSetup(request);
+  if(tool==="desktop.chrome_open_url")return await desktopChromeOpenUrl(request);
+  if(tool==="desktop.chrome_focus")return await desktopChromeFocus(request);
+  if(tool==="desktop.screenshot")return await desktopScreenshot(request);
+  if(tool==="desktop.click")return await desktopClick(request);
+  if(tool==="desktop.type_text")return await desktopTypeText(request);
+  if(tool==="desktop.press_key")return await desktopPressKey(request);
+
   if(tool==="system.info")return await systemInfo();
   if(String(tool).startsWith("android."))return await androidTool(tool,request);
   if(tool==="hardware.inspect")return await hardwareInspect();
