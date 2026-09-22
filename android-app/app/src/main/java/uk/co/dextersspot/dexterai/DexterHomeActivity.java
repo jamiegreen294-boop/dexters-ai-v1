@@ -1,19 +1,17 @@
 package uk.co.dextersspot.dexterai;
 
+import android.Manifest;
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.drawable.Drawable;
 import android.hardware.camera2.CameraManager;
-import android.content.Context;
-import android.Manifest;
-import android.net.Uri;
 import android.os.BatteryManager;
 import android.os.Build;
 import android.os.Bundle;
-import android.provider.Settings;
 import android.util.Base64;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebSettings;
@@ -29,6 +27,9 @@ public class DexterHomeActivity extends Activity {
         super.onCreate(b);
         getWindow().setStatusBarColor(0xFF030506);
         getWindow().setNavigationBarColor(0xFF030506);
+        DexterUi.applyImmersive(this);
+        try { DeviceOwnerPolicy.applyCompanyShell(this); } catch(Exception ignored) {}
+
         web = new WebView(this);
         setContentView(web);
         WebSettings s = web.getSettings();
@@ -48,19 +49,33 @@ public class DexterHomeActivity extends Activity {
         });
         web.addJavascriptInterface(new Bridge(), "DexterBridge");
         web.loadUrl("file:///android_asset/launcher.html");
+        if(DexterDeviceAdminReceiver.isDeviceOwner(this)){
+            try { startLockTask(); } catch(Exception ignored) {}
+        }
+    }
+
+    @Override protected void onResume(){
+        super.onResume();
+        DexterUi.applyImmersive(this);
+        if(DexterDeviceAdminReceiver.isDeviceOwner(this)){
+            try { startLockTask(); } catch(Exception ignored) {}
+        }
     }
 
     @Override public void onBackPressed() {
         if (web != null) {
             web.evaluateJavascript("(function(){try{return dexterBack()?'handled':'home'}catch(e){return 'home'}})()", value -> {
-                if ("\"home\"".equals(value)) DexterHomeActivity.super.onBackPressed();
+                if ("\"home\"".equals(value)) {
+                    web.evaluateJavascript("show('home')",null);
+                }
             });
-        } else super.onBackPressed();
+        }
     }
 
     @Override protected void onNewIntent(Intent intent){
         super.onNewIntent(intent);
         setIntent(intent);
+        DexterUi.applyImmersive(this);
         String page=intent.getStringExtra("page");
         if(web!=null && page!=null && page.matches("home|control|settings|store|about")){
             web.evaluateJavascript("show('"+page+"')",null);
@@ -69,35 +84,27 @@ public class DexterHomeActivity extends Activity {
 
     public final class Bridge {
         @JavascriptInterface public void openUrl(String url) {
-            try { startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url))); } catch(Exception ignored) {}
+            openDexterWeb(url);
+        }
+        @JavascriptInterface public void openBrowser() {
+            openDexterWeb("https://www.google.com/");
         }
         @JavascriptInterface public void openCamera() {
             launchAny(new String[]{"com.android.camera2","com.android.camera","com.meizu.media.camera"});
-        }
-        @JavascriptInterface public void openBrowser() {
-            launchAny(new String[]{"com.android.chrome","com.google.android.googlequicksearchbox"});
         }
         @JavascriptInterface public void openMessages() {
             launchAny(new String[]{"com.google.android.apps.messaging","com.android.mms"});
         }
         @JavascriptInterface public void openPhone() {
-            try { startActivity(new Intent(Intent.ACTION_DIAL)); } catch(Exception ignored) {}
+            launchAny(new String[]{"com.google.android.dialer","com.android.dialer","com.android.contacts"});
         }
         @JavascriptInterface public void launchPackages(String packages) {
             launchAny(packages == null ? new String[]{} : packages.split(","));
         }
         @JavascriptInterface public void openSetting(String key) {
-            try {
-                Intent i;
-                if ("wifi".equals(key)) i=new Intent(Settings.ACTION_WIFI_SETTINGS);
-                else if ("bluetooth".equals(key)) i=new Intent(Settings.ACTION_BLUETOOTH_SETTINGS);
-                else if ("apps".equals(key)) i=new Intent(Settings.ACTION_APPLICATION_SETTINGS);
-                else if ("battery".equals(key)) i=new Intent(Settings.ACTION_BATTERY_SAVER_SETTINGS);
-                else if ("storage".equals(key)) i=new Intent(Settings.ACTION_INTERNAL_STORAGE_SETTINGS);
-                else if ("security".equals(key)) i=new Intent(Settings.ACTION_SECURITY_SETTINGS);
-                else i=new Intent(Settings.ACTION_SETTINGS);
-                startActivity(i);
-            } catch(Exception ignored) {}
+            runOnUiThread(() -> {
+                if(web!=null)web.evaluateJavascript("openDexterSetting('"+safeSetting(key)+"')",null);
+            });
         }
         @JavascriptInterface public int getBatteryLevel() {
             try {
@@ -108,7 +115,7 @@ public class DexterHomeActivity extends Activity {
         @JavascriptInterface public boolean toggleTorch() {
             try {
                 if (Build.VERSION.SDK_INT >= 23 && checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-                    runOnUiThread(() -> requestPermissions(new String[]{Manifest.permission.CAMERA}, 404));
+                    requestPermissions(new String[]{Manifest.permission.CAMERA}, 404);
                     return false;
                 }
                 CameraManager cm=(CameraManager)getSystemService(Context.CAMERA_SERVICE);
@@ -144,6 +151,19 @@ public class DexterHomeActivity extends Activity {
         }
     }
 
+    private String safeSetting(String key){
+        if(key==null)return "system";
+        return key.matches("network|devices|display|sound|battery|storage|security|accounts|system")?key:"system";
+    }
+
+    private void openDexterWeb(String url){
+        try{
+            Intent i=new Intent(this,DexterWebActivity.class);
+            i.putExtra("url",url);
+            startActivity(i);
+        }catch(Exception ignored){}
+    }
+
     private void launchAny(String[] packages) {
         PackageManager pm=getPackageManager();
         for(String p:packages){
@@ -152,5 +172,8 @@ public class DexterHomeActivity extends Activity {
                 if(i!=null){ startActivity(i); return; }
             } catch(Exception ignored) {}
         }
+        runOnUiThread(()->{
+            if(web!=null)web.evaluateJavascript("showNotice('Dexter OS','This app is not installed or is not approved for this company phone.')",null);
+        });
     }
 }
