@@ -17,5 +17,20 @@
     "Dexter AI pairing",
     "approved apps",
     "OTA channel"
-  ]
+  ],
+  "rolePolicy": {
+    "defaultRole": "staff",
+    "roles": [
+      "staff",
+      "manager",
+      "owner"
+    ],
+    "playStoreAccess": [
+      "manager",
+      "owner"
+    ],
+    "playStorePackage": "com.android.vending",
+    "hidePlayStoreForStaff": true,
+    "revokeVisibilityWhenManagerSessionEnds": true
+  }
 }
