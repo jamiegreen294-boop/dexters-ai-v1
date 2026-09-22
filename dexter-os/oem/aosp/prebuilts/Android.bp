@@ -1,0 +1,10 @@
+android_app_import {
+    name: "DexterOS",
+    apk: "DexterOS.apk",
+    certificate: "platform",
+    privileged: true,
+    product_specific: true,
+    dex_preopt: {
+        enabled: true,
+    },
+}
