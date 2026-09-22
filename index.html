@@ -29,6 +29,7 @@ pre{white-space:pre-wrap;word-break:break-word;background:#090b10;padding:12px;b
 <div class="navtitle desktop-only">Workspace</div>
 <button data-tab="chat" class="active">💬 Chat</button>
 <button data-tab="work">🧠 Work</button>
+<button data-tab="projects">📁 Projects</button>
 <button data-tab="tasks">✅ Tasks</button>
 <button data-tab="artifacts">📄 Artifacts</button>
 <button data-tab="approvals">🔐 Approvals</button>
@@ -46,14 +47,21 @@ pre{white-space:pre-wrap;word-break:break-word;background:#090b10;padding:12px;b
 
 <main>
 <section id="p-chat" class="panel active"><div class="grid2">
-<div class="card"><div class="head"><h2>Chat with Dexter</h2><div id="agent" class="pill">Dexter</div></div><div id="chat" class="chat"></div><div class="composer"><textarea id="msg" placeholder="Ask Dexter anything…"></textarea><button id="send" class="btn">Send</button></div></div>
+<div class="card"><div class="head"><h2>Chat with Dexter</h2><div id="agent" class="pill">Dexter</div></div><div id="chat" class="chat"></div><div class="composer"><textarea id="msg" placeholder="Ask Dexter anything…"></textarea><div class="actions"><button id="voiceChat" class="btn secondary" title="Voice command">🎙️</button><button id="send" class="btn">Send</button></div></div></div>
 <div class="card"><div class="head"><h2>At a glance</h2><button id="refreshAll" class="btn secondary">Refresh</button></div><div class="body"><div id="metrics" class="grid3"></div><div class="sectiontitle">System</div><div id="healthMini" class="list"></div><div class="sectiontitle">Recent work</div><div id="recentMini" class="list"></div></div></div>
 </div></section>
 
 <section id="p-work" class="panel"><div class="grid2">
-<div class="card"><div class="head"><h2>New Work task</h2><span class="pill">TEST execution</span></div><div class="body workbox"><input id="workTitle" class="input" placeholder="Optional task title"><textarea id="workMsg" placeholder="Describe the work Dexter should carry out. Live/consequential actions will stop for owner approval."></textarea><select id="workAgent"><option value="">Auto-select agent</option><option value="coding-agent">Coding Agent</option><option value="platform-doctor">Platform Doctor</option><option value="visual-verifier">Visual Verifier</option><option value="business-agent">Business Agent</option><option value="customer-assistant">Customer Assistant</option></select><button id="runWork" class="btn">Start Work</button><div id="workResult" class="small"></div></div></div>
+<div class="card"><div class="head"><h2>New Work task</h2><span class="pill">TEST execution</span></div><div class="body workbox"><input id="workTitle" class="input" placeholder="Optional task title"><textarea id="workMsg" placeholder="Describe the work Dexter should carry out. Live/consequential actions will stop for owner approval."></textarea><select id="workAgent"><option value="">Auto-select agent</option><option value="coding-agent">Coding Agent</option><option value="platform-doctor">Platform Doctor</option><option value="visual-verifier">Visual Verifier</option><option value="business-agent">Business Agent</option><option value="customer-assistant">Customer Assistant</option></select><div class="actions"><button id="voiceWork" class="btn secondary">🎙️ Voice</button><button id="runWork" class="btn">Start Work</button></div><div id="workResult" class="small"></div></div></div>
 <div class="card"><div class="head"><h2>How Work behaves</h2></div><div class="body"><div class="list"><div class="item"><b>Read & analyse</b><p>Can run automatically inside Dexter AI Test.</p></div><div class="item"><b>Test changes</b><p>Use isolated test resources only.</p></div><div class="item"><b>Approved external website actions</b><p>Registrations, applications and form submissions can run live only after owner approval. Dexters POS, KDS, Loyalty App and Back Office writes stay protected.</p></div><div class="item"><b>Payments / destructive / security actions</b><p>Remain separately approval-gated or blocked unless explicitly enabled.</p></div><div class="item"><b>Artifacts</b><p>Plans and completed outputs are stored as persistent work artifacts.</p></div></div></div></div>
 </div></section>
+
+<section id="p-projects" class="panel">
+<div class="grid2">
+  <div class="card"><div class="head"><h2>Project workspaces</h2><button class="btn secondary" onclick="refresh()">Refresh</button></div><div class="body"><div class="small">Resume a Dexter project from its real tasks, files, artifacts and postmortems.</div><div id="projectList" class="list" style="margin-top:10px"></div></div></div>
+  <div class="card"><div class="head"><h2>Resume state</h2><span class="pill">TEST workspace</span></div><div class="body"><div id="projectResume"><div class="small">Choose a project to continue.</div></div></div></div>
+</div>
+</section>
 
 <section id="p-tasks" class="panel"><div class="card"><div class="head"><h2>Tasks</h2><button class="btn secondary" onclick="refresh()">Refresh</button></div><div class="body"><div id="tasks" class="list"></div><div id="taskDetail" class="sectiontitle"></div><div id="taskDetailBody"></div></div></div></section>
 <section id="p-artifacts" class="panel"><div class="card"><div class="head"><h2>Artifacts</h2><span class="pill">persistent work</span></div><div class="body"><div id="artifacts" class="list"></div><div id="artifactBody"></div></div></div></section>
@@ -127,7 +135,7 @@ pre{white-space:pre-wrap;word-break:break-word;background:#090b10;padding:12px;b
 <section id="p-operator" class="panel">
 <div class="metrics" id="operatorMetrics"></div>
 <div class="grid2">
-  <div class="card"><div class="head"><h2>Autonomous V2</h2><div class="actions"><button class="btn" onclick="runSelfRepair()">Fix TEST issues</button><button class="btn secondary" onclick="queueEval()">Queue eval</button><button class="btn secondary" onclick="runLearningReview()">Learn now</button></div></div><div class="body"><div class="small">Safe autonomous repair, evaluation and learning. Live POS, KDS, Loyalty and Back Office writes remain protected.</div><div class="sectiontitle">Self-repair history</div><div id="operatorRepair" class="list"></div><div class="sectiontitle">AI evaluation</div><div id="operatorEval" class="list"></div></div></div>
+  <div class="card"><div class="head"><h2>Autonomous V2</h2><div class="actions"><button class="btn" onclick="runSelfRepair()">Fix all safe TEST issues</button><button class="btn secondary" onclick="queueEval()">Queue eval</button><button class="btn secondary" onclick="collectEval()">Collect eval</button><button class="btn secondary" onclick="runLearningReview()">Learn now</button></div></div><div class="body"><div class="small">Safe autonomous repair, evaluation and learning. Live POS, KDS, Loyalty and Back Office writes remain protected.</div><div class="sectiontitle">Self-repair history</div><div id="operatorRepair" class="list"></div><div class="sectiontitle">AI evaluation</div><div id="operatorEval" class="list"></div></div></div>
   <div class="card"><div class="head"><h2>Agent & tool telemetry</h2><button class="btn secondary" onclick="refresh()">Refresh</button></div><div class="body"><div class="sectiontitle">Agent runs</div><div id="operatorAgentRuns" class="list"></div><div class="sectiontitle">Tool runs</div><div id="operatorToolRuns" class="list"></div></div></div>
 </div>
 <div class="grid2">
@@ -135,7 +143,10 @@ pre{white-space:pre-wrap;word-break:break-word;background:#090b10;padding:12px;b
   <div class="card"><div class="head"><h2>Regression suite</h2><button class="btn" onclick="runRegression()">Run Dexter Core</button></div><div class="body"><div id="operatorRegression" class="list"><div class="small">No regression run yet.</div></div></div></div>
 </div>
 <div class="grid2">
+  <div class="card"><div class="head"><h2>Business-wide state</h2><span id="operatorStatePill" class="pill">checking</span></div><div class="body"><div id="operatorHealthState" class="list"></div><div class="sectiontitle">Alerts</div><div id="operatorAlerts" class="list"></div></div></div>
   <div class="card"><div class="head"><h2>Learning signals</h2></div><div class="body"><div id="operatorLearningSignals" class="list"></div><div class="sectiontitle">Last-known-good</div><div id="operatorRollback" class="list"></div></div></div>
+</div>
+<div class="grid2">
   <div class="card"><div class="head"><h2>Create test rollback point</h2></div><div class="body workbox">
     <select id="rollbackSystem"></select>
     <input id="rollbackLabel" class="input" placeholder="Label, e.g. Stable command centre">
@@ -187,6 +198,15 @@ function renderDashboard(d){
  $('connectors').innerHTML=conns.map(c=>'<div class="item"><div class="row"><b>'+esc(c.name)+'</b><span class="status">'+esc(c.status)+'</span></div><p>'+esc(c.last_error||('Last checked '+fmtDate(c.last_checked_at)))+'</p><p>'+(c.runtime_ready===false?'⚪ Runtime credential not loaded':'✅ Registry configured')+'</p></div>').join('')||'<div class="small">No connectors.</div>';
  $('homeJobs').innerHTML=jobs.slice(0,15).map(j=>item(j.tool_name||j.job_type,(j.error||'')+(j.completed_at?' · '+fmtDate(j.completed_at):''),j.status)).join('')||'<div class="small">No Home PC jobs.</div>';
  $('audit').innerHTML=audit.map(a=>item(a.action,(a.actor||'system')+' · '+fmtDate(a.created_at),a.environment||'test')).join('')||'<div class="small">No audit activity.</div>';
+ const projects=d.projects||[], ops=d.operationsHealth||[], alerts=(d.notifications||[]).filter(x=>x.status!=='dismissed');
+ if($('projectList'))$('projectList').innerHTML=projects.map(p=>'<div class="item"><div class="row"><div><b>'+esc(p.name)+'</b><p>'+esc(p.description||p.slug||'')+'</p></div><button class="btn secondary" onclick="resumeProject(\''+esc(p.id)+'\')">Resume</button></div></div>').join('')||'<div class="small">No project workspaces yet.</div>';
+ const latestBySystem={};ops.forEach(x=>{if(!latestBySystem[x.system_key])latestBySystem[x.system_key]=x});
+ const healthRows=Object.values(latestBySystem);
+ const badHealth=healthRows.filter(x=>['offline','failed','critical','error'].includes(String(x.status).toLowerCase()));
+ const warnHealth=healthRows.filter(x=>['warning','degraded'].includes(String(x.status).toLowerCase()));
+ if($('operatorStatePill')){$('operatorStatePill').textContent=badHealth.length?'RED':warnHealth.length?'AMBER':'GREEN';$('operatorStatePill').className='pill '+(badHealth.length?'bad':warnHealth.length?'warn':'ok')}
+ if($('operatorHealthState'))$('operatorHealthState').innerHTML=healthRows.slice(0,12).map(x=>item(x.system_name||x.system_key,x.summary||fmtDate(x.checked_at),x.status)).join('')||'<div class="small">No operational health checks yet.</div>';
+ if($('operatorAlerts'))$('operatorAlerts').innerHTML=alerts.slice(0,10).map(x=>item(x.title,x.message,x.severity)).join('')||'<div class="small">No active alerts.</div>';
  const nodes=d.systemNodes||[], edges=d.systemEdges||[], runs=d.regressionRuns||[], points=d.rollbackPoints||[];
  const agentRuns=d.agentRunTelemetry||[], toolRuns=d.toolRunTelemetry||[], repairs=d.selfRepairRuns||[], signals=d.learningSignals||[], evals=d.evalRuns||[];
  const latestEval=evals[0]||null;
@@ -205,8 +225,33 @@ function renderDashboard(d){
  if($('rollbackSystem'))$('rollbackSystem').innerHTML=nodes.filter(n=>n.environment==='test').map(n=>'<option value="'+esc(n.system_key)+'">'+esc(n.name)+'</option>').join('');
 
 }
+async function resumeProject(projectId){
+ try{
+   note('Loading project state…');
+   const r=await api('project_resume',{projectId});
+   const t=r.activeTasks||[], done=r.recentCompleted||[], arts=r.artifacts||[], files=r.files||[], pms=r.postmortems||[];
+   $('projectResume').innerHTML=
+     '<div class="item"><div class="row"><b>'+esc(r.project?.name||'Project')+'</b><span class="status">'+esc(r.project?.status||'active')+'</span></div><p>'+esc(r.continuation?.summary||'')+'</p></div>'+
+     '<div class="sectiontitle">Continue next</div>'+
+     (t.length?t.slice(0,6).map(x=>'<div class="item"><b>'+esc(x.title)+'</b><p>'+esc(x.status+' · '+(x.progress||0)+'%')+'</p><div class="actions"><button class="btn secondary" onclick="openTask(\''+esc(x.id)+'\')">Open task</button></div></div>').join(''):'<div class="small">No active task.</div>')+
+     '<div class="sectiontitle">Recent completed</div>'+done.slice(0,5).map(x=>item(x.title,fmtDate(x.updated_at),x.status)).join('')+
+     '<div class="sectiontitle">Files & artifacts</div>'+files.slice(0,5).map(x=>item(x.name,x.extraction_status||'file')).join('')+arts.slice(0,5).map(x=>item(x.name,x.artifact_type)).join('')+
+     (pms.length?'<div class="sectiontitle">Recent postmortems</div>'+pms.slice(0,5).map(x=>item(x.title,x.root_cause||'',x.status)).join(''):'');
+ }catch(e){note(e.message)}
+}
+let voiceRecognition=null;
+function startVoice(targetId){
+ const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+ if(!SR){note('Voice recognition is not available in this browser.');return}
+ try{voiceRecognition?.abort?.()}catch{}
+ const r=new SR();voiceRecognition=r;r.lang='en-GB';r.interimResults=false;r.continuous=false;
+ r.onstart=()=>note('Listening…');
+ r.onresult=e=>{const text=Array.from(e.results).map(x=>x[0]?.transcript||'').join(' ').trim();if(text){$(targetId).value=($(targetId).value?$(targetId).value+' ':'')+text;note('Voice command added.')}};
+ r.onerror=e=>note('Voice: '+(e.error||'recognition error'));
+ r.start();
+}
 async function runSelfRepair(){
- try{note('Dexter is checking and repairing safe TEST issues…');const r=await api('self_repair',{triggerSource:'manual'});note('Self-repair '+r.status+' · '+(r.actions?.length||0)+' actions');await refresh()}catch(e){note(e.message)}
+ try{note('Dexter is checking and repairing safe TEST issues…');const r=await api('self_repair_all',{triggerSource:'manual'});const last=(r.passes||[]).at(-1)||{};note('Repair '+r.status+' · '+(r.passes?.length||0)+' pass(es) · '+(last.actions?.length||0)+' latest actions');await refresh()}catch(e){note(e.message)}
 }
 async function queueEval(){
  try{note('Queuing free local Dexter evaluation…');const r=await api('eval_run',{triggerSource:'manual'});note('Evaluation queued on Home PC');await refresh()}catch(e){note(e.message)}
@@ -367,7 +412,7 @@ async function executeTool(id){try{note('Running approved action…');const d=aw
 async function addMemory(){const content=$('memoryContent').value.trim();if(!content)return note('Enter the memory first.');try{await api('memory_add',{category:$('memoryCategory').value.trim()||'general',content});$('memoryContent').value='';note('Approved memory added.');await refresh()}catch(e){note(e.message)}}
 async function learn(){const topic=$('learnTopic').value.trim();if(!topic)return note('Enter a research topic.');try{await api('learn',{topic,category:$('learnCategory').value.trim()||'general'});$('learnTopic').value='';note('Research queued on Dexter Home PC.');await refresh()}catch(e){note(e.message)}}
 async function selfTest(){ $('selfTest').disabled=true;$('selfResults').innerHTML='<div class="small">Running checks…</div>';try{const d=await api('self_test');$('selfResults').innerHTML=(d.checks||[]).map(c=>'<div class="item"><div class="row"><b>'+esc(c.name)+'</b><span class="'+(c.ok?'ok':'bad')+'">'+(c.ok?'PASS':'FAIL')+'</span></div><pre>'+esc(JSON.stringify(c.detail||{},null,2))+'</pre></div>').join('')||item('Self test',d.passed+'/'+d.total+' passed')}catch(e){$('selfResults').innerHTML=item('Self test failed',e.message,'FAIL')}finally{$('selfTest').disabled=false}}
-$('unlock').onclick=unlock;$('send').onclick=send;$('runWork').onclick=runWork;$('addMemory').onclick=addMemory;$('learnBtn').onclick=learn;$('selfTest').onclick=selfTest;$('refreshAll').onclick=refresh;
+$('unlock').onclick=unlock;$('send').onclick=send;$('runWork').onclick=runWork;$('addMemory').onclick=addMemory;$('learnBtn').onclick=learn;$('selfTest').onclick=selfTest;$('refreshAll').onclick=refresh;if($('voiceChat'))$('voiceChat').onclick=()=>startVoice('msg');if($('voiceWork'))$('voiceWork').onclick=()=>startVoice('workMsg');
 $('msg').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}});
 window.addEventListener('load',async()=>{tok=localStorage.getItem('dexter_tok')||sessionStorage.getItem('dexter_tok')||'';sid=localStorage.getItem('dexter_sid')||uid();if(tok){try{const h=await api('health');$('lock').classList.add('hidden');$('workspace').classList.remove('hidden');showHealth(h);await Promise.all([refresh(),loadHistory()])}catch{tok=''}}});
 </script></body></html>
