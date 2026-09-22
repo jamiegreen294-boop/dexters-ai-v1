@@ -1,30 +1,42 @@
 {
   "product": "Dexter OS",
-  "softwareFoundation": "complete-pending-hardware-bind",
+  "commonSoftwareStatus": "complete-pending-device-port",
+  "commonSoftwareModulesComplete": true,
   "customerSurfaces": {
     "homeSettingsControlCentre": "implemented",
     "managerOwnerAccess": "implemented",
     "playStoreRoleGate": "implemented",
-    "dialerInCall": "oem-module-present",
-    "messaging": "oem-module-present",
-    "files": "oem-module-present",
-    "esim": "oem-module-present",
-    "setup": "oem-module-present",
-    "updater": "oem-module-present",
-    "camera": "customer-surface-present-hardware-pipeline-pending"
+    "dialerInCall": "implemented-common-module-hardware-call-validation-pending",
+    "messaging": "implemented-common-module-carrier-mms-validation-pending",
+    "files": "implemented",
+    "esim": "implemented-common-module-euicc-carrier-validation-pending",
+    "setup": "implemented-factory-role-provisioning",
+    "updater": "implemented-update-engine-client-device-payload-pending",
+    "camera": "implemented-generic-camera2-hardware-lens-validation-pending"
+  },
+  "releaseInfrastructure": {
+    "factoryRoleProvisioning": true,
+    "factoryAcceptanceScript": true,
+    "devicePortTemplate": true,
+    "otaManifestContract": true,
+    "oemHandoffPackaging": true,
+    "privateSigningKeysInRepo": false
   },
   "hardwareBindingRequired": [
+    "selected eSIM-capable handset / OEM BSP",
     "device tree / BoardConfig",
     "kernel and vendor image",
-    "modem RIL / IMS",
-    "eUICC / LPA",
-    "camera HAL",
-    "audio HAL",
-    "display / touch / sensors",
-    "AVB and release signing",
-    "device-specific OTA payload",
+    "modem RIL / IMS / VoLTE / VoWiFi",
+    "eUICC / LPA / SM-DP+ production validation",
+    "camera HAL and exact lens tuning",
+    "audio HAL / proximity / Bluetooth-call routing",
+    "display / touch / sensors / power / thermal",
+    "AVB and release signing keys",
+    "device-specific A/B or Virtual A/B OTA payload",
     "UK radio / SAR / emergency-call certification"
   ],
+  "goLiveState": "software-ready-for-hardware-port",
   "retailReady": false,
-  "retailReadyWhen": "all RELEASE-GATES.md checks pass on the exact production hardware SKU"
+  "retailReadyReason": "Retail readiness can only be asserted after the full RELEASE-GATES.md suite passes on the exact production hardware SKU.",
+  "retailReadyWhen": "all release gates pass on the selected production hardware and carrier profile"
 }
