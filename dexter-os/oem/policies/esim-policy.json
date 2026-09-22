@@ -1,0 +1,37 @@
+{
+  "feature": "Dexter eSIM",
+  "requiredHardware": {
+    "euicc": true,
+    "androidFeature": "android.hardware.telephony.euicc",
+    "physicalSim": "nano-SIM preferred for v1",
+    "multipleEnabledProfiles": "preferred",
+    "androidMinimumForMEP": 13
+  },
+  "customerExperience": {
+    "surface": "Dexter eSIM",
+    "stockAndroidEuiccSettingsVisible": false,
+    "activationMethods": ["activation-code", "qr-code"],
+    "profileList": true,
+    "enableDisableDeleteProfiles": true,
+    "managerPolicy": "profile deletion and enterprise-managed profile changes may be restricted to Manager/Owner"
+  },
+  "platform": {
+    "lpaBackend": "OEM/AOSP-compatible LPA required",
+    "lui": "DexterEsim",
+    "gsmaArchitecture": "Consumer RSP / SGP.21 + SGP.22",
+    "smdpPlusCompatible": true,
+    "smDsCompatible": true
+  },
+  "releaseRequirements": [
+    "eUICC EID readable",
+    "download production profile from SM-DP+",
+    "enable/switch/disable/delete profile",
+    "cold boot with active eSIM",
+    "emergency calling with eSIM",
+    "VoLTE and VoWiFi validation",
+    "physical SIM plus eSIM DSDS validation if advertised",
+    "MEP validation if advertised",
+    "factory reset behaviour verified",
+    "OTA does not corrupt eUICC/LPA state"
+  ]
+}
