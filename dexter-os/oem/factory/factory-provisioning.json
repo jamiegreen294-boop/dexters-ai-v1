@@ -1,0 +1,23 @@
+{
+  "package": "uk.co.dextersspot.dexterai",
+  "mode": "system-image-device-owner",
+  "steps": [
+    "flash signed Dexter OS build",
+    "verify AVB green state",
+    "apply serial/IMEI factory records using OEM tooling",
+    "boot Dexter Setup",
+    "enrol device in Dexter OTA channel",
+    "create device identity",
+    "apply default approved-app catalogue",
+    "run camera/audio/radio/Wi-Fi/Bluetooth/GNSS diagnostics",
+    "verify emergency calling with SIM",
+    "verify OTA update and rollback protection",
+    "seal retail state"
+  ],
+  "forbidden": [
+    "shipping with test signing keys",
+    "shipping with USB debugging enabled",
+    "shipping with unlocked bootloader",
+    "shipping with stock launcher selectable by customer"
+  ]
+}
