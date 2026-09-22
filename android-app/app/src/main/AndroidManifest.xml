@@ -78,6 +78,7 @@
         <activity android:name=".DexterStoreActivity" android:exported="false" android:screenOrientation="portrait"/>
         <activity android:name=".DexterInboxActivity" android:exported="false"/>
         <activity android:name=".DexterControlCentreActivity" android:exported="false" android:screenOrientation="portrait"/>
+        <activity android:name=".DexterCameraActivity" android:exported="false" android:screenOrientation="portrait"/>
         <activity android:name=".DexterSettingsActivity" android:exported="false" android:screenOrientation="portrait"/>
         <activity android:name=".QuickStartActivity" android:exported="false"/>
 
