@@ -47,7 +47,7 @@ pre{white-space:pre-wrap;word-break:break-word;background:#090b10;padding:12px;b
 
 <main>
 <section id="p-chat" class="panel active"><div class="grid2">
-<div class="card"><div class="head"><h2>Chat with Dexter</h2><div id="agent" class="pill">Dexter</div></div><div id="chat" class="chat"></div><div class="composer"><textarea id="msg" placeholder="Ask Dexter anything…"></textarea><div class="actions"><button id="voiceChat" class="btn secondary" title="Voice command">🎙️</button><button id="send" class="btn">Send</button></div></div></div>
+<div class="card"><div class="head"><h2>Chat with Dexter</h2><div id="agent" class="pill">Dexter</div></div><div id="chat" class="chat"></div><div class="composer"><textarea id="msg" placeholder="Ask Dexter anything…"></textarea><div><div class="actions"><button id="voiceChat" class="btn secondary" title="Voice command">🎙️</button><button id="send" class="btn">Send</button></div><label class="small"><input id="voiceReplies" type="checkbox"> 🔊 Speak Dexter replies</label></div></div></div>
 <div class="card"><div class="head"><h2>At a glance</h2><button id="refreshAll" class="btn secondary">Refresh</button></div><div class="body"><div id="metrics" class="grid3"></div><div class="sectiontitle">System</div><div id="healthMini" class="list"></div><div class="sectiontitle">Recent work</div><div id="recentMini" class="list"></div></div></div>
 </div></section>
 
@@ -135,7 +135,7 @@ pre{white-space:pre-wrap;word-break:break-word;background:#090b10;padding:12px;b
 <section id="p-operator" class="panel">
 <div class="metrics" id="operatorMetrics"></div>
 <div class="grid2">
-  <div class="card"><div class="head"><h2>Autonomous V2</h2><div class="actions"><button class="btn" onclick="runSelfRepair()">Fix all safe TEST issues</button><button class="btn secondary" onclick="queueEval()">Queue eval</button><button class="btn secondary" onclick="collectEval()">Collect eval</button><button class="btn secondary" onclick="runLearningReview()">Learn now</button></div></div><div class="body"><div class="small">Safe autonomous repair, evaluation and learning. Live POS, KDS, Loyalty and Back Office writes remain protected.</div><div class="sectiontitle">Self-repair history</div><div id="operatorRepair" class="list"></div><div class="sectiontitle">AI evaluation</div><div id="operatorEval" class="list"></div></div></div>
+  <div class="card"><div class="head"><h2>Autonomous V2</h2><div class="actions"><button class="btn" onclick="runSelfRepair()">Fix all safe TEST issues</button><button class="btn secondary" onclick="queueEval()">Queue eval</button><button class="btn secondary" onclick="collectEval()">Collect eval</button><button class="btn secondary" onclick="runLearningReview()">Learn now</button><button class="btn secondary" onclick="consolidateMemory()">Verify memory</button></div></div><div class="body"><div class="small">Safe autonomous repair, evaluation and learning. Live POS, KDS, Loyalty and Back Office writes remain protected.</div><div class="sectiontitle">Self-repair history</div><div id="operatorRepair" class="list"></div><div class="sectiontitle">AI evaluation</div><div id="operatorEval" class="list"></div></div></div>
   <div class="card"><div class="head"><h2>Agent & tool telemetry</h2><button class="btn secondary" onclick="refresh()">Refresh</button></div><div class="body"><div class="sectiontitle">Agent runs</div><div id="operatorAgentRuns" class="list"></div><div class="sectiontitle">Tool runs</div><div id="operatorToolRuns" class="list"></div></div></div>
 </div>
 <div class="grid2">
@@ -171,7 +171,8 @@ function uid(){return crypto.randomUUID?crypto.randomUUID():'xxxxxxxx-xxxx-4xxx-
 function esc(v){return String(v??'').replace(/[&<>"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[s]))}
 function note(t){$('toast').textContent=t;$('toast').classList.remove('hidden');clearTimeout(note.t);note.t=setTimeout(()=>$('toast').classList.add('hidden'),3500)}
 async function api(action,extra={}){const r=await fetch(EP,{method:'POST',headers:{'content-type':'application/json','x-dexter-token':tok},body:JSON.stringify({action,sessionId:sid,...extra})});const d=await r.json().catch(()=>({error:'Bad server response'}));if(!r.ok)throw Error(d.error||'Request failed');return d}
-function addMsg(role,text,meta=''){const e=document.createElement('div');e.className='msg '+role;e.textContent=text;if(meta){const m=document.createElement('div');m.className='meta';m.textContent=meta;e.append(m)}$('chat').append(e);$('chat').scrollTop=$('chat').scrollHeight}
+function speakText(text){try{if(!('speechSynthesis' in window))return;window.speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(String(text||''));u.lang='en-GB';u.rate=1;window.speechSynthesis.speak(u)}catch{}}
+function addMsg(role,text,meta=''){const e=document.createElement('div');e.className='msg '+role;e.textContent=text;if(meta){const m=document.createElement('div');m.className='meta';m.textContent=meta;e.append(m)}$('chat').append(e);$('chat').scrollTop=$('chat').scrollHeight;if(role==='a'&&$('voiceReplies')?.checked)speakText(text)}
 function item(title,meta='',status=''){return '<div class="item"><div class="row"><b>'+esc(title)+'</b>'+(status?'<span class="status">'+esc(status)+'</span>':'')+'</div>'+(meta?'<p>'+esc(meta)+'</p>':'')+'</div>'}
 function fmtDate(v){try{return new Date(v).toLocaleString('en-GB')}catch{return String(v||'')}}
 function setTab(name){document.querySelectorAll('.nav button[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));$('p-'+name)?.classList.add('active');if(name==='phones')loadPhones();if(name==='esim')loadEsim()}
@@ -209,9 +210,10 @@ function renderDashboard(d){
  if($('operatorAlerts'))$('operatorAlerts').innerHTML=alerts.slice(0,10).map(x=>item(x.title,x.message,x.severity)).join('')||'<div class="small">No active alerts.</div>';
  const nodes=d.systemNodes||[], edges=d.systemEdges||[], runs=d.regressionRuns||[], points=d.rollbackPoints||[];
  const agentRuns=d.agentRunTelemetry||[], toolRuns=d.toolRunTelemetry||[], repairs=d.selfRepairRuns||[], signals=d.learningSignals||[], evals=d.evalRuns||[];
- const latestEval=evals[0]||null;
+ const latestEval=evals[0]||null,usage=d.usage24h||{};
  if($('operatorMetrics'))$('operatorMetrics').innerHTML=[
-   ['Systems',nodes.length],['Eval score',latestEval?.score!=null?latestEval.score+'%':'—'],['Self-repairs',repairs.length],['Agent runs',agentRuns.length],['Tool runs',toolRuns.length],['Learning signals',signals.length]
+   ['Systems',nodes.length],['Eval score',latestEval?.score!=null?latestEval.score+'%':'—'],['Self-repairs',repairs.length],['Agent runs',agentRuns.length],['Tool runs',toolRuns.length],['Learning signals',signals.length],
+   ['24h tokens',Number(usage.input_tokens||0)+Number(usage.output_tokens||0)],['Local runs',usage.local_runs||0],['Est. model cost','£'+(Number(usage.estimated_cost_pence||0)/100).toFixed(2)]
  ].map(x=>'<div class="metric"><b>'+x[1]+'</b><span>'+x[0]+'</span></div>').join('');
  if($('operatorRepair'))$('operatorRepair').innerHTML=repairs.slice(0,8).map(r=>item('Repair · '+fmtDate(r.started_at),(r.actions?.length||0)+' actions · '+(r.verification?.critical_failures??'?')+' critical remaining',r.status)).join('')||'<div class="small">No self-repair run yet.</div>';
  if($('operatorEval'))$('operatorEval').innerHTML=evals.slice(0,8).map(r=>item('Evaluation · '+fmtDate(r.created_at),(r.passed||0)+' passed · '+(r.failed||0)+' failed'+(r.score!=null?' · '+r.score+'%':''),r.status)).join('')||'<div class="small">No evaluation run yet.</div>';
@@ -261,6 +263,9 @@ async function collectEval(){
 }
 async function runLearningReview(){
  try{note('Reviewing recent work and failures…');const r=await api('learning_review',{triggerSource:'manual'});note('Learning: '+(r.signals||0)+' signals · '+(r.postmortems||0)+' postmortems');await refresh()}catch(e){note(e.message)}
+}
+async function consolidateMemory(){
+ try{note('Checking reviewed work for safe durable memory…');const r=await api('memory_consolidate');note('Memory: '+(r.promoted||0)+' promoted · '+(r.skipped||0)+' held back');await refresh()}catch(e){note(e.message)}
 }
 async function runRegression(){
  try{
@@ -414,5 +419,5 @@ async function learn(){const topic=$('learnTopic').value.trim();if(!topic)return
 async function selfTest(){ $('selfTest').disabled=true;$('selfResults').innerHTML='<div class="small">Running checks…</div>';try{const d=await api('self_test');$('selfResults').innerHTML=(d.checks||[]).map(c=>'<div class="item"><div class="row"><b>'+esc(c.name)+'</b><span class="'+(c.ok?'ok':'bad')+'">'+(c.ok?'PASS':'FAIL')+'</span></div><pre>'+esc(JSON.stringify(c.detail||{},null,2))+'</pre></div>').join('')||item('Self test',d.passed+'/'+d.total+' passed')}catch(e){$('selfResults').innerHTML=item('Self test failed',e.message,'FAIL')}finally{$('selfTest').disabled=false}}
 $('unlock').onclick=unlock;$('send').onclick=send;$('runWork').onclick=runWork;$('addMemory').onclick=addMemory;$('learnBtn').onclick=learn;$('selfTest').onclick=selfTest;$('refreshAll').onclick=refresh;if($('voiceChat'))$('voiceChat').onclick=()=>startVoice('msg');if($('voiceWork'))$('voiceWork').onclick=()=>startVoice('workMsg');
 $('msg').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}});
-window.addEventListener('load',async()=>{tok=localStorage.getItem('dexter_tok')||sessionStorage.getItem('dexter_tok')||'';sid=localStorage.getItem('dexter_sid')||uid();if(tok){try{const h=await api('health');$('lock').classList.add('hidden');$('workspace').classList.remove('hidden');showHealth(h);await Promise.all([refresh(),loadHistory()])}catch{tok=''}}});
+window.addEventListener('load',async()=>{if($('voiceReplies')){$('voiceReplies').checked=localStorage.getItem('dexter_voice_replies')==='1';$('voiceReplies').onchange=()=>localStorage.setItem('dexter_voice_replies',$('voiceReplies').checked?'1':'0')}tok=localStorage.getItem('dexter_tok')||sessionStorage.getItem('dexter_tok')||'';sid=localStorage.getItem('dexter_sid')||uid();if(tok){try{const h=await api('health');$('lock').classList.add('hidden');$('workspace').classList.remove('hidden');showHealth(h);await Promise.all([refresh(),loadHistory()])}catch{tok=''}}});
 </script></body></html>
