@@ -176,8 +176,9 @@ public final class DeviceOwnerPolicy {
         } catch(Exception e){ try{skipped.put("lockTaskPackage",safeMessage(e));}catch(Exception ignored){} }
         if(Build.VERSION.SDK_INT>=28){
             try {
-                d.setLockTaskFeatures(a,DevicePolicyManager.LOCK_TASK_FEATURE_NONE);
+                d.setLockTaskFeatures(a,DevicePolicyManager.LOCK_TASK_FEATURE_GLOBAL_ACTIONS);
                 applied.put("systemUiLocked",true);
+                applied.put("powerMenuEnabled",true);
             } catch(Exception e){ try{skipped.put("systemUiLocked",safeMessage(e));}catch(Exception ignored){} }
         }
         if(Build.VERSION.SDK_INT>=23){
