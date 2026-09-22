@@ -33,6 +33,8 @@ import java.io.ByteArrayOutputStream;
 
 public class DexterHomeActivity extends Activity {
     private boolean firstResumeDone=false;
+    private float dexTouchStartX=0f;
+    private float dexTouchStartY=0f;
     private WebView web;
     private boolean torchOn=false;
     private boolean rotationEnabled=false;
@@ -70,6 +72,23 @@ public class DexterHomeActivity extends Activity {
             }
         });
         web.addJavascriptInterface(new Bridge(),"DexterBridge");
+        web.setOnTouchListener((v,e)->{
+            try {
+                if(e.getAction()==android.view.MotionEvent.ACTION_DOWN){
+                    dexTouchStartX=e.getX();
+                    dexTouchStartY=e.getY();
+                } else if(e.getAction()==android.view.MotionEvent.ACTION_UP){
+                    float dx=e.getX()-dexTouchStartX;
+                    float dy=e.getY()-dexTouchStartY;
+                    if(dexTouchStartY<=180f && dy>90f && Math.abs(dy)>Math.abs(dx)){
+                        web.evaluateJavascript("openControl()",null);
+                    } else if(dy<-90f && Math.abs(dy)>Math.abs(dx)){
+                        web.evaluateJavascript("closeControl()",null);
+                    }
+                }
+            } catch(Exception ignored) {}
+            return false;
+        });
         web.loadUrl("file:///android_asset/launcher.html");
     }
 
@@ -77,12 +96,31 @@ public class DexterHomeActivity extends Activity {
         super.onResume();
         DeviceAccessClient.enforceExpiry(this);
         enterImmersive();
+        if(firstResumeDone && web!=null){
+            web.postDelayed(() -> {
+                try { web.evaluateJavascript("show('home')",null); } catch(Exception ignored) {}
+            },120);
+        }
+        firstResumeDone=true;
         new Thread(()->{ try { DexterEsimClient.report(DexterHomeActivity.this); } catch(Exception ignored) {} },"dexter-esim-report").start();
         try { if(DeviceAgentService.hasToken(this) || DexterDeviceAdminReceiver.isDeviceOwner(this)) DeviceAgentService.start(this); } catch(Exception ignored) {}
         try {
             DevicePolicyManager d=(DevicePolicyManager)getSystemService(DEVICE_POLICY_SERVICE);
+            if(d!=null && d.isDeviceOwnerApp(getPackageName())){
+                try { d.setStatusBarDisabled(DexterDeviceAdminReceiver.component(this),true); } catch(Exception ignored) {}
+            }
             if(d!=null && d.isLockTaskPermitted(getPackageName())) startLockTask();
         } catch(Exception ignored) {}
+    }
+
+    @Override protected void onPause(){
+        try {
+            DevicePolicyManager d=(DevicePolicyManager)getSystemService(DEVICE_POLICY_SERVICE);
+            if(d!=null && d.isDeviceOwnerApp(getPackageName())){
+                try { d.setStatusBarDisabled(DexterDeviceAdminReceiver.component(this),false); } catch(Exception ignored) {}
+            }
+        } catch(Exception ignored) {}
+        super.onPause();
     }
 
     @Override public void onWindowFocusChanged(boolean hasFocus){
