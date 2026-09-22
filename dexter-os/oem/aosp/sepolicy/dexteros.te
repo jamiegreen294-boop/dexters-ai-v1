@@ -1,0 +1,8 @@
+# Dexter OS privileged app domain extension.
+# OEM sepolicy must be reviewed against the exact Android release and never
+# grant blanket access to modem, keystore, filesystem or other app data.
+
+type dexteros_app, domain;
+app_domain(dexteros_app)
+
+# Add only narrowly required binder/property rules after AVC review on hardware.
