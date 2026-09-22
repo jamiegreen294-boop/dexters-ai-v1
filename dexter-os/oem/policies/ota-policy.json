@@ -1,0 +1,19 @@
+{
+  "product": "Dexter OS",
+  "channels": ["test", "beta", "stable"],
+  "defaultChannel": "stable",
+  "signedUpdatesOnly": true,
+  "rollbackProtection": true,
+  "stagedRollout": true,
+  "minimumBatteryPercent": 40,
+  "wifiPreferred": true,
+  "ownerCanPinVersion": true,
+  "emergencySecurityUpdatesMayOverrideWindow": true,
+  "productionRequirements": [
+    "AVB production keys",
+    "release signing keys stored outside source control",
+    "signed OTA metadata",
+    "rollback index management",
+    "device-specific recovery/update integration"
+  ]
+}
