@@ -31,9 +31,11 @@ public final class DexterEsimClient {
             out.put("android",Build.VERSION.RELEASE);
             out.put("activeEmbeddedProfiles",embeddedProfiles(c));
         }catch(Exception e){
-            out.put("euiccSupported",false);
-            out.put("euiccEnabled",false);
-            out.put("error",String.valueOf(e.getMessage()));
+            try{
+                out.put("euiccSupported",false);
+                out.put("euiccEnabled",false);
+                out.put("error",String.valueOf(e.getMessage()));
+            }catch(Exception ignored){}
         }
         return out;
     }
