@@ -5,6 +5,7 @@ import android.graphics.Color;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
+import android.webkit.JavascriptInterface;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -43,6 +44,7 @@ public class DexterWebActivity extends Activity {
 
         web=new WebView(this);
         WebSettings s=web.getSettings(); s.setJavaScriptEnabled(true); s.setDomStorageEnabled(true);
+        web.addJavascriptInterface(new PosBridge(),"DexterManaged");
         web.setWebViewClient(new WebViewClient());
         root.addView(web,new LinearLayout.LayoutParams(-1,0,1f));
         setContentView(root);
@@ -51,6 +53,19 @@ public class DexterWebActivity extends Activity {
         if(url==null || !(url.startsWith("https://")||url.startsWith("http://")))url="https://www.google.com/";
         web.loadUrl(url);
     }
+    public final class PosBridge {
+        @JavascriptInterface public String getPosCredentials(){
+            try{
+                android.content.SharedPreferences p=getSharedPreferences("dexter_pos",MODE_PRIVATE);
+                String id=p.getString("device_id","");
+                String secret=p.getString("device_secret","");
+                if(id==null||secret==null||id.isEmpty()||secret.length()<32) return "{}";
+                return new org.json.JSONObject().put("device_id",id).put("device_secret",secret).toString();
+            }catch(Exception e){return "{}";}
+        }
+        @JavascriptInterface public boolean isDexterManaged(){ return DexterDeviceAdminReceiver.isDeviceOwner(DexterWebActivity.this); }
+    }
+
     @Override protected void onResume(){super.onResume();immersive();}
     @Override public void onWindowFocusChanged(boolean h){super.onWindowFocusChanged(h);if(h)immersive();}
     @Override public void onBackPressed(){if(web!=null&&web.canGoBack())web.goBack();else finish();}
