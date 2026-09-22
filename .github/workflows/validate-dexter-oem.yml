@@ -47,6 +47,15 @@ jobs:
             dexter-os/oem/aosp/apps/DexterEsim/Android.bp
             dexter-os/oem/aosp/apps/DexterEsim/AndroidManifest.xml
             dexter-os/oem/aosp/apps/DexterEsim/src/uk/co/dexter/os/esim/EsimActivity.java
+            dexter-os/oem/aosp/apps/DexterSetup/Android.bp
+            dexter-os/oem/aosp/apps/DexterSetup/AndroidManifest.xml
+            dexter-os/oem/aosp/apps/DexterUpdater/Android.bp
+            dexter-os/oem/aosp/apps/DexterUpdater/AndroidManifest.xml
+            dexter-os/oem/aosp/apps/DexterCamera/Android.bp
+            dexter-os/oem/aosp/apps/DexterCamera/AndroidManifest.xml
+            dexter-os/oem/factory/dexter-role-provision.sh
+            dexter-os/oem/ota/release-manifest.schema.json
+            dexter-os/oem/release/RELEASE-STATUS.json
             dexter-os/oem/factory/factory-provisioning.json
           )
           for f in "${required[@]}"; do test -s "$f" || { echo "Missing $f"; exit 1; }; done
@@ -67,3 +76,9 @@ jobs:
           grep -q 'DexterEsim' dexter-os/oem/aosp/dexter_os_common.mk
           grep -q 'android.hardware.telephony.euicc' dexter-os/oem/aosp/apps/DexterEsim/AndroidManifest.xml
           grep -q 'WRITE_EMBEDDED_SUBSCRIPTIONS' dexter-os/oem/aosp/permissions/privapp-permissions-dexter.xml
+          grep -q 'DexterSetup' dexter-os/oem/aosp/dexter_os_common.mk
+          grep -q 'DexterUpdater' dexter-os/oem/aosp/dexter_os_common.mk
+          grep -q 'DexterCamera' dexter-os/oem/aosp/dexter_os_common.mk
+          grep -q 'android.app.role.DIALER' dexter-os/oem/factory/dexter-role-provision.sh
+          grep -q 'android.app.role.SMS' dexter-os/oem/factory/dexter-role-provision.sh
+          grep -q 'retailReady' dexter-os/oem/release/RELEASE-STATUS.json
