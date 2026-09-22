@@ -35,6 +35,8 @@ public class DexterHomeActivity extends Activity {
     private boolean firstResumeDone=false;
     private float dexTouchStartX=0f;
     private float dexTouchStartY=0f;
+    private float activityTouchStartX=0f;
+    private float activityTouchStartY=0f;
     private WebView web;
     private boolean torchOn=false;
     private boolean rotationEnabled=false;
@@ -111,6 +113,32 @@ public class DexterHomeActivity extends Activity {
             }
             if(d!=null && d.isLockTaskPermitted(getPackageName())) startLockTask();
         } catch(Exception ignored) {}
+    }
+
+    @Override public boolean dispatchTouchEvent(android.view.MotionEvent e){
+        try {
+            if(e.getAction()==android.view.MotionEvent.ACTION_DOWN){
+                activityTouchStartX=e.getX();
+                activityTouchStartY=e.getY();
+            } else if(e.getAction()==android.view.MotionEvent.ACTION_UP){
+                float dx=e.getX()-activityTouchStartX;
+                float dy=e.getY()-activityTouchStartY;
+                if(activityTouchStartY<=220f && dy>100f && Math.abs(dy)>Math.abs(dx)){
+                    if(web!=null) web.evaluateJavascript("openControl()",null);
+                    enterImmersive();
+                    return true;
+                }
+                if(dy<-100f && Math.abs(dy)>Math.abs(dx)){
+                    if(web!=null) web.evaluateJavascript("closeControl()",null);
+                    enterImmersive();
+                }
+            }
+        } catch(Exception ignored) {}
+        boolean handled=super.dispatchTouchEvent(e);
+        if(e.getAction()==android.view.MotionEvent.ACTION_UP){
+            try { getWindow().getDecorView().postDelayed(this::enterImmersive,120); } catch(Exception ignored) {}
+        }
+        return handled;
     }
 
     @Override public void onWindowFocusChanged(boolean hasFocus){
