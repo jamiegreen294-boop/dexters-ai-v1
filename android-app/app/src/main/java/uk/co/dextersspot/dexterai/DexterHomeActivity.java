@@ -23,6 +23,8 @@ import android.provider.Settings;
 import android.util.Base64;
 import android.view.View;
 import android.view.WindowManager;
+import android.view.WindowInsets;
+import android.view.WindowInsetsController;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -96,6 +98,15 @@ public class DexterHomeActivity extends Activity {
             View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION |
             View.SYSTEM_UI_FLAG_LAYOUT_STABLE
         );
+        if(Build.VERSION.SDK_INT>=30){
+            try {
+                WindowInsetsController c=getWindow().getInsetsController();
+                if(c!=null){
+                    c.hide(WindowInsets.Type.statusBars()|WindowInsets.Type.navigationBars());
+                    c.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+                }
+            } catch(Exception ignored) {}
+        }
     }
 
     @Override public void onBackPressed() {
