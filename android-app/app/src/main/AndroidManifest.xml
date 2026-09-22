@@ -72,12 +72,13 @@
             </intent-filter>
         </activity>
 
-        <activity android:name=".BusinessAppsActivity" android:exported="false"/>
-        <activity android:name=".DexterStoreActivity" android:exported="false"/>
-        <activity android:name=".DexterInboxActivity" android:exported="false"/>
-        <activity android:name=".DexterControlCentreActivity" android:exported="false"/>
-        <activity android:name=".DexterSettingsActivity" android:exported="false"/>
-        <activity android:name=".QuickStartActivity" android:exported="false"/>
+        <activity android:name=".BusinessAppsActivity" android:exported="false" android:screenOrientation="portrait"/>
+        <activity android:name=".DexterWebActivity" android:exported="false" android:screenOrientation="portrait"/>
+        <activity android:name=".DexterStoreActivity" android:exported="false" android:screenOrientation="portrait"/>
+        <activity android:name=".DexterInboxActivity" android:exported="false" android:screenOrientation="portrait"/>
+        <activity android:name=".DexterControlCentreActivity" android:exported="false" android:screenOrientation="portrait"/>
+        <activity android:name=".DexterSettingsActivity" android:exported="false" android:screenOrientation="portrait"/>
+        <activity android:name=".QuickStartActivity" android:exported="false" android:screenOrientation="portrait"/>
 
         <activity
             android:name=".DexterBootSplashActivity"
@@ -95,7 +96,7 @@
             android:name=".DexterHomeActivity"
             android:exported="true"
             android:launchMode="singleTask"
-            android:screenOrientation="unspecified">
+            android:screenOrientation="portrait">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.HOME"/>
@@ -103,6 +104,6 @@
             </intent-filter>
         </activity>
 
-        <activity android:name=".MainActivity" android:exported="false" android:screenOrientation="unspecified"/>
+        <activity android:name=".MainActivity" android:exported="false" android:screenOrientation="portrait"/>
     </application>
 </manifest>
