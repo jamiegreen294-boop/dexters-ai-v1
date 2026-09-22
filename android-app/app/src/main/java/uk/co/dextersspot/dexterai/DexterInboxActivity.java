@@ -129,7 +129,13 @@ public class DexterInboxActivity extends Activity {
             box.setOnClickListener(v->{
                 markRead(id);
                 if(!deep.isEmpty()){
-                    try{ startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(deep))); }catch(Exception ignored){}
+                    try{
+                        Uri u=Uri.parse(deep);
+                        String s=u.getScheme();
+                        if("http".equalsIgnoreCase(s)||"https".equalsIgnoreCase(s)){
+                            Intent w=new Intent(this,DexterWebActivity.class);w.putExtra("url",deep);startActivity(w);
+                        }
+                    }catch(Exception ignored){}
                 }
             });
 
