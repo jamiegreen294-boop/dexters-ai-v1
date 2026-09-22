@@ -64,9 +64,13 @@ jobs:
           git fetch origin gh-pages
           git worktree add "$RUNNER_TEMP/gh-pages" origin/gh-pages
           mkdir -p "$RUNNER_TEMP/gh-pages/device"
+          if [ -f "$RUNNER_TEMP/gh-pages/device/Dexter-Business-Phone-v44.apk" ] && [ ! -f "$RUNNER_TEMP/gh-pages/device/Dexter-Business-Phone-v44-rollback.apk" ]; then
+            cp "$RUNNER_TEMP/gh-pages/device/Dexter-Business-Phone-v44.apk" "$RUNNER_TEMP/gh-pages/device/Dexter-Business-Phone-v44-rollback.apk"
+          fi
           cp android-app/app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/gh-pages/device/Dexter-Business-Phone-v45.apk"
+          cp android-app/app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/gh-pages/device/Dexter-Business-Phone-v44.apk"
           cd "$RUNNER_TEMP/gh-pages"
-          git add device/Dexter-Business-Phone-v45.apk
+          git add device/Dexter-Business-Phone-v45.apk device/Dexter-Business-Phone-v44.apk device/Dexter-Business-Phone-v44-rollback.apk
           if git diff --cached --quiet; then
             echo "Dexter OS managed APK already current"
           else
