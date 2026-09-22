@@ -209,7 +209,14 @@ public final class DeviceOwnerPolicy {
     }
 
     private static boolean isInstalled(PackageManager pm,String pkg){
-        try{pm.getPackageInfo(pkg,0);return true;}catch(Exception e){return false;}
+        try{
+            if(android.os.Build.VERSION.SDK_INT>=24){
+                pm.getPackageInfo(pkg,PackageManager.MATCH_UNINSTALLED_PACKAGES);
+            }else{
+                pm.getPackageInfo(pkg,0);
+            }
+            return true;
+        }catch(Exception e){return false;}
     }
 
     private static void applyRestriction(DevicePolicyManager d,ComponentName a,String restriction,String label,JSONObject applied,JSONObject skipped){
