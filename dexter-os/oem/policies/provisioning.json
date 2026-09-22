@@ -1,0 +1,21 @@
+{
+  "brand": "Dexter",
+  "setupWizard": "Dexter Setup",
+  "defaultLauncher": "Dexter Home",
+  "deviceOwnerPackage": "uk.co.dextersspot.dexterai",
+  "allowStockLauncher": false,
+  "allowStockSettingsFromCustomerUi": false,
+  "customerFacingAndroidBranding": false,
+  "locale": "en-GB",
+  "managedBy": "Dexter OS",
+  "requiredProvisioningSteps": [
+    "device identity",
+    "network",
+    "owner or customer account",
+    "terms and privacy",
+    "security PIN",
+    "Dexter AI pairing",
+    "approved apps",
+    "OTA channel"
+  ]
+}
