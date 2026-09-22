@@ -1327,6 +1327,22 @@ async function desktopProfileSetup(request={}){
   }
   return {ok:true,windows_user:windowsUser,chrome_profile:profileDir,workspace:workspaceDir,chrome:desktopChromePath(),isolation:"Dedicated Chrome user-data directory; no owner cookies/passwords are copied."};
 }
+async function desktopChromeInstall(){
+  desktopRequireWindows();
+  const existing=desktopChromeCandidates().find(p=>fs.existsSync(p));
+  if(existing)return {ok:true,installed:false,chrome:existing,reason:"already-installed"};
+  let r;
+  try{
+    r=await runProcess("winget",["install","--id","Google.Chrome","-e","--scope","user","--accept-package-agreements","--accept-source-agreements","--silent"],WORKSPACE,180000);
+  }catch(e){
+    throw new Error("Chrome install could not start: "+String(e?.message||e));
+  }
+  if(r.code!==0)throw new Error("Chrome install failed: "+String(r.stderr||r.stdout||"unknown error").slice(0,3000));
+  await new Promise(x=>setTimeout(x,2000));
+  const chrome=desktopChromeCandidates().find(p=>fs.existsSync(p));
+  if(!chrome)throw new Error("Chrome installer completed but chrome.exe was not found.");
+  return {ok:true,installed:true,chrome};
+}
 async function desktopChromeOpenUrl(request={}){
   desktopRequireWindows();
   const url=safeUrl(request.url||"https://www.google.com/");
@@ -1395,6 +1411,7 @@ async function desktopPressKey(request={}){
 }
 async function workspaceTool(tool,request={}){
   if(tool==="desktop.profile.setup")return await desktopProfileSetup(request);
+  if(tool==="desktop.chrome_install")return await desktopChromeInstall();
   if(tool==="desktop.chrome_open_url")return await desktopChromeOpenUrl(request);
   if(tool==="desktop.chrome_focus")return await desktopChromeFocus(request);
   if(tool==="desktop.screenshot")return await desktopScreenshot(request);
