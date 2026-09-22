@@ -1166,9 +1166,11 @@ async function androidDeviceInfo(serial){
 }
 async function androidInstallApproved(request={}){
   if(request?.approval_granted!==true)throw new Error("Android app installation requires owner approval.");
-  const approvedDexterTest=/^https:\/\/jamiegreen294-boop\.github\.io\/dexters-ai-v1\/device\/Dexter-Business-Phone-v\d+\.apk$/i.test(String(request.url||"").trim());
-  const approvedDexterOsPreview=/^https:\/\/jamiegreen294-boop\.github\.io\/dexters-ai-v1\/device\/Dexter-OS-Preview-v\d+\.apk$/i.test(String(request.url||"").trim());
-  if(!LIVE_ACTIONS&&!approvedDexterTest&&!approvedDexterOsPreview)throw new Error("Only owner-approved Dexter Business Phone or Dexter OS Preview test APKs may be installed while Dexter is in TEST mode.");
+  const installUrl=String(request.url||"").trim();
+  const approvedDexterTest=/^https:\/\/jamiegreen294-boop\.github\.io\/dexters-ai-v1\/device\/Dexter-Business-Phone-v\d+\.apk$/i.test(installUrl);
+  const approvedDexterRaw=/^https:\/\/raw\.githubusercontent\.com\/jamiegreen294-boop\/dexters-ai-v1\/gh-pages\/device\/Dexter-Business-Phone-v\d+\.apk$/i.test(installUrl);
+  const approvedDexterOsPreview=/^https:\/\/jamiegreen294-boop\.github\.io\/dexters-ai-v1\/device\/Dexter-OS-Preview-v\d+\.apk$/i.test(installUrl);
+  if(!LIVE_ACTIONS&&!approvedDexterTest&&!approvedDexterRaw&&!approvedDexterOsPreview)throw new Error("Only owner-approved Dexter Business Phone or Dexter OS Preview test APKs may be installed while Dexter is in TEST mode.");
   const serial=String(request.serial||"").trim();
   const url=String(request.url||"").trim();
   if(!/^https:\/\//i.test(url))throw new Error("Approved APK URL must use HTTPS.");
