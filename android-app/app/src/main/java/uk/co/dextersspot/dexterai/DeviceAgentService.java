@@ -170,6 +170,7 @@ public class DeviceAgentService extends Service {
             case "device.health": return deviceHealth();
             case "device.policy.status": return DeviceOwnerPolicy.status(this);
             case "device.policy.apply_business": return DeviceOwnerPolicy.applyBusinessMode(this);
+            case "device.role.set": return DeviceOwnerPolicy.setAccessRole(this,req.optString("role","staff"));
             case "device.lock": return DeviceOwnerPolicy.lockNow(this);
             case "device.wipe": return DeviceOwnerPolicy.wipeDevice(this,req.optString("reason","Owner-authorised remote wipe"));
             case "device.internet.protect": return DeviceOwnerPolicy.setInternetProtection(this,req.optString("hostname","security.cloudflare-dns.com"));
