@@ -113,16 +113,6 @@ public class DexterHomeActivity extends Activity {
         } catch(Exception ignored) {}
     }
 
-    @Override protected void onPause(){
-        try {
-            DevicePolicyManager d=(DevicePolicyManager)getSystemService(DEVICE_POLICY_SERVICE);
-            if(d!=null && d.isDeviceOwnerApp(getPackageName())){
-                try { d.setStatusBarDisabled(DexterDeviceAdminReceiver.component(this),false); } catch(Exception ignored) {}
-            }
-        } catch(Exception ignored) {}
-        super.onPause();
-    }
-
     @Override public void onWindowFocusChanged(boolean hasFocus){
         super.onWindowFocusChanged(hasFocus);
         if(hasFocus) enterImmersive();
@@ -142,7 +132,6 @@ public class DexterHomeActivity extends Activity {
                 WindowInsetsController c=getWindow().getInsetsController();
                 if(c!=null){
                     c.hide(WindowInsets.Type.statusBars()|WindowInsets.Type.navigationBars());
-                    c.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
                 }
             } catch(Exception ignored) {}
         }
