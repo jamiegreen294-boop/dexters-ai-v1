@@ -1,0 +1,61 @@
+name: Validate Dexter OS OEM Foundation
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - build/dexter-os-oem-foundation-v1
+    paths:
+      - 'dexter-os/oem/**'
+      - '.github/workflows/validate-dexter-oem.yml'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate JSON and XML
+        run: |
+          python3 - <<'PY'
+          import json, pathlib, xml.etree.ElementTree as ET
+          root=pathlib.Path("dexter-os/oem")
+          for p in root.rglob("*.json"):
+              json.loads(p.read_text(encoding="utf-8"))
+              print("JSON OK",p)
+          for p in root.rglob("*.xml"):
+              ET.parse(p)
+              print("XML OK",p)
+          PY
+
+      - name: Validate required OEM handoff files
+        run: |
+          required=(
+            dexter-os/oem/README.md
+            dexter-os/oem/HARDWARE-BRINGUP.md
+            dexter-os/oem/RELEASE-GATES.md
+            dexter-os/oem/aosp/AndroidProducts.mk
+            dexter-os/oem/aosp/dexter_os_arm64.mk
+            dexter-os/oem/aosp/dexter_os_common.mk
+            dexter-os/oem/aosp/prebuilts/Android.bp
+            dexter-os/oem/aosp/permissions/privapp-permissions-dexter.xml
+            dexter-os/oem/aosp/permissions/default-permissions-dexter.xml
+            dexter-os/oem/policies/ota-policy.json
+            dexter-os/oem/policies/provisioning.json
+            dexter-os/oem/factory/factory-provisioning.json
+          )
+          for f in "${required[@]}"; do test -s "$f" || { echo "Missing $f"; exit 1; }; done
+
+      - name: Reject private signing material
+        run: |
+          if find dexter-os/oem -type f \( -iname '*.jks' -o -iname '*.keystore' -o -iname '*.pem' -o -iname '*.pk8' -o -iname '*.x509.pem' \) | grep -q .; then
+            echo "Private/signing material must not be committed to the OEM source tree."
+            exit 1
+          fi
+
+      - name: Check product wiring
+        run: |
+          grep -q 'DexterOS' dexter-os/oem/aosp/dexter_os_common.mk
+          grep -q 'privapp-permissions-dexter.xml' dexter-os/oem/aosp/dexter_os_common.mk
+          grep -q 'certificate: "platform"' dexter-os/oem/aosp/prebuilts/Android.bp
+          grep -q 'uk.co.dextersspot.dexterai' dexter-os/oem/aosp/permissions/privapp-permissions-dexter.xml
