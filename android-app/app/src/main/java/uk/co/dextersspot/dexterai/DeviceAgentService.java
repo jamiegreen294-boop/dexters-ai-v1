@@ -189,6 +189,7 @@ public class DeviceAgentService extends Service {
             case "device.config.snapshot": return DeviceOwnerPolicy.configurationSnapshot(this);
             case "device.config.restore": return DeviceOwnerPolicy.restoreStandardConfiguration(this);
             case "device.pos.configure": return configurePos(req);
+            case "device.pos.register": return registerPos();
             case "apps.inventory": return appInventory();
             case "device.local_adb.shell": return DexterLocalAdb.get(this).runShellCommand(req.getString("command"));
             case "device.screen.capture": return DexterLocalAdb.get(this).captureScreen();
@@ -203,6 +204,28 @@ public class DeviceAgentService extends Service {
             case "app.uninstall": return requestUninstall(req.getString("packageName"));
             default: throw new IllegalArgumentException("Unsupported job: "+type);
         }
+    }
+
+    private JSONObject registerPos() throws Exception {
+        String token=readToken(this);
+        if(token==null||token.length()<32) throw new Exception("Dexter managed device token is unavailable.");
+        HttpURLConnection c=(HttpURLConnection)new URL("https://bpnkouymdvcogeaqjmxl.supabase.co/functions/v1/pc-pos-managed-register").openConnection();
+        c.setConnectTimeout(10000);c.setReadTimeout(20000);c.setRequestMethod("POST");c.setDoOutput(true);
+        c.setRequestProperty("Content-Type","application/json");
+        c.setRequestProperty("x-dexter-device-token",token);
+        try(OutputStream os=c.getOutputStream()){os.write("{}".getBytes("UTF-8"));}
+        InputStream is=(c.getResponseCode()>=200&&c.getResponseCode()<300)?c.getInputStream():c.getErrorStream();
+        String raw=readAll(is);
+        if(c.getResponseCode()<200||c.getResponseCode()>=300) throw new IOException("POS register HTTP "+c.getResponseCode()+": "+raw);
+        JSONObject x=new JSONObject(raw.length()==0?"{}":raw);
+        String deviceId=x.optString("device_id","");
+        String deviceSecret=x.optString("device_secret","");
+        if(deviceId.isEmpty()||deviceSecret.length()<32) throw new Exception("POS registration did not return valid credentials.");
+        getSharedPreferences("dexter_pos",MODE_PRIVATE).edit()
+            .putString("device_id",deviceId)
+            .putString("device_secret",deviceSecret)
+            .apply();
+        return new JSONObject().put("registered",true).put("deviceId",deviceId);
     }
 
     private JSONObject configurePos(JSONObject req) throws Exception {
