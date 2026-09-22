@@ -44,6 +44,82 @@ public final class DeviceOwnerPolicy {
         try { d.setPasswordQuality(a, DevicePolicyManager.PASSWORD_QUALITY_NUMERIC_COMPLEX); } catch(Exception ignored) {}
         try { d.setPasswordMinimumLength(a, 6); } catch(Exception ignored) {}
         try { d.setMaximumTimeToLock(a, 120000L); } catch(Exception ignored) {}
+        try { d.setPermissionPolicy(a, DevicePolicyManager.PERMISSION_POLICY_AUTO_GRANT); } catch(Exception ignored) {}
+        try { d.setPermissionGrantState(a,c.getPackageName(),android.Manifest.permission.CAMERA,DevicePolicyManager.PERMISSION_GRANT_STATE_GRANTED); } catch(Exception ignored) {}
+        if(Build.VERSION.SDK_INT>=33){
+            try { d.setPermissionGrantState(a,c.getPackageName(),android.Manifest.permission.POST_NOTIFICATIONS,DevicePolicyManager.PERMISSION_GRANT_STATE_GRANTED); } catch(Exception ignored) {}
+        }
+    }
+
+    public static JSONObject applyCompanyShell(Context c) throws Exception {
+        if(!isOwner(c)) throw new IllegalStateException("Dexter is not Device Owner.");
+        DevicePolicyManager d=dpm(c); ComponentName a=admin(c);
+        applyBusinessMode(c);
+
+        JSONObject applied=new JSONObject();
+        JSONObject skipped=new JSONObject();
+
+        String[] restrictions=new String[]{
+            UserManager.DISALLOW_CONFIG_WIFI,
+            UserManager.DISALLOW_CONFIG_BLUETOOTH,
+            UserManager.DISALLOW_CONFIG_MOBILE_NETWORKS,
+            UserManager.DISALLOW_CONFIG_VPN,
+            UserManager.DISALLOW_CONFIG_TETHERING,
+            UserManager.DISALLOW_CONFIG_LOCATION,
+            UserManager.DISALLOW_CONFIG_DATE_TIME,
+            UserManager.DISALLOW_CONFIG_BRIGHTNESS,
+            UserManager.DISALLOW_ADD_USER,
+            UserManager.DISALLOW_REMOVE_USER,
+            UserManager.DISALLOW_USER_SWITCH,
+            UserManager.DISALLOW_FACTORY_RESET
+        };
+        for(String r:restrictions){
+            try { d.addUserRestriction(a,r); applied.put(r,true); }
+            catch(Exception e){ skipped.put(r,safeMessage(e)); }
+        }
+
+        if(Build.VERSION.SDK_INT>=33){
+            try { d.addUserRestriction(a,UserManager.DISALLOW_CHANGE_WIFI_STATE); applied.put("disallowChangeWifiState",true); }
+            catch(Exception e){ skipped.put("disallowChangeWifiState",safeMessage(e)); }
+        }
+
+        String[] lockPackages=new String[]{
+            c.getPackageName(),
+            "com.google.android.apps.messaging",
+            "com.google.android.gm",
+            "com.whatsapp.w4b",
+            "com.google.android.apps.maps",
+            "com.android.camera2",
+            "com.google.android.dialer",
+            "com.android.dialer",
+            "com.android.contacts"
+        };
+        try { d.setLockTaskPackages(a,lockPackages); applied.put("lockTaskPackages",new JSONArray(lockPackages)); }
+        catch(Exception e){ skipped.put("lockTaskPackages",safeMessage(e)); }
+        try {
+            if(Build.VERSION.SDK_INT>=28)d.setLockTaskFeatures(a,DevicePolicyManager.LOCK_TASK_FEATURE_NONE);
+            applied.put("lockTaskFeatures","none");
+        } catch(Exception e){ skipped.put("lockTaskFeatures",safeMessage(e)); }
+
+        try {
+            boolean disabled=d.setKeyguardDisabled(a,true);
+            applied.put("keyguardDisabled",disabled);
+        } catch(Exception e){ skipped.put("keyguardDisabled",safeMessage(e)); }
+
+        try {
+            IntentFilter home=new IntentFilter(Intent.ACTION_MAIN);
+            home.addCategory(Intent.CATEGORY_HOME);
+            home.addCategory(Intent.CATEGORY_DEFAULT);
+            d.addPersistentPreferredActivity(a,home,new ComponentName(c,DexterHomeActivity.class));
+            applied.put("dexterHomePersistent",true);
+        } catch(Exception e){ skipped.put("dexterHomePersistent",safeMessage(e)); }
+
+        JSONObject j=new JSONObject();
+        j.put("companyShell",true);
+        j.put("applied",applied);
+        j.put("skipped",skipped);
+        j.put("partial",skipped.length()>0);
+        return j;
     }
 
     public static JSONObject status(Context c) throws Exception {
