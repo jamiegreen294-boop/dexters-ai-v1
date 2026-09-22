@@ -37,6 +37,7 @@ pre{white-space:pre-wrap;word-break:break-word;background:#090b10;padding:12px;b
 <button data-tab="learning">📚 Learning</button>
 <div class="navtitle desktop-only">System</div>
 <button data-tab="phones">📱 Phones</button>
+<button data-tab="travel">🚦 Travel</button>
 <button data-tab="connections">🔌 Connections</button>
 <button data-tab="health">🩺 Health</button>
 <button data-tab="activity">🧾 Activity</button>
@@ -70,6 +71,25 @@ pre{white-space:pre-wrap;word-break:break-word;background:#090b10;padding:12px;b
 <section id="p-memory" class="panel"><div class="grid2"><div class="card"><div class="head"><h2>Approved memory</h2></div><div class="body"><div id="memoryList" class="list"></div></div></div><div class="card"><div class="head"><h2>Add memory</h2></div><div class="body workbox"><input id="memoryCategory" class="input" value="business" placeholder="Category"><textarea id="memoryContent" placeholder="A durable fact or rule Dexter should remember…"></textarea><button id="addMemory" class="btn">Add approved memory</button><div class="small">Only durable facts belong here. Conversation history is stored separately.</div></div></div></div></section>
 <section id="p-learning" class="panel"><div class="grid2"><div class="card"><div class="head"><h2>Verified learning</h2></div><div class="body"><div id="learningList" class="list"></div></div></div><div class="card"><div class="head"><h2>Research & learn</h2></div><div class="body workbox"><input id="learnCategory" class="input" value="operations" placeholder="Category"><textarea id="learnTopic" placeholder="Topic Dexter should research and learn about…"></textarea><button id="learnBtn" class="btn">Queue research</button><div class="small">Learning is queued through the Home PC research worker and only verified notes are used as trusted context.</div></div></div></div></section>
 
+
+<section id="p-travel" class="panel">
+<div class="grid2">
+<div class="card"><div class="head"><h2>Cowcaddens Travel Monitor</h2><span class="pill ok">PUBLIC / OFFICIAL ONLY</span></div><div class="body">
+<div class="small">Dexter uses only official public information and open data here. No private CCTV, no camera scraping, no recording, and no direct hotlinking to Traffic Scotland camera images.</div>
+<div class="sectiontitle">Live road information</div>
+<div class="list">
+<div class="item"><div class="row"><b>Traffic Scotland incidents</b><span class="status">live public page</span></div><p>Current trunk-road incidents and queues affecting Glasgow/M8.</p><div class="actions"><button class="btn secondary" onclick="openOfficial('https://www.traffic.gov.scot/traffic-information/incidents')">Open incidents</button></div></div>
+<div class="item"><div class="row"><b>Roadworks</b><span class="status">official / open data</span></div><p>Scottish roadworks information, including disruptive works. Dexter may use open-data exports for automated alerts.</p><div class="actions"><button class="btn secondary" onclick="openOfficial('https://roadworks.scot/opendata')">Open roadworks data</button></div></div>
+<div class="item"><div class="row"><b>Traffic cameras</b><span class="status">view-only</span></div><p>Camera images stay on Traffic Scotland's own public viewer. Dexter does not copy, embed, scrape or store them.</p><div class="actions"><button class="btn secondary" onclick="openOfficial('https://www.traffic.gov.scot/traffic-cameras')">Open official cameras</button></div></div>
+</div>
+</div></div>
+<div class="card"><div class="head"><h2>Glasgow Subway</h2><span class="pill">SPT</span></div><div class="body">
+<div class="list"><div class="item"><div class="row"><b>Service updates</b><span class="status">official source</span></div><p>Use SPT's published disruption information for closures and service changes.</p><div class="actions"><button class="btn secondary" onclick="openOfficial('https://www.spt.co.uk/travel-with-spt/disruptions/')">Open SPT disruptions</button></div></div></div>
+<div class="sectiontitle">Phone notifications</div>
+<div class="item"><b>Legal notification rules</b><p>Roadwork alerts can be generated from reusable open data. Traffic camera notifications may link staff to the official viewer, but Dexter will never republish the camera image. Subway alerts must come from official/public SPT information or an approved feed.</p><div class="actions"><button id="travelNotify" class="btn" onclick="enableTravelNotifications()">Enable device notifications</button></div><p id="travelNotifyStatus" class="small"></p></div>
+</div></div>
+</div></section>
+
 <section id="p-connections" class="panel"><div class="card"><div class="head"><h2>Connections</h2><button class="btn secondary" onclick="refresh()">Refresh</button></div><div class="body"><div id="connectors" class="grid3"></div></div></div></section>
 <section id="p-health" class="panel"><div class="grid2"><div class="card"><div class="head"><h2>Self test</h2><button id="selfTest" class="btn">Run self test</button></div><div class="body"><div id="selfResults" class="list"><div class="small">Run the full AI, menu, memory, agent and connector checks.</div></div></div></div><div class="card"><div class="head"><h2>Runtime health</h2></div><div class="body"><div id="healthFull" class="list"></div><div class="sectiontitle">Home jobs</div><div id="homeJobs" class="list"></div></div></div></div></section>
 <section id="p-activity" class="panel"><div class="card"><div class="head"><h2>Audit activity</h2><span class="pill">TEST environment</span></div><div class="body"><div id="audit" class="list"></div></div></div></section>
@@ -87,6 +107,12 @@ async function api(action,extra={}){const r=await fetch(EP,{method:'POST',header
 function addMsg(role,text,meta=''){const e=document.createElement('div');e.className='msg '+role;e.textContent=text;if(meta){const m=document.createElement('div');m.className='meta';m.textContent=meta;e.append(m)}$('chat').append(e);$('chat').scrollTop=$('chat').scrollHeight}
 function item(title,meta='',status=''){return '<div class="item"><div class="row"><b>'+esc(title)+'</b>'+(status?'<span class="status">'+esc(status)+'</span>':'')+'</div>'+(meta?'<p>'+esc(meta)+'</p>':'')+'</div>'}
 function fmtDate(v){try{return new Date(v).toLocaleString('en-GB')}catch{return String(v||'')}}
+function openOfficial(url){window.open(url,'_blank','noopener,noreferrer')}
+async function enableTravelNotifications(){
+ const s=$('travelNotifyStatus');
+ if(!('Notification' in window)){s.textContent='This browser does not support notifications.';return}
+ try{const p=await Notification.requestPermission();s.textContent=p==='granted'?'Notifications enabled on this device.':'Notification permission not granted.';if(p==='granted')new Notification('Dexter Travel',{body:'Travel notifications are enabled. Camera alerts will only link to the official Traffic Scotland viewer.'})}catch(e){s.textContent='Could not enable notifications: '+e.message}
+}
 function setTab(name){document.querySelectorAll('.nav button[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));$('p-'+name)?.classList.add('active');if(name==='phones')loadPhones()}
 document.querySelectorAll('.nav button[data-tab]').forEach(b=>b.onclick=()=>setTab(b.dataset.tab));
 
