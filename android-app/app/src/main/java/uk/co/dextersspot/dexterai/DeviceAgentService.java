@@ -57,6 +57,7 @@ public class DeviceAgentService extends Service {
         super.onCreate();
         createChannel();
         startForeground(NOTIFICATION_ID, buildNotification("Dexter device agent connected"));
+        AgentWatchdogReceiver.schedule(this);
     }
 
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
@@ -81,14 +82,14 @@ public class DeviceAgentService extends Service {
         while (running) {
             try { DeviceAccessClient.enforceExpiry(this); } catch(Exception ignored) {}
             try {
-                heartbeat();
-            } catch (Exception e) {
-                recordAgentError("heartbeat: " + String.valueOf(e.getMessage()));
-            }
-            try {
                 pollJobs();
             } catch (Exception e) {
                 recordAgentError("pollJobs: " + String.valueOf(e.getMessage()));
+            }
+            try {
+                heartbeat();
+            } catch (Exception e) {
+                recordAgentError("heartbeat: " + String.valueOf(e.getMessage()));
             }
             try {
                 pollDexterSend();
@@ -127,6 +128,10 @@ public class DeviceAgentService extends Service {
         info.put("osVersion",Build.VERSION.RELEASE+" (API "+Build.VERSION.SDK_INT+")");
         info.put("appVersion",appVersion());
         info.put("securityPatch",Build.VERSION.SECURITY_PATCH);
+        android.content.SharedPreferences agentPrefs=getSharedPreferences("dexter_device",MODE_PRIVATE);
+        info.put("agentLastSuccessAt",agentPrefs.getLong("agent_last_success_at",0));
+        info.put("agentLastErrorAt",agentPrefs.getLong("agent_last_error_at",0));
+        info.put("agentLastError",agentPrefs.getString("agent_last_error",""));
         PowerManager pm=(PowerManager)getSystemService(POWER_SERVICE);
         info.put("batteryOptimisationIgnored",pm!=null && pm.isIgnoringBatteryOptimizations(getPackageName()));
         JSONObject cap=new JSONObject();
