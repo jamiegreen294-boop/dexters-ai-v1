@@ -223,6 +223,18 @@ public class DexterHomeActivity extends Activity {
                 return human(used)+" used · "+human(free)+" free · "+human(total)+" total";
             } catch(Exception e){ return "Storage unavailable"; }
         }
+        @JavascriptInterface public String getAccessRole(){ return DeviceOwnerPolicy.getAccessRole(DexterHomeActivity.this); }
+        @JavascriptInterface public boolean openPlayStore(){
+            try {
+                String role=DeviceOwnerPolicy.getAccessRole(DexterHomeActivity.this);
+                if(!("manager".equals(role)||"owner".equals(role))) return false;
+                DeviceOwnerPolicy.enforcePlayStoreRole(DexterHomeActivity.this);
+                Intent i=getPackageManager().getLaunchIntentForPackage("com.android.vending");
+                if(i==null)return false;
+                startActivity(i);
+                return true;
+            } catch(Exception e){ return false; }
+        }
         @JavascriptInterface public boolean isDeviceOwner(){
             return DexterDeviceAdminReceiver.isDeviceOwner(DexterHomeActivity.this);
         }
