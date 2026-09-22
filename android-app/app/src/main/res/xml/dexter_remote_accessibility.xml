@@ -7,4 +7,4 @@
     android:canPerformGestures="true"
     android:canTakeScreenshot="true"
     android:accessibilityFlags="flagReportViewIds|flagRetrieveInteractiveWindows|flagIncludeNotImportantViews"
-    android:description="@string/app_name" />
+    />
