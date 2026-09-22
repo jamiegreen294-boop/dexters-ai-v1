@@ -47,7 +47,7 @@ button{font:inherit;color:inherit}
 .boot{position:fixed;inset:0;z-index:50;background:#000;display:flex;align-items:center;justify-content:center;flex-direction:column}.boot .bigD{font-size:120px;font-weight:900;color:var(--gold);text-shadow:0 0 24px rgba(244,207,113,.35)}.boot h2{font-size:31px;letter-spacing:.13em;margin:0}.boot .biz{letter-spacing:.34em;color:#e4c766;font-size:12px;margin-top:6px}.boot .strap{position:absolute;top:68%;text-align:center;letter-spacing:.35em;color:#e4c766;font-size:11px;line-height:2}.boot .progress{position:absolute;bottom:14%;width:56%;height:4px;background:#596066;border-radius:3px;overflow:hidden}.boot .progress i{display:block;width:58%;height:100%;background:linear-gradient(90deg,#fff,#d5a331)}.boot .pow{position:absolute;bottom:7%;font-size:11px;text-align:center;color:#ddd}
 
 /* v56 iPhone-style Dexter status + pull-down Control Centre */
-.dexStatus{position:fixed;z-index:120;left:0;right:0;top:0;height:38px;padding:5px 14px 0;display:flex;align-items:center;justify-content:space-between;background:#020608;color:#fff;font-size:13px;font-weight:750;letter-spacing:.01em;box-shadow:0 1px 0 rgba(255,255,255,.04);user-select:none}
+.dexStatus{touch-action:none;position:fixed;z-index:120;left:0;right:0;top:0;height:38px;padding:5px 14px 0;display:flex;align-items:center;justify-content:space-between;background:#020608;color:#fff;font-size:13px;font-weight:750;letter-spacing:.01em;box-shadow:0 1px 0 rgba(255,255,255,.04);user-select:none}
 .dexStatus .right{display:flex;align-items:center;gap:7px;font-size:12px}
 .dexStatus .pill{width:24px;height:11px;border:1.5px solid #fff;border-radius:3px;position:relative;display:inline-block}
 .dexStatus .pill:after{content:"";position:absolute;right:-4px;top:3px;width:2px;height:4px;border-radius:0 2px 2px 0;background:#fff}
@@ -67,6 +67,8 @@ button{font:inherit;color:inherit}
 .controlSheet .qcircle{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.12)}
 .controlSheet .storejump{background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.1)}
 
+
+.dots{display:none!important}
 </style></head><svg aria-hidden="true" width="0" height="0" style="position:absolute"><defs>
 <symbol id="i-ai" viewBox="0 0 48 48"><path d="M10 19c0-8 6-13 14-13s14 5 14 13v14c0 5-4 9-9 9H19c-5 0-9-4-9-9z" fill="none" stroke="white" stroke-width="4"/><circle cx="18" cy="27" r="3" fill="white"/><circle cx="30" cy="27" r="3" fill="white"/><path d="M18 35h12M24 6V2" stroke="white" stroke-width="4" stroke-linecap="round"/><path d="M5 23v8M43 23v8" stroke="white" stroke-width="4" stroke-linecap="round"/></symbol>
 <symbol id="i-crown" viewBox="0 0 48 48"><path d="M8 16l9 9 7-15 7 15 9-9-4 20H12z" fill="none" stroke="white" stroke-width="4" stroke-linejoin="round"/><circle cx="8" cy="14" r="3" fill="white"/><circle cx="24" cy="8" r="3" fill="white"/><circle cx="40" cy="14" r="3" fill="white"/></symbol>
@@ -333,7 +335,7 @@ document.addEventListener('touchend',e=>{
   swipeX=swipeY=null;
   const panel=document.getElementById('control');
   const controlOpen=panel&&panel.classList.contains('open');
-  if(startY<=90 && dy>75 && Math.abs(dy)>Math.abs(dx)){openControl();return}
+  if(startY<=180 && dy>75 && Math.abs(dy)>Math.abs(dx)){openControl();return}
   if(controlOpen && dy<-70 && Math.abs(dy)>Math.abs(dx)){closeControl();return}
   if(Math.abs(dx)>70 && Math.abs(dx)>Math.abs(dy) && dx>0 && (current==='settings'||current==='store'||current==='about'||current==='settingDetail'||current==='notice'||current==='access'||current==='esim'))show('home');
 }, {passive:true});
