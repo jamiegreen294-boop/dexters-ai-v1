@@ -20,6 +20,7 @@ public class DeviceAgentService extends Service {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private volatile boolean running = false;
     private volatile Thread workerThread;
+    private PowerManager.WakeLock agentWakeLock;
 
     public static boolean hasToken(Context c) {
         return readToken(c).length() >= 32;
@@ -58,6 +59,14 @@ public class DeviceAgentService extends Service {
         super.onCreate();
         createChannel();
         startForeground(NOTIFICATION_ID, buildNotification("Dexter device agent connected"));
+        try {
+            PowerManager pm=(PowerManager)getSystemService(POWER_SERVICE);
+            if(pm!=null){
+                agentWakeLock=pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,getPackageName()+":DexterAgent");
+                agentWakeLock.setReferenceCounted(false);
+                agentWakeLock.acquire();
+            }
+        } catch(Exception ignored) {}
         AgentWatchdogReceiver.schedule(this);
     }
 
@@ -83,6 +92,7 @@ public class DeviceAgentService extends Service {
     @Override public void onDestroy() {
         running = false;
         try { if(workerThread!=null) workerThread.interrupt(); } catch(Exception ignored) {}
+        try { if(agentWakeLock!=null && agentWakeLock.isHeld()) agentWakeLock.release(); } catch(Exception ignored) {}
         try {
             Intent restart=new Intent(getApplicationContext(),DeviceAgentService.class);
             PendingIntent pi=PendingIntent.getService(getApplicationContext(),297,restart,PendingIntent.FLAG_ONE_SHOT|PendingIntent.FLAG_IMMUTABLE);
