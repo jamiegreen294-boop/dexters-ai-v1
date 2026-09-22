@@ -59,6 +59,22 @@ Deno.serve(async(req)=>{
     const {client,agent}=await agentAuth(req);
 
     if(action==="poll"){
+      // Recover abandoned jobs after a Home Host crash/restart. Active jobs renew
+      // their lease via heartbeat, so only stale running jobs are re-queued.
+      const staleBefore=new Date(Date.now()-90_000).toISOString();
+      const {data:staleJobs}=await client.from("dexter_home_jobs")
+        .select("id,claimed_by,updated_at,status")
+        .eq("status","running")
+        .eq("claimed_by",agent.id)
+        .lt("updated_at",staleBefore)
+        .limit(25);
+      for(const stale of (staleJobs||[])){
+        await client.from("dexter_home_jobs").update({
+          status:"queued",claimed_by:null,claimed_at:null,updated_at:now(),
+          error:"Recovered automatically after Home Host interruption."
+        }).eq("id",stale.id).eq("status","running").eq("claimed_by",agent.id);
+      }
+
       const {data:jobs,error}=await client.from("dexter_home_jobs").select("*").eq("status","queued").order("created_at",{ascending:true}).limit(25);
       if(error)throw error;
       const job=(jobs||[]).find((j:any)=>{
@@ -190,7 +206,12 @@ Deno.serve(async(req)=>{
     }
 
     if(action==="heartbeat"){
-      return json({ok:true,agent:{id:agent.id,name:agent.name,last_seen_at:now()}});
+      const currentJobId=String(body.current_job_id||"").trim();
+      if(currentJobId){
+        await client.from("dexter_home_jobs").update({updated_at:now()})
+          .eq("id",currentJobId).eq("status","running").eq("claimed_by",agent.id);
+      }
+      return json({ok:true,agent:{id:agent.id,name:agent.name,last_seen_at:now()},current_job_id:currentJobId||null});
     }
 
     return json({error:"Unknown action"},400);
