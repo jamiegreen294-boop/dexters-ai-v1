@@ -1391,7 +1391,7 @@ async function desktopChromeOpenUrl(request={}){
   desktopRequireWindows();
   const url=safeUrl(request.url||"https://www.google.com/");
   const chrome=desktopChromePath(),profile=desktopProfileDir();
-  const child=spawn(chrome,["--user-data-dir="+profile,"--profile-directory=Default","--remote-debugging-port=9222","--new-window",url],{detached:true,stdio:"ignore",windowsHide:false});
+  const child=spawn(chrome,["--user-data-dir="+profile,"--profile-directory=Default","--remote-debugging-port=9222","--remote-debugging-address=127.0.0.1","--remote-allow-origins=*","--no-first-run","--no-default-browser-check","--new-window",url],{detached:true,stdio:"ignore",windowsHide:false});
   child.unref();
   await new Promise(r=>setTimeout(r,1200));
   return {ok:true,url,chrome,profile,pid:child.pid||null};
