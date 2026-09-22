@@ -1282,11 +1282,13 @@ function desktopRequireWindows(){
   if(process.platform!=="win32")throw new Error("Desktop controls require Windows.");
 }
 function desktopChromeCandidates(){
-  return [
+  const candidates=[
     path.join(process.env.ProgramFiles||"C:\\Program Files","Google","Chrome","Application","chrome.exe"),
     path.join(process.env["ProgramFiles(x86)"]||"C:\\Program Files (x86)","Google","Chrome","Application","chrome.exe"),
     path.join(process.env.LOCALAPPDATA||"","Google","Chrome","Application","chrome.exe")
   ].filter(Boolean);
+  try{const bundled=chromium.executablePath();if(bundled)candidates.push(bundled);}catch{}
+  return candidates;
 }
 function desktopChromePath(){
   const found=desktopChromeCandidates().find(p=>fs.existsSync(p));
