@@ -1412,7 +1412,7 @@ async function desktopChromeCdp(){
   let page=null;
   for(let i=0;i<20;i++){
     const pages=browser.contexts().flatMap(c=>c.pages());
-    page=pages.find(p=>/esimerge\.com\/apply/.test(p.url()))||pages.find(p=>/^https?:\/\//.test(p.url()))||null;
+    page=pages.find(p=>/esimerge\.com\/apply/.test(p.url()))||[...pages].reverse().find(p=>/^https?:\/\//.test(p.url()))||null;
     if(page)break;
     await new Promise(r=>setTimeout(r,500));
   }
