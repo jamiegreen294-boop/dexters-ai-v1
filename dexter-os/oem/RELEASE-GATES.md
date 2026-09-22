@@ -21,6 +21,19 @@ A build cannot be labelled retail-ready until every gate passes.
 - voicemail integration
 - dual-SIM behaviour if advertised
 
+## eSIM
+- production eUICC detected as android.hardware.telephony.euicc
+- EID readable and LPA backend healthy
+- Dexter eSIM LUI selected instead of stock Android eSIM settings
+- production SM-DP+ profile download
+- enable/switch/disable/delete profile
+- cold boot with active eSIM
+- emergency calling over eSIM
+- VoLTE / VoWiFi carrier validation
+- physical SIM + eSIM DSDS if advertised
+- MEP if advertised
+- factory reset and OTA eSIM-state tests
+
 ## Messaging
 - SMS/MMS send and receive
 - OTP handling
