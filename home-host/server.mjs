@@ -1633,11 +1633,11 @@ function scheduleSelfRestart(delayMs=1500){
 }
 
 async function selfUpdateWorker(){
-  const rawUrl="https://raw.githubusercontent.com/jamiegreen294-boop/dexters-ai-v1/build/real-dexter-ai/home-host/server.mjs?dexter_update="+Date.now();
+  const rawUrl="https://api.github.com/repos/jamiegreen294-boop/dexters-ai-v1/contents/home-host/server.mjs?ref="+encodeURIComponent("build/real-dexter-ai")+"&dexter_update="+Date.now();
   const controller=new AbortController();
   const timer=setTimeout(()=>controller.abort(),30000);
   try{
-    const r=await fetch(rawUrl,{signal:controller.signal,cache:"no-store",headers:{"Cache-Control":"no-cache, no-store, must-revalidate","Pragma":"no-cache"}});
+    const r=await fetch(rawUrl,{signal:controller.signal,cache:"no-store",headers:{"Accept":"application/vnd.github.raw+json","Cache-Control":"no-cache, no-store, must-revalidate","Pragma":"no-cache","User-Agent":"Dexter-AI-Home-Host"}});
     if(!r.ok)throw new Error("Worker update download failed: HTTP "+r.status);
     const next=await r.text();
     if(!next.includes("Dexter AI Home Host running")||!next.includes("executeCloudJob"))throw new Error("Downloaded worker failed validation.");
