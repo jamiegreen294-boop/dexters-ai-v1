@@ -74,17 +74,17 @@ pre{white-space:pre-wrap;word-break:break-word;background:#090b10;padding:12px;b
 
 <section id="p-travel" class="panel">
 <div class="grid2">
-<div class="card"><div class="head"><h2>Cowcaddens Travel Monitor</h2><span class="pill ok">PUBLIC / OFFICIAL ONLY</span></div><div class="body">
+<div class="card"><div class="head"><h2>Cowcaddens & Ibrox Travel Monitor</h2><span class="pill ok">PUBLIC / OFFICIAL ONLY</span></div><div class="body">
 <div class="small">Dexter uses only official public information and open data here. No private CCTV, no camera scraping, no recording, and no direct hotlinking to Traffic Scotland camera images.</div>
 <div class="sectiontitle">Live road information</div>
 <div class="list">
-<div class="item"><div class="row"><b>Traffic Scotland incidents</b><span class="status">live public page</span></div><p>Current trunk-road incidents and queues affecting Glasgow/M8.</p><div class="actions"><button class="btn secondary" onclick="openOfficial('https://www.traffic.gov.scot/traffic-information/incidents')">Open incidents</button></div></div>
+<div class="item"><div class="row"><b>Traffic Scotland incidents</b><span class="status">live public page</span></div><p>Current trunk-road incidents and queues affecting Glasgow/M8, Cowcaddens and Ibrox/Govan approaches.</p><div class="actions"><button class="btn secondary" onclick="openOfficial('https://www.traffic.gov.scot/traffic-information/incidents')">Open incidents</button></div></div>
 <div class="item"><div class="row"><b>Roadworks</b><span class="status">official / open data</span></div><p>Scottish roadworks information, including disruptive works. Dexter may use open-data exports for automated alerts.</p><div class="actions"><button class="btn secondary" onclick="openOfficial('https://roadworks.scot/opendata')">Open roadworks data</button></div></div>
 <div class="item"><div class="row"><b>Traffic cameras</b><span class="status">view-only</span></div><p>Camera images stay on Traffic Scotland's own public viewer. Dexter does not copy, embed, scrape or store them.</p><div class="actions"><button class="btn secondary" onclick="openOfficial('https://www.traffic.gov.scot/traffic-cameras')">Open official cameras</button></div></div>
 </div>
 </div></div>
-<div class="card"><div class="head"><h2>Glasgow Subway</h2><span class="pill">SPT</span></div><div class="body">
-<div class="list"><div class="item"><div class="row"><b>Service updates</b><span class="status">official source</span></div><p>Use SPT's published disruption information for closures and service changes.</p><div class="actions"><button class="btn secondary" onclick="openOfficial('https://www.spt.co.uk/travel-with-spt/disruptions/')">Open SPT disruptions</button></div></div></div>
+<div class="card"><div class="head"><h2>Glasgow Subway / Ibrox</h2><span class="pill">SPT</span></div><div class="body">
+<div class="list"><div class="item"><div class="row"><b>Service updates</b><span class="status">official source</span></div><p>Use SPT's published disruption information for closures and service changes, including Ibrox station and the Inner/Outer Circle.</p><div class="actions"><button class="btn secondary" onclick="openOfficial('https://www.spt.co.uk/travel-with-spt/disruptions/')">Open SPT disruptions</button></div></div></div>
 <div class="sectiontitle">Phone notifications</div>
 <div class="item"><b>Legal notification rules</b><p>Roadwork alerts can be generated from reusable open data. Traffic camera notifications may link staff to the official viewer, but Dexter will never republish the camera image. Subway alerts must come from official/public SPT information or an approved feed.</p><div class="actions"><button id="travelNotify" class="btn" onclick="enableTravelNotifications()">Enable device notifications</button></div><p id="travelNotifyStatus" class="small"></p></div>
 </div></div>
