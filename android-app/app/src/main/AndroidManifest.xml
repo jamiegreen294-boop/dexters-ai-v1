@@ -4,6 +4,7 @@
     <uses-permission android:name="android.permission.FLASHLIGHT"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE"/>
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
@@ -72,11 +73,12 @@
             </intent-filter>
         </activity>
 
-        <activity android:name=".BusinessAppsActivity" android:exported="false"/>
-        <activity android:name=".DexterStoreActivity" android:exported="false"/>
+        <activity android:name=".BusinessAppsActivity" android:exported="false" android:screenOrientation="portrait"/>
+        <activity android:name=".DexterWebActivity" android:exported="false" android:screenOrientation="portrait"/>
+        <activity android:name=".DexterStoreActivity" android:exported="false" android:screenOrientation="portrait"/>
         <activity android:name=".DexterInboxActivity" android:exported="false"/>
-        <activity android:name=".DexterControlCentreActivity" android:exported="false"/>
-        <activity android:name=".DexterSettingsActivity" android:exported="false"/>
+        <activity android:name=".DexterControlCentreActivity" android:exported="false" android:screenOrientation="portrait"/>
+        <activity android:name=".DexterSettingsActivity" android:exported="false" android:screenOrientation="portrait"/>
         <activity android:name=".QuickStartActivity" android:exported="false"/>
 
         <activity
@@ -95,7 +97,7 @@
             android:name=".DexterHomeActivity"
             android:exported="true"
             android:launchMode="singleTask"
-            android:screenOrientation="unspecified">
+            android:screenOrientation="portrait">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.HOME"/>
