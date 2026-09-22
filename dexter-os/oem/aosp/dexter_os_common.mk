@@ -3,7 +3,8 @@ PRODUCT_PACKAGES += \
     DexterOS \
     DexterDialer \
     DexterMessaging \
-    DexterFiles
+    DexterFiles \
+    DexterEsim
 
 PRODUCT_COPY_FILES += \
     vendor/dexter/permissions/privapp-permissions-dexter.xml:$(TARGET_COPY_OUT_PRODUCT)/etc/permissions/privapp-permissions-dexter.xml \
