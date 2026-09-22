@@ -125,6 +125,10 @@ public class DexterHomeActivity extends Activity {
         String page=intent.getStringExtra("page");
         if(web!=null && page!=null && page.matches("home|control|settings|store|about")){
             web.evaluateJavascript("show('"+page+"')",null);
+            return;
+        }
+        if(web!=null && Intent.ACTION_MAIN.equals(intent.getAction()) && intent.hasCategory(Intent.CATEGORY_HOME)){
+            web.evaluateJavascript("show('home')",null);
         }
     }
 
