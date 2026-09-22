@@ -1391,10 +1391,47 @@ async function desktopChromeOpenUrl(request={}){
   desktopRequireWindows();
   const url=safeUrl(request.url||"https://www.google.com/");
   const chrome=desktopChromePath(),profile=desktopProfileDir();
-  const child=spawn(chrome,["--user-data-dir="+profile,"--profile-directory=Default","--new-window",url],{detached:true,stdio:"ignore",windowsHide:false});
+  const child=spawn(chrome,["--user-data-dir="+profile,"--profile-directory=Default","--remote-debugging-port=9222","--new-window",url],{detached:true,stdio:"ignore",windowsHide:false});
   child.unref();
   await new Promise(r=>setTimeout(r,1200));
   return {ok:true,url,chrome,profile,pid:child.pid||null};
+}
+async function desktopChromeCdp(){
+  const endpoint="http://127.0.0.1:9222";
+  let browser;
+  try{browser=await chromium.connectOverCDP(endpoint)}catch(e){throw new Error("Dexter visible Chromium is not available for local control.");}
+  const contexts=browser.contexts();
+  const pages=contexts.flatMap(c=>c.pages());
+  const page=pages.find(p=>/esimerge\.com\/apply/.test(p.url()))||pages[pages.length-1];
+  if(!page){await browser.close();throw new Error("No visible Dexter Chromium page found.");}
+  return {browser,page};
+}
+async function desktopChromeSnapshot(){
+  const {browser,page}=await desktopChromeCdp();
+  try{return await snapshot(page)}finally{await browser.close().catch(()=>{})}
+}
+async function desktopChromeFill(request={}){
+  const {browser,page}=await desktopChromeCdp();
+  try{
+    const ref=String(request.ref||"");
+    const el=await byRef(page,ref);
+    const type=String(await el.getAttribute("type")||"").toLowerCase();
+    const name=String(await el.getAttribute("name")||"").toLowerCase();
+    if(/password|otp|2fa|card|bank|payment|identity|kyc/.test(type+" "+name))throw new Error("Sensitive field blocked.");
+    await el.fill(String(request.value??""));
+    return {ok:true,url:page.url()};
+  }finally{await browser.close().catch(()=>{})}
+}
+async function desktopChromeClick(request={}){
+  const {browser,page}=await desktopChromeCdp();
+  try{
+    const el=await byRef(page,String(request.ref||""));
+    const text=((await el.innerText().catch(()=>""))+" "+String(await el.getAttribute("aria-label")||"")).toLowerCase();
+    if(/captcha|cloudflare|turnstile|verify you are human|verification/.test(text))throw new Error("Human verification required.");
+    await el.click({timeout:15000});
+    await page.waitForTimeout(700);
+    return await snapshot(page);
+  }finally{await browser.close().catch(()=>{})}
 }
 async function desktopChromeFocus(){
   desktopRequireWindows();
@@ -1459,6 +1496,9 @@ async function workspaceTool(tool,request={}){
   if(tool==="desktop.profile.setup")return await desktopProfileSetup(request);
   if(tool==="desktop.chrome_install")return await desktopChromeInstall();
   if(tool==="desktop.chrome_open_url")return await desktopChromeOpenUrl(request);
+  if(tool==="desktop.chrome_snapshot")return await desktopChromeSnapshot();
+  if(tool==="desktop.chrome_fill")return await desktopChromeFill(request);
+  if(tool==="desktop.chrome_click")return await desktopChromeClick(request);
   if(tool==="desktop.chrome_focus")return await desktopChromeFocus(request);
   if(tool==="desktop.screenshot")return await desktopScreenshot(request);
   if(tool==="desktop.click")return await desktopClick(request);
