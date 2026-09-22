@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Dexter OS OTA release manifest",
+  "type": "object",
+  "required": ["product", "channel", "version", "securityPatch", "payload", "sha256", "size", "rollbackIndex"],
+  "properties": {
+    "product": {"type": "string"},
+    "channel": {"enum": ["test", "beta", "stable"]},
+    "version": {"type": "string"},
+    "securityPatch": {"type": "string"},
+    "payload": {"type": "string"},
+    "sha256": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"},
+    "size": {"type": "integer", "minimum": 1},
+    "rollbackIndex": {"type": "integer", "minimum": 0},
+    "metadataSignature": {"type": "string"},
+    "notes": {"type": "string"}
+  }
+}
