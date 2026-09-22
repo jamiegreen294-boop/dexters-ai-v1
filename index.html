@@ -36,6 +36,7 @@ pre{white-space:pre-wrap;word-break:break-word;background:#090b10;padding:12px;b
 <button data-tab="memory">🧷 Memory</button>
 <button data-tab="learning">📚 Learning</button>
 <div class="navtitle desktop-only">System</div>
+<button data-tab="phones">📱 Phones</button>
 <button data-tab="connections">🔌 Connections</button>
 <button data-tab="health">🩺 Health</button>
 <button data-tab="activity">🧾 Activity</button>
@@ -55,6 +56,16 @@ pre{white-space:pre-wrap;word-break:break-word;background:#090b10;padding:12px;b
 <section id="p-tasks" class="panel"><div class="card"><div class="head"><h2>Tasks</h2><button class="btn secondary" onclick="refresh()">Refresh</button></div><div class="body"><div id="tasks" class="list"></div><div id="taskDetail" class="sectiontitle"></div><div id="taskDetailBody"></div></div></div></section>
 <section id="p-artifacts" class="panel"><div class="card"><div class="head"><h2>Artifacts</h2><span class="pill">persistent work</span></div><div class="body"><div id="artifacts" class="list"></div><div id="artifactBody"></div></div></div></section>
 <section id="p-approvals" class="panel"><div class="card"><div class="head"><h2>Owner approvals</h2><span class="pill">TEST only</span></div><div class="body"><div id="approvals" class="list"></div></div></div></section>
+
+<section id="p-phones" class="panel">
+<div class="card">
+<div class="head"><h2>Dexter Phones</h2><div class="actions"><button class="btn secondary" onclick="loadPhones()">Refresh</button></div></div>
+<div class="body">
+<div class="small">Owner console for Dexter OS test/company devices. Role changes and locks are sent through the authenticated Dexter phone agent.</div>
+<div id="phoneDevices" class="list" style="margin-top:12px"></div>
+</div>
+</div>
+</section>
 
 <section id="p-memory" class="panel"><div class="grid2"><div class="card"><div class="head"><h2>Approved memory</h2></div><div class="body"><div id="memoryList" class="list"></div></div></div><div class="card"><div class="head"><h2>Add memory</h2></div><div class="body workbox"><input id="memoryCategory" class="input" value="business" placeholder="Category"><textarea id="memoryContent" placeholder="A durable fact or rule Dexter should remember…"></textarea><button id="addMemory" class="btn">Add approved memory</button><div class="small">Only durable facts belong here. Conversation history is stored separately.</div></div></div></div></section>
 <section id="p-learning" class="panel"><div class="grid2"><div class="card"><div class="head"><h2>Verified learning</h2></div><div class="body"><div id="learningList" class="list"></div></div></div><div class="card"><div class="head"><h2>Research & learn</h2></div><div class="body workbox"><input id="learnCategory" class="input" value="operations" placeholder="Category"><textarea id="learnTopic" placeholder="Topic Dexter should research and learn about…"></textarea><button id="learnBtn" class="btn">Queue research</button><div class="small">Learning is queued through the Home PC research worker and only verified notes are used as trusted context.</div></div></div></div></section>
@@ -76,7 +87,7 @@ async function api(action,extra={}){const r=await fetch(EP,{method:'POST',header
 function addMsg(role,text,meta=''){const e=document.createElement('div');e.className='msg '+role;e.textContent=text;if(meta){const m=document.createElement('div');m.className='meta';m.textContent=meta;e.append(m)}$('chat').append(e);$('chat').scrollTop=$('chat').scrollHeight}
 function item(title,meta='',status=''){return '<div class="item"><div class="row"><b>'+esc(title)+'</b>'+(status?'<span class="status">'+esc(status)+'</span>':'')+'</div>'+(meta?'<p>'+esc(meta)+'</p>':'')+'</div>'}
 function fmtDate(v){try{return new Date(v).toLocaleString('en-GB')}catch{return String(v||'')}}
-function setTab(name){document.querySelectorAll('.nav button[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));$('p-'+name)?.classList.add('active')}
+function setTab(name){document.querySelectorAll('.nav button[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));$('p-'+name)?.classList.add('active');if(name==='phones')loadPhones()}
 document.querySelectorAll('.nav button[data-tab]').forEach(b=>b.onclick=()=>setTab(b.dataset.tab));
 
 function showHealth(h){
@@ -104,6 +115,41 @@ function renderDashboard(d){
 async function refresh(){
  try{const [h,d,c]=await Promise.all([api('health'),api('dashboard'),api('connectors')]);showHealth(h);d.connectors=c.connectors||d.connectors;renderDashboard(d)}catch(e){note(e.message)}
 }
+async function loadPhones(){
+ try{
+  const d=await api('device_list');
+  const devices=d.devices||[];
+  $('phoneDevices').innerHTML=devices.map(x=>{
+    const role=String(x.management?.accessRole||'staff').toLowerCase();
+    const configured=(x.configured_roles||[]).join(', ')||'none';
+    const online=x.status||'unknown';
+    const session=x.access_session?('Active '+x.access_session.role+' until '+fmtDate(x.access_session.expires_at)):'No elevated session';
+    return '<div class="item">'+
+      '<div class="row"><div><b>'+esc(x.name||x.model||'Dexter Phone')+'</b><p>'+esc((x.manufacturer||'')+' '+(x.model||'')+' · '+(x.app_version||'unknown version'))+'</p></div><span class="status">'+esc(online)+'</span></div>'+
+      '<p>Role: <b>'+esc(role)+'</b> · PINs: '+esc(configured)+' · '+esc(session)+'</p>'+
+      '<p>Last seen: '+esc(fmtDate(x.last_seen_at))+' · Compliance: '+esc(x.compliance_status||'unknown')+'</p>'+
+      '<div class="actions">'+
+        '<button class="btn secondary" onclick="phoneRole(\''+esc(x.id)+'\',\'staff\')">Staff</button>'+
+        '<button class="btn secondary" onclick="phoneRole(\''+esc(x.id)+'\',\'manager\')">Manager</button>'+
+        '<button class="btn secondary" onclick="phoneRole(\''+esc(x.id)+'\',\'owner\')">Owner</button>'+
+        '<button class="btn secondary" onclick="phoneJob(\''+esc(x.id)+'\',\'device.health\')">Health</button>'+
+        '<button class="btn secondary" onclick="phoneJob(\''+esc(x.id)+'\',\'device.lock\')">Lock device</button>'+
+        '<button class="btn danger" onclick="phoneResetAccess(\''+esc(x.id)+'\')">Reset Manager/Owner PINs</button>'+
+      '</div></div>';
+  }).join('')||'<div class="small">No paired Dexter phones.</div>';
+ }catch(e){note(e.message)}
+}
+async function phoneRole(id,role){
+ try{await api('device_job_create',{deviceId:id,jobType:'device.role.set',request:{role}});note('Role change queued: '+role);setTimeout(loadPhones,1200)}catch(e){note(e.message)}
+}
+async function phoneJob(id,jobType){
+ try{await api('device_job_create',{deviceId:id,jobType,request:{}});note(jobType==='device.lock'?'Device lock queued.':'Phone check queued.');setTimeout(loadPhones,1200)}catch(e){note(e.message)}
+}
+async function phoneResetAccess(id){
+ if(!confirm('Reset Manager and Owner PINs on this Dexter phone and return it to Staff mode?'))return;
+ try{await api('device_access_reset',{deviceId:id,targetRole:'all'});note('Phone access reset.');setTimeout(loadPhones,1200)}catch(e){note(e.message)}
+}
+
 async function loadHistory(){try{const d=await api('history');$('chat').innerHTML='';if(!(d.history||[]).length)addMsg('a','Awright. Dexter AI Test is ready. Ask a question or use Work mode for a proper task.');else(d.history||[]).forEach(m=>addMsg(m.role==='assistant'?'a':'u',m.content,fmtDate(m.created_at)))}catch{addMsg('a','Awright. Dexter AI Test is ready.')}}
 async function unlock(){tok=$('token').value.trim();if(!tok)return note('Enter your Dexter owner code.');sid=localStorage.getItem('dexter_sid')||uid();try{const h=await api('health');($('remember').checked?localStorage:sessionStorage).setItem('dexter_tok',tok);localStorage.setItem('dexter_sid',sid);$('lock').classList.add('hidden');$('workspace').classList.remove('hidden');showHealth(h);await Promise.all([refresh(),loadHistory()])}catch(e){tok='';note(e.message)}}
 async function send(){const m=$('msg').value.trim();if(!m)return;$('msg').value='';addMsg('u',m);$('send').disabled=true;try{const d=await api('chat',{message:m});addMsg('a',d.reply||'No reply returned.',[d.agent,d.model].filter(Boolean).join(' · '));$('agent').textContent=d.agent||'Dexter'}catch(e){addMsg('a','Error: '+e.message)}finally{$('send').disabled=false;$('msg').focus()}}
