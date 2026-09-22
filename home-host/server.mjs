@@ -1409,15 +1409,20 @@ async function desktopChromeCdp(){
   const endpoint="http://127.0.0.1:9222";
   let browser;
   try{browser=await chromium.connectOverCDP(endpoint)}catch(e){throw new Error("Dexter visible Chromium is not available for local control.");}
-  const contexts=browser.contexts();
-  const pages=contexts.flatMap(c=>c.pages());
-  const page=pages.find(p=>/esimerge\.com\/apply/.test(p.url()))||pages[pages.length-1];
-  if(!page){await browser.close();throw new Error("No visible Dexter Chromium page found.");}
+  let page=null;
+  for(let i=0;i<20;i++){
+    const pages=browser.contexts().flatMap(c=>c.pages());
+    page=pages.find(p=>/esimerge\.com\/apply/.test(p.url()))||pages.find(p=>/^https?:\/\//.test(p.url()))||null;
+    if(page)break;
+    await new Promise(r=>setTimeout(r,500));
+  }
+  if(!page)throw new Error("No loaded web page found in Dexter Chrome.");
+  await page.waitForLoadState("domcontentloaded",{timeout:15000}).catch(()=>{});
   return {browser,page};
 }
 async function desktopChromeSnapshot(){
   const {browser,page}=await desktopChromeCdp();
-  try{return await snapshot(page)}finally{await browser.close().catch(()=>{})}
+  try{return await snapshot(page)}finally{}
 }
 async function desktopChromeFill(request={}){
   const {browser,page}=await desktopChromeCdp();
@@ -1429,7 +1434,7 @@ async function desktopChromeFill(request={}){
     if(/password|otp|2fa|card|bank|payment|identity|kyc/.test(type+" "+name))throw new Error("Sensitive field blocked.");
     await el.fill(String(request.value??""));
     return {ok:true,url:page.url()};
-  }finally{await browser.close().catch(()=>{})}
+  }finally{}
 }
 async function desktopChromeClick(request={}){
   const {browser,page}=await desktopChromeCdp();
@@ -1440,7 +1445,7 @@ async function desktopChromeClick(request={}){
     await el.click({timeout:15000});
     await page.waitForTimeout(700);
     return await snapshot(page);
-  }finally{await browser.close().catch(()=>{})}
+  }finally{}
 }
 async function desktopChromeFocus(){
   desktopRequireWindows();
