@@ -137,9 +137,19 @@ public class DexterRemoteAccessibilityService extends AccessibilityService {
             String k = key == null ? "" : key.trim().toUpperCase(java.util.Locale.ROOT);
             int action;
             if ("BACK".equals(k)) action = GLOBAL_ACTION_BACK;
-            else if ("HOME".equals(k)) action = GLOBAL_ACTION_HOME;
+            else if ("HOME".equals(k)) {
+                if (Build.VERSION.SDK_INT >= 31) {
+                    try { performGlobalAction(GLOBAL_ACTION_DISMISS_NOTIFICATION_SHADE); } catch (Exception ignored) {}
+                }
+                action = GLOBAL_ACTION_HOME;
+            }
             else if ("APP_SWITCH".equals(k)) action = GLOBAL_ACTION_RECENTS;
             else if ("NOTIFICATIONS".equals(k)) action = GLOBAL_ACTION_NOTIFICATIONS;
+            else if ("DISMISS_NOTIFICATIONS".equals(k)) {
+                if (Build.VERSION.SDK_INT < 31) return out.put("connected", false).put("error", "Dismiss shade requires Android 12+.");
+                boolean dismissed=performGlobalAction(GLOBAL_ACTION_DISMISS_NOTIFICATION_SHADE);
+                return out.put("connected", true).put("method", "accessibility").put("action", "key").put("key", k).put("performed", dismissed);
+            }
             else return out.put("connected", false).put("error", "Accessibility key unsupported: " + k);
             boolean ok = performGlobalAction(action);
             return out.put("connected", true).put("method", "accessibility").put("action", "key").put("key", k).put("performed", ok);
