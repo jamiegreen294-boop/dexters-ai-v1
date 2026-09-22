@@ -1,0 +1,20 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="uk.co.dexter.os.esim">
+    <uses-feature android:name="android.hardware.telephony.euicc" android:required="true"/>
+    <uses-permission android:name="android.permission.WRITE_EMBEDDED_SUBSCRIPTIONS"/>
+    <uses-permission android:name="android.permission.READ_PHONE_STATE"/>
+    <uses-permission android:name="android.permission.READ_PRIVILEGED_PHONE_STATE"/>
+    <uses-permission android:name="android.permission.MANAGE_DEVICE_POLICY_MANAGED_SUBSCRIPTIONS"/>
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <application android:theme="@android:style/Theme.Material.NoActionBar" android:label="Dexter eSIM">
+        <activity android:name=".EsimActivity" android:exported="true"
+            android:permission="android.permission.BIND_EUICC_SERVICE">
+            <intent-filter android:priority="200">
+                <action android:name="android.service.euicc.action.MANAGE_EMBEDDED_SUBSCRIPTIONS"/>
+                <action android:name="android.service.euicc.action.PROVISION_EMBEDDED_SUBSCRIPTION"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.service.euicc.category.EUICC_UI"/>
+            </intent-filter>
+        </activity>
+        <receiver android:name=".EsimResultReceiver" android:exported="false"/>
+    </application>
+</manifest>
