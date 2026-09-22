@@ -14,3 +14,14 @@ Before Dexter OS can be sold on a handset, the OEM/device partner must provide a
 10. Factory provisioning: Dexter OS image flashing, serial/IMEI handling, device-owner enrollment and OTA enrollment.
 
 The current Meizu managed-shell prototype proves the Dexter UX/control model. It is not a substitute for this hardware bring-up.
+
+
+## eSIM / eUICC
+- production GSMA-compliant eUICC fitted to the exact retail SKU
+- Android feature android.hardware.telephony.euicc exposed
+- working OEM/AOSP LPA backend
+- modem eUICC terminal capabilities and default boot profile support
+- Radio HAL SIM-power and slot-status support for the Android release
+- physical SIM + eSIM DSDS preferred
+- Android 13+ MEP support preferred for dual active eSIM profiles
+- production SM-DP+ interoperability evidence required
