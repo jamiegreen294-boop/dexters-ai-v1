@@ -99,7 +99,7 @@ button{font:inherit;color:inherit}
 <div class="owner"><div class="roundico" style="background:#111;border:2px solid var(--gold);color:var(--gold);font-weight:900">D</div><div style="flex:1"><b>Dexters Business</b><small>Owner</small></div><div class="arrow">›</div></div>
 <div class="label">Device</div><div class="group"><div class="row" onclick="openEsim()"><div class="rIcon"><svg><use href="#i-signal"/></svg></div><div><b>Dexter eSIM</b><small id="esimSummary">Checking hardware…</small></div><div class="arrow">›</div></div><div class="row" onclick="openDexterSetting('network')"><div class="rIcon"><svg><use href="#i-wifi"/></svg></div><b>Network & Internet</b><div class="arrow">›</div></div><div class="row" onclick="openDexterSetting('devices')"><div class="rIcon"><svg><use href="#i-business"/></svg></div><b>Connected Devices</b><div class="arrow">›</div></div><div class="row" onclick="openDexterSetting('display')"><div class="rIcon"><svg><use href="#i-sun"/></svg></div><b>Display</b><div class="arrow">›</div></div><div class="row" onclick="openDexterSetting('sound')"><div class="rIcon"><svg><use href="#i-msg"/></svg></div><b>Sound & Vibration</b><div class="arrow">›</div></div><div class="row" onclick="openDexterSetting('battery')"><div class="rIcon"><svg><use href="#i-battery"/></svg></div><b>Battery</b><div class="arrow">›</div></div><div class="row" onclick="openDexterSetting('storage')"><div class="rIcon"><svg><use href="#i-storage"/></svg></div><b>Storage</b><div class="arrow">›</div></div><div class="row" onclick="openDexterSetting('security')"><div class="rIcon"><svg><use href="#i-lock"/></svg></div><b>Security & Privacy</b><div class="arrow">›</div></div></div>
 <div class="label">Dexter</div><div class="group"><div class="row" onclick="url('https://jamiegreen294-boop.github.io/dexters-ai-v1/')"><div class="rIcon"><svg><use href="#i-ai"/></svg></div><b>Dexter AI</b><div class="arrow">›</div></div><div class="row" onclick="show('store')"><div class="rIcon"><svg><use href="#i-office"/></svg></div><b>Dexter Apps</b><div class="arrow">›</div></div><div class="row" onclick="show('control')"><div class="rIcon"><svg><use href="#i-business"/></svg></div><b>Business Tools</b><div class="arrow">›</div></div><div class="row" onclick="show('store')"><div class="rIcon"><svg><use href="#i-store"/></svg></div><b>Dexter Store</b><div class="arrow">›</div></div><div class="row" onclick="show('about')"><div class="rIcon"><svg><use href="#i-user"/></svg></div><b>About Dexter OS</b><div class="arrow">›</div></div></div>
-<div class="label">Access</div><div class="group"><div class="row" onclick="openAccess()"><div class="rIcon"><svg><use href="#i-lock"/></svg></div><div><b>Manager Access</b><small id="accessSummary">Staff mode</small></div><div class="arrow">›</div></div></div>
+<div class="label">Access</div><div class="group"><div class="row" onclick="openAccess()"><div class="rIcon"><svg><use href="#i-lock"/></svg></div><div><b>Manager Access</b><small id="accessSummary">Staff mode</small></div><div class="arrow">›</div></div><div id="remoteControlRow" class="row" style="display:none" onclick="openRemoteControlSetup()"><div class="rIcon"><svg><use href="#i-ai"/></svg></div><div><b>Dexter Remote Control</b><small id="remoteControlSummary">One-time setup</small></div><div class="arrow">›</div></div><div id="wirelessDebugRow" class="row" style="display:none" onclick="openWirelessDebugging()"><div class="rIcon"><svg><use href="#i-wifi"/></svg></div><div><b>Wireless Debugging</b><small>ADB fallback for diagnostics</small></div><div class="arrow">›</div></div></div>
 <div class="label">Owner</div><div class="group"><div class="row" onclick="openDexterSetting('accounts')"><div class="rIcon"><svg><use href="#i-user"/></svg></div><b>Accounts</b><div class="arrow">›</div></div><div class="row" onclick="openDexterSetting('system')"><div class="rIcon"><svg><use href="#i-gear"/></svg></div><b>System</b><div class="arrow">›</div></div></div></section>
 
 <section id="esim" class="page">
@@ -198,12 +198,26 @@ function openManagerPlay(){
     if(!B().openPlayStore())showNotice('Google Play','Google Play is available only in Manager or Owner mode.');
   }catch(e){showNotice('Google Play','Google Play is available only in Manager or Owner mode.')}
 }
+function openRemoteControlSetup(){
+  try{
+    if(!B().openRemoteControlSetup())showNotice('Dexter Remote Control','Unlock Manager or Owner mode first.');
+  }catch(e){showNotice('Dexter Remote Control','Unlock Manager or Owner mode first.')}
+}
+function openWirelessDebugging(){
+  try{
+    if(!B().openWirelessDebugging())showNotice('Wireless Debugging','Unlock Manager or Owner mode first.');
+  }catch(e){showNotice('Wireless Debugging','Unlock Manager or Owner mode first.')}
+}
 function applyRoleUi(){
   let role='staff';
   try{role=String(B().getAccessRole()||'staff').toLowerCase()}catch(e){}
   const elevated=(role==='manager'||role==='owner');
   const row=document.getElementById('playStoreManagerRow');
   if(row)row.style.display=elevated?'grid':'none';
+  const remote=document.getElementById('remoteControlRow');if(remote)remote.style.display=elevated?'grid':'none';
+  const adb=document.getElementById('wirelessDebugRow');if(adb)adb.style.display=elevated?'grid':'none';
+  const rs=document.getElementById('remoteControlSummary');
+  if(rs){let ready=false;try{ready=!!B().isRemoteControlReady()}catch(e){}rs.textContent=ready?'Always-on access active':'Tap once to enable';}
   const sum=document.getElementById('accessSummary');if(sum)sum.textContent=role.charAt(0).toUpperCase()+role.slice(1)+' mode';
   const title=document.getElementById('accessRoleTitle');if(title)title.textContent=role.charAt(0).toUpperCase()+role.slice(1)+' mode';
   const sub=document.getElementById('accessRoleSub');if(sub)sub.textContent=elevated?'Elevated Dexter controls are unlocked.':'Manager and Owner controls are locked.';
