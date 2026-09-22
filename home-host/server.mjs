@@ -31,12 +31,20 @@ const LIVE_ACTIONS=String(process.env.DEXTER_LIVE_ACTIONS||"false").toLowerCase(
 const AGENT_ENDPOINT=(process.env.DEXTER_AGENT_ENDPOINT||"https://eikruaxxzzxmfjvsmwwo.supabase.co/functions/v1/dexter-home-agent").replace(/\/$/,"");
 const AGENT_TOKEN=process.env.DEXTER_AGENT_TOKEN||"";
 let agentBusy=false;
+let currentCloudJobId=null;
 
 if(!TOKEN||TOKEN.length<24){
   console.error("Set DEXTER_BROWSER_WORKER_TOKEN to a long random value before starting Dexter.");
   process.exit(1);
 }
 for(const dir of [PROFILE,WORKSPACE,JOB_DIR,IMAGE_DIR,SDCPP_DIR,SDCPP_MODEL_DIR])fs.mkdirSync(dir,{recursive:true});
+
+process.on("uncaughtException",err=>{
+  console.error("Dexter uncaught exception:",String(err?.stack||err?.message||err));
+});
+process.on("unhandledRejection",err=>{
+  console.error("Dexter unhandled rejection:",String(err?.stack||err?.message||err));
+});
 
 let context;
 const pageSessions=new Map();
@@ -347,7 +355,14 @@ function runProcess(command,args,cwd,timeout=120000){
     }
     const child=spawn(executable,runArgs,{cwd,windowsHide:true,shell:false,env:{...process.env,CI:"1"}});
     let stdout="",stderr="",killed=false,settled=false;
-    const timer=setTimeout(()=>{killed=true;try{child.kill();}catch{}},timeout);
+    const timer=setTimeout(()=>{
+      killed=true;
+      try{
+        if(process.platform==="win32"&&child.pid){
+          spawn(process.env.ComSpec||"cmd.exe",["/d","/s","/c","taskkill /PID "+child.pid+" /T /F"],{windowsHide:true,shell:false});
+        }else child.kill("SIGKILL");
+      }catch{}
+    },timeout);
     child.stdout?.on("data",d=>stdout+=d.toString());
     child.stderr?.on("data",d=>stderr+=d.toString());
     child.on("error",err=>{if(settled)return;settled=true;clearTimeout(timer);reject(err);});
@@ -1193,7 +1208,7 @@ async function androidTool(tool,request={}){
   if(tool==="android.connect"){
     const address=String(request.address||"").trim();
     if(!/^[A-Za-z0-9_.:-]+:\d{2,5}$/.test(address))throw new Error("Android wireless-debug address must be host:port.");
-    const r=await adbRun(["connect",address],30000);
+    const r=await adbRun(["connect",address],15000);
     return {address,output:r.stdout.trim()};
   }
   if(tool==="android.autoconnect"){
@@ -1727,7 +1742,11 @@ async function agentRequest(body){
 }
 async function heartbeat(){
   if(!AGENT_TOKEN)return;
-  try{await agentRequest({action:"heartbeat"});}catch(e){console.error("Dexter heartbeat:",String(e?.message||e));}
+  try{
+    await agentRequest({action:"heartbeat",current_job_id:currentCloudJobId||null});
+  }catch(e){
+    console.error("Dexter heartbeat:",String(e?.message||e));
+  }
 }
 async function pollHomeJobs(){
   if(!AGENT_TOKEN||agentBusy)return;
@@ -1736,11 +1755,20 @@ async function pollHomeJobs(){
     const d=await agentRequest({action:"poll"});
     const job=d?.job;
     if(!job)return;
+    currentCloudJobId=String(job.id||"")||null;
     try{
+      await heartbeat();
       const result=await executeCloudJob(job);
       await agentRequest({action:"result",job_id:job.id,status:"completed",result});
     }catch(e){
-      await agentRequest({action:"result",job_id:job.id,status:"failed",error:String(e?.message||e).slice(0,5000)});
+      try{
+        await agentRequest({action:"result",job_id:job.id,status:"failed",error:String(e?.message||e).slice(0,5000)});
+      }catch(reportError){
+        console.error("Dexter home-agent result report:",String(reportError?.message||reportError));
+      }
+    }finally{
+      currentCloudJobId=null;
+      await heartbeat().catch(()=>{});
     }
   }catch(e){
     console.error("Dexter home-agent poll:",String(e?.message||e));
@@ -1794,6 +1822,6 @@ server.listen(PORT,"127.0.0.1",()=>{
   if(AGENT_TOKEN){
     setTimeout(pollHomeJobs,1000);
     setInterval(pollHomeJobs,5000);
-    setInterval(heartbeat,30000);
+    setInterval(heartbeat,15000);
   }
 });
