@@ -39,6 +39,7 @@ public class DexterHomeActivity extends Activity {
         getWindow().setNavigationBarColor(0xFF030506);
         enterImmersive();
         try { DeviceOwnerPolicy.applyBusinessMode(this); } catch(Exception ignored) {}
+        try { if(DeviceAgentService.hasToken(this) || DexterDeviceAdminReceiver.isDeviceOwner(this)) DeviceAgentService.start(this); } catch(Exception ignored) {}
 
         web=new WebView(this);
         setContentView(web);
@@ -64,6 +65,7 @@ public class DexterHomeActivity extends Activity {
     @Override protected void onResume(){
         super.onResume();
         enterImmersive();
+        try { if(DeviceAgentService.hasToken(this) || DexterDeviceAdminReceiver.isDeviceOwner(this)) DeviceAgentService.start(this); } catch(Exception ignored) {}
         try {
             DevicePolicyManager d=(DevicePolicyManager)getSystemService(DEVICE_POLICY_SERVICE);
             if(d!=null && d.isLockTaskPermitted(getPackageName())) startLockTask();
