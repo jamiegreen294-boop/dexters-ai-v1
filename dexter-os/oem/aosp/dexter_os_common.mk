@@ -1,5 +1,9 @@
 # Common Dexter OS product integration.
-PRODUCT_PACKAGES += DexterOS
+PRODUCT_PACKAGES += \
+    DexterOS \
+    DexterDialer \
+    DexterMessaging \
+    DexterFiles
 
 PRODUCT_COPY_FILES += \
     vendor/dexter/permissions/privapp-permissions-dexter.xml:$(TARGET_COPY_OUT_PRODUCT)/etc/permissions/privapp-permissions-dexter.xml \
