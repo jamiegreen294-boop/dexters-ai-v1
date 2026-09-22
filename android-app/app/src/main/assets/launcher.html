@@ -99,8 +99,29 @@ button{font:inherit;color:inherit}
 <div class="owner"><div class="roundico" style="background:#111;border:2px solid var(--gold);color:var(--gold);font-weight:900">D</div><div style="flex:1"><b>Dexters Business</b><small>Owner</small></div><div class="arrow">›</div></div>
 <div class="label">Device</div><div class="group"><div class="row" onclick="openDexterSetting('network')"><div class="rIcon"><svg><use href="#i-wifi"/></svg></div><b>Network & Internet</b><div class="arrow">›</div></div><div class="row" onclick="openDexterSetting('devices')"><div class="rIcon"><svg><use href="#i-business"/></svg></div><b>Connected Devices</b><div class="arrow">›</div></div><div class="row" onclick="openDexterSetting('display')"><div class="rIcon"><svg><use href="#i-sun"/></svg></div><b>Display</b><div class="arrow">›</div></div><div class="row" onclick="openDexterSetting('sound')"><div class="rIcon"><svg><use href="#i-msg"/></svg></div><b>Sound & Vibration</b><div class="arrow">›</div></div><div class="row" onclick="openDexterSetting('battery')"><div class="rIcon"><svg><use href="#i-battery"/></svg></div><b>Battery</b><div class="arrow">›</div></div><div class="row" onclick="openDexterSetting('storage')"><div class="rIcon"><svg><use href="#i-storage"/></svg></div><b>Storage</b><div class="arrow">›</div></div><div class="row" onclick="openDexterSetting('security')"><div class="rIcon"><svg><use href="#i-lock"/></svg></div><b>Security & Privacy</b><div class="arrow">›</div></div></div>
 <div class="label">Dexter</div><div class="group"><div class="row" onclick="url('https://jamiegreen294-boop.github.io/dexters-ai-v1/')"><div class="rIcon"><svg><use href="#i-ai"/></svg></div><b>Dexter AI</b><div class="arrow">›</div></div><div class="row" onclick="show('store')"><div class="rIcon"><svg><use href="#i-office"/></svg></div><b>Dexter Apps</b><div class="arrow">›</div></div><div class="row" onclick="show('control')"><div class="rIcon"><svg><use href="#i-business"/></svg></div><b>Business Tools</b><div class="arrow">›</div></div><div class="row" onclick="show('store')"><div class="rIcon"><svg><use href="#i-store"/></svg></div><b>Dexter Store</b><div class="arrow">›</div></div><div class="row" onclick="show('about')"><div class="rIcon"><svg><use href="#i-user"/></svg></div><b>About Dexter OS</b><div class="arrow">›</div></div></div>
+<div class="label">Access</div><div class="group"><div class="row" onclick="openAccess()"><div class="rIcon"><svg><use href="#i-lock"/></svg></div><div><b>Manager Access</b><small id="accessSummary">Staff mode</small></div><div class="arrow">›</div></div></div>
 <div class="label">Owner</div><div class="group"><div class="row" onclick="openDexterSetting('accounts')"><div class="rIcon"><svg><use href="#i-user"/></svg></div><b>Accounts</b><div class="arrow">›</div></div><div class="row" onclick="openDexterSetting('system')"><div class="rIcon"><svg><use href="#i-gear"/></svg></div><b>System</b><div class="arrow">›</div></div></div></section>
 
+<section id="access" class="page">
+<div style="display:flex;align-items:center;gap:10px"><button onclick="show('settings')" style="border:0;background:#151d22;color:white;width:40px;height:40px;border-radius:20px;font-size:22px">‹</button><div class="h1" style="margin:12px 0 2px">Manager Access</div></div>
+<div class="owner"><div class="roundico">D</div><div><b id="accessRoleTitle">Staff mode</b><small id="accessRoleSub">Manager and Owner controls are locked.</small></div></div>
+<div class="group">
+<div class="row" onclick="selectAccessRole('manager')"><div class="rIcon">M</div><div><b>Manager</b><small>15 minute access</small></div><div class="arrow">›</div></div>
+<div class="row" onclick="selectAccessRole('owner')"><div class="rIcon">O</div><div><b>Owner</b><small>30 minute access</small></div><div class="arrow">›</div></div>
+</div>
+<div id="accessPinBox" style="padding:8px 2px">
+<input id="accessPin" inputmode="numeric" pattern="[0-9]*" maxlength="10" type="password" placeholder="Enter 6–10 digit PIN" style="width:100%;box-sizing:border-box;border:1px solid #29333a;border-radius:14px;background:#11181d;color:white;padding:15px 14px;font-size:20px;letter-spacing:4px;outline:none">
+<div style="display:flex;gap:10px;margin-top:10px">
+<button onclick="submitAccessLogin()" style="flex:1;border:0;border-radius:14px;padding:13px;background:#f4cf71;color:#111;font-weight:800">Unlock</button>
+<button onclick="lockAccess()" style="flex:1;border:1px solid #3a454c;border-radius:14px;padding:13px;background:#151d22;color:white;font-weight:700">Lock to Staff</button>
+</div></div>
+<div id="ownerPinSetup" style="display:none">
+<div class="label">Owner setup</div><div class="group">
+<div class="row" onclick="setupAccessPin('manager')"><div class="rIcon">M</div><div><b>Set Manager PIN</b><small>6–10 digits</small></div><div class="arrow">›</div></div>
+<div class="row" onclick="setupAccessPin('owner')"><div class="rIcon">O</div><div><b>Set Owner PIN</b><small>6–10 digits</small></div><div class="arrow">›</div></div>
+</div></div>
+<div id="accessMessage" style="font-size:13px;color:#a9b2b7;padding:8px 4px 18px">Loading access status…</div>
+</section>
 <section id="store" class="page"><div class="h1">Dexter Store</div><div class="search">⌕ &nbsp;&nbsp; Search apps, tools and updates</div><div class="storehero"><div class="dex"><span style="color:var(--gold)">D</span> DEXTERS</div><div class="tag">TOOLS FOR A<br>STRONGER TOMORROW</div><div class="city" style="bottom:0;height:110px;right:-8px"><i class="a"></i><i class="b"></i><i class="c"></i><i class="d"></i><i class="e"></i></div></div><div class="tabs"><button class="tab on" onclick="storeTab(this,'Featured')">Featured</button><button class="tab" onclick="storeTab(this,'Business')">Business</button><button class="tab" onclick="storeTab(this,'Tools')">Tools</button><button class="tab" onclick="storeTab(this,'Updates')">Updates</button></div><div class="storelist"><div class="srow"><div class="ico purple"><svg><use href="#i-ai"/></svg></div><div><b>Dexter AI</b><small>Your AI business assistant</small></div><button class="open" onclick="url('https://jamiegreen294-boop.github.io/dexters-ai-v1/')">Open</button></div><div id="playStoreManagerRow" class="srow" style="display:none"><div class="ico" style="background:#173b2a"><svg><use href="#i-store"/></svg></div><div><b>Google Play</b><small>Manager / Owner access only</small></div><button class="open" onclick="openManagerPlay()">Open</button></div><div class="srow"><div class="ico gold"><svg><use href="#i-crown"/></svg></div><div><b>Loyalty</b><small>Rewards and customer loyalty</small></div><button class="open" onclick="url('https://app.dextersspot.co.uk')">Open</button></div><div class="srow"><div class="ico teal"><svg><use href="#i-pos"/></svg></div><div><b>POS</b><small>Point of sale made simple</small></div><button class="open" onclick="url('https://backoffice.dextersspot.co.uk/pc-pos-test/')">Open</button></div><div class="srow"><div class="ico teal"><svg><use href="#i-office"/></svg></div><div><b>Back Office</b><small>Manage your business</small></div><button class="open" onclick="url('https://backoffice.dextersspot.co.uk/')">Open</button></div><div class="srow"><div class="ico slate"><svg><use href="#i-scan"/></svg></div><div><b>Scanner</b><small>Scan and store documents</small></div><button class="open" onclick="camera()">Open</button></div><div class="srow"><div class="ico purple"><svg><use href="#i-globe"/></svg></div><div><b>Website</b><small>Manage your online presence</small></div><button class="open" onclick="url('https://dextersspot.co.uk')">Open</button></div></div><div class="bottom">
 <div onclick="show('home')"><b>⌂</b>Home</div><div onclick="storeTab(null,'Apps')"><b>▦</b>Apps</div><div onclick="storeTab(null,'Updates')"><b>♧</b>Updates</div><div onclick="show('settings')"><b>♙</b>Account</div>
 </div></section>
@@ -122,6 +143,14 @@ function setting(k){openDexterSetting(k)}
 function toggleTorch(){try{const on=!!B().toggleTorch();document.getElementById('torchBtn')?.classList.toggle('on',on)}catch(e){showNotice('Torch','Torch could not be changed. Check camera/flash permission in Dexter OS.')}}
 function toggleDark(){document.documentElement.classList.toggle('dexterLight');showNotice('Dark Mode',document.documentElement.classList.contains('dexterLight')?'Light appearance enabled for this session.':'Dark appearance enabled.')}
 function showNotice(title,body){document.getElementById('noticeTitle').textContent=title;document.getElementById('noticeHeading').textContent=title;document.getElementById('noticeBody').textContent=body;show('notice')}
+let accessSelectedRole='manager',accessExpiresAt=null,accessTimer=null;
+function openAccess(){show('access');try{B().accessStatus()}catch(e){dexterAccessResult(JSON.stringify({error:'Access service unavailable.'}))}}
+function selectAccessRole(role){accessSelectedRole=role;document.getElementById('accessMessage').textContent=(role==='owner'?'Owner':'Manager')+' selected. Enter the PIN to continue.';document.getElementById('accessPin').focus()}
+function submitAccessLogin(){const pin=document.getElementById('accessPin').value.trim();if(!/^\d{6,10}$/.test(pin)){document.getElementById('accessMessage').textContent='Enter a 6–10 digit PIN.';return}document.getElementById('accessMessage').textContent='Checking…';try{B().accessLogin(accessSelectedRole,pin)}catch(e){document.getElementById('accessMessage').textContent='Unable to check PIN.'}}
+function setupAccessPin(role){const pin=document.getElementById('accessPin').value.trim();if(!/^\d{6,10}$/.test(pin)){document.getElementById('accessMessage').textContent='Enter the new 6–10 digit PIN above first.';return}document.getElementById('accessMessage').textContent='Saving '+role+' PIN…';try{B().accessSetupPin(role,pin)}catch(e){document.getElementById('accessMessage').textContent='Unable to save PIN.'}}
+function lockAccess(){document.getElementById('accessMessage').textContent='Locking…';try{B().accessLogout()}catch(e){applyRoleUi()}}
+function updateAccessCountdown(){if(accessTimer){clearInterval(accessTimer);accessTimer=null}if(!accessExpiresAt)return;const render=()=>{const ms=new Date(accessExpiresAt).getTime()-Date.now();if(ms<=0){accessExpiresAt=null;applyRoleUi();document.getElementById('accessMessage').textContent='Session expired. Staff mode restored.';return}const m=Math.floor(ms/60000),s=Math.floor((ms%60000)/1000);document.getElementById('accessMessage').textContent='Elevated access expires in '+m+':'+String(s).padStart(2,'0')};render();accessTimer=setInterval(render,1000)}
+window.dexterAccessResult=function(raw){let r={};try{r=typeof raw==='string'?JSON.parse(raw):raw||{}}catch(e){};const msg=document.getElementById('accessMessage');if(r.error){if(msg)msg.textContent=r.error+(r.attemptsRemaining!==undefined?' · '+r.attemptsRemaining+' attempts left':'');return}if(r.role){accessExpiresAt=r.expiresAt||null;document.getElementById('accessPin').value='';applyRoleUi();if(msg)msg.textContent=r.role.charAt(0).toUpperCase()+r.role.slice(1)+' access active.';updateAccessCountdown()}if(Array.isArray(r.configuredRoles)){if(msg)msg.textContent=r.configuredRoles.length?'Configured: '+r.configuredRoles.join(', '):'No Manager/Owner PIN has been configured yet.';applyRoleUi()}if(r.ok&&r.role&&!r.accessSession){if(msg)msg.textContent=r.role.charAt(0).toUpperCase()+r.role.slice(1)+' PIN saved.';try{B().accessStatus()}catch(e){}}};
 function openManagerPlay(){
   try{
     if(!B().openPlayStore())showNotice('Google Play','Google Play is available only in Manager or Owner mode.');
@@ -130,9 +159,13 @@ function openManagerPlay(){
 function applyRoleUi(){
   let role='staff';
   try{role=String(B().getAccessRole()||'staff').toLowerCase()}catch(e){}
+  const elevated=(role==='manager'||role==='owner');
   const row=document.getElementById('playStoreManagerRow');
-  if(row)row.style.display=(role==='manager'||role==='owner')?'grid':'none';
-  document.querySelectorAll('.owner small').forEach((el,i)=>{if(i===0)el.textContent=role.charAt(0).toUpperCase()+role.slice(1)});
+  if(row)row.style.display=elevated?'grid':'none';
+  const sum=document.getElementById('accessSummary');if(sum)sum.textContent=role.charAt(0).toUpperCase()+role.slice(1)+' mode';
+  const title=document.getElementById('accessRoleTitle');if(title)title.textContent=role.charAt(0).toUpperCase()+role.slice(1)+' mode';
+  const sub=document.getElementById('accessRoleSub');if(sub)sub.textContent=elevated?'Elevated Dexter controls are unlocked.':'Manager and Owner controls are locked.';
+  const setup=document.getElementById('ownerPinSetup');if(setup)setup.style.display=role==='owner'?'block':'none';
 }
 function storeTab(btn,name){
   document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
@@ -202,7 +235,7 @@ document.addEventListener('touchend',e=>{
   if(Math.abs(dx)<70||Math.abs(dx)<=Math.abs(dy))return;
   if(current==='home'&&dx<0)show('control');
   else if(current==='control'&&dx>0)show('home');
-  else if((current==='settings'||current==='store'||current==='about'||current==='settingDetail'||current==='notice')&&dx>0)show('home');
+  else if((current==='settings'||current==='store'||current==='about'||current==='settingDetail'||current==='notice'||current==='access')&&dx>0)show('home');
 }, {passive:true});
 try{let b=B();let v=b.getBatteryLevel();if(v>=0)document.getElementById('batt').textContent=v+'%';document.getElementById('model').textContent='Business Phone · '+b.getDeviceModel();const w=document.getElementById('wifiState');if(w)w.textContent=b.isWifiEnabled()?'On':'Off';const vb=document.getElementById('volumeBar');if(vb){const vol=b.getMediaVolume();if(vol>=0)vb.style.width=vol+'%'}}catch(e){}
 applyRoleUi();setTimeout(()=>document.getElementById('boot').style.display='none',1500);
