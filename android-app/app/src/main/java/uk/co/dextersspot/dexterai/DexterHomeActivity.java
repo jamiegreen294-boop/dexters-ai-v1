@@ -278,6 +278,18 @@ public class DexterHomeActivity extends Activity {
                 return true;
             } catch(Exception e){ return false; }
         }
+        @JavascriptInterface public boolean openDexterAppInfo(){
+            try {
+                String role=DeviceOwnerPolicy.getAccessRole(DexterHomeActivity.this);
+                if(!("manager".equals(role)||"owner".equals(role))) return false;
+                try { stopLockTask(); } catch(Exception ignored) {}
+                Intent i=new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    Uri.parse("package:"+getPackageName()));
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(i);
+                return true;
+            } catch(Exception e){ return false; }
+        }
         @JavascriptInterface public boolean openWirelessDebugging(){
             try {
                 String role=DeviceOwnerPolicy.getAccessRole(DexterHomeActivity.this);
