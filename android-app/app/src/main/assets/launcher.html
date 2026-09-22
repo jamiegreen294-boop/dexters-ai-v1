@@ -89,11 +89,11 @@ button{font:inherit;color:inherit}
 <section id="control" class="page"><div class="h1">Dexter OS</div><div class="sub">Control Centre</div>
 <div class="ccgrid">
 <div class="cc" onclick="openDexterSetting('network')"><div class="roundico"><svg><use href="#i-wifi"/></svg></div><div><b>Wi‑Fi</b><small>Connected</small></div></div>
-<div class="cc" onclick="showNotice('Bluetooth','Bluetooth stays managed by Dexter OS. Approved scanners and business devices appear under Connected Devices.')"><div class="roundico"><svg><use href="#i-bluetooth"/></svg></div><div><b>Bluetooth</b><small>Managed</small></div></div>
-<div class="cc" onclick="showNotice('Mobile Data','Mobile data is carrier-managed. Dexter OS will control this directly when the white-label mobile profile is connected.')"><div class="roundico green"><svg><use href="#i-signal"/></svg></div><div><b>Mobile Data</b><small>Managed</small></div></div>
+<div class="cc" onclick="openDexterSetting('devices')"><div class="roundico"><svg><use href="#i-bluetooth"/></svg></div><div><b>Bluetooth</b><small>Managed</small></div></div>
+<div class="cc" onclick="openDexterSetting('mobile')"><div class="roundico green"><svg><use href="#i-signal"/></svg></div><div><b>Mobile Data</b><small>Managed</small></div></div>
 <div class="cc" onclick="openDexterSetting('battery')"><div class="roundico green"><svg><use href="#i-battery"/></svg></div><div><b>Battery</b><small id="batt">85%</small></div></div></div>
 <div class="slider" onclick="cycleBrightness()"><svg style="width:28px;height:28px"><use href="#i-sun"/></svg>☀ <div id="brightBar" class="bar"></div></div><div class="slider" onclick="cycleVolume()"><span style="font-size:28px">🔊</span><div id="volumeBar" class="bar" style="width:52%"></div></div>
-<div class="quick"><button onclick="toggleDark()"><div class="qcircle"><svg><use href="#i-moon"/></svg></div>Dark Mode</button><button onclick="showNotice('Do Not Disturb','Dexter OS keeps notification behaviour managed without opening Android Settings.')"><div class="qcircle"><svg><use href="#i-moon"/></svg></div>Do Not Disturb</button><button onclick="toggleRotation()"><div class="qcircle"><svg><use href="#i-rotate"/></svg></div>Auto Rotate</button><button id="torchBtn" onclick="toggleTorch()"><div class="qcircle"><svg><use href="#i-torch"/></svg></div>Torch</button><button onclick="toggleLocation()"><div class="qcircle"><svg><use href="#i-location"/></svg></div>Location</button><button onclick="showNotice('Hotspot','Hotspot is reserved for the managed carrier profile and will be enabled from Dexter OS when carrier provisioning is connected.')"><div class="qcircle"><svg><use href="#i-wifi"/></svg></div>Hotspot</button><button onclick="showNotice('Airplane Mode','Airplane mode is protected by the managed-device policy. Dexter OS does not open the old Android settings screen.')"><div class="qcircle"><svg><use href="#i-plane"/></svg></div>Airplane Mode</button><button onclick="showNotice('Screen Record','Screen recording is not exposed until the Dexter privacy/consent flow is active. No system-settings screen will be opened.')"><div class="qcircle"><svg><use href="#i-video"/></svg></div>Screen Record</button></div><div class="storejump" onclick="show('store')"><div class="ico" style="width:58px;height:58px;background:linear-gradient(145deg,#f849b5,#7928ff 55%,#ffd166)"><svg><use href="#i-store"/></svg></div><div class="grow"><b>Dexter Store</b><small>Apps, tools and updates</small></div><div class="arrow">›</div></div></section>
+<div class="quick"><button onclick="toggleDark()"><div class="qcircle"><svg><use href="#i-moon"/></svg></div>Dark Mode</button><button onclick="openDexterSetting('notifications')"><div class="qcircle"><svg><use href="#i-moon"/></svg></div>Do Not Disturb</button><button onclick="toggleRotation()"><div class="qcircle"><svg><use href="#i-rotate"/></svg></div>Auto Rotate</button><button id="torchBtn" onclick="toggleTorch()"><div class="qcircle"><svg><use href="#i-torch"/></svg></div>Torch</button><button onclick="toggleLocation()"><div class="qcircle"><svg><use href="#i-location"/></svg></div>Location</button><button onclick="openDexterSetting('hotspot')"><div class="qcircle"><svg><use href="#i-wifi"/></svg></div>Hotspot</button><button onclick="openDexterSetting('airplane')"><div class="qcircle"><svg><use href="#i-plane"/></svg></div>Airplane Mode</button><button onclick="openDexterSetting('recording')"><div class="qcircle"><svg><use href="#i-video"/></svg></div>Screen Record</button></div><div class="storejump" onclick="show('store')"><div class="ico" style="width:58px;height:58px;background:linear-gradient(145deg,#f849b5,#7928ff 55%,#ffd166)"><svg><use href="#i-store"/></svg></div><div class="grow"><b>Dexter Store</b><small>Apps, tools and updates</small></div><div class="arrow">›</div></div></section>
 
 <section id="settings" class="page"><div style="display:flex;align-items:center;gap:10px"><button onclick="show('home')" style="border:0;background:#151d22;color:white;width:40px;height:40px;border-radius:20px;font-size:22px">⌂</button><div class="h1" style="margin:12px 0 2px">Settings</div></div><div class="search">⌕ &nbsp;&nbsp; Search settings</div>
 <div class="owner"><div class="roundico" style="background:#111;border:2px solid var(--gold);color:var(--gold);font-weight:900">D</div><div style="flex:1"><b>Dexters Business</b><small>Owner</small></div><div class="arrow">›</div></div>
@@ -192,7 +192,12 @@ function settingItem(section,item){
   if(item==='Wi-Fi'){toggleWifi();return}
   if(item==='Mobile Data'){showNotice('Mobile Data','Carrier-managed. Direct control activates with the white-label mobile profile.');return}
   if(item==='Hotspot'){showNotice('Hotspot','Managed carrier hotspot control is reserved for the retail mobile profile.');return}
-  if(item==='Private DNS'){showNotice('Private DNS','Protected by Dexter device policy.');return}
+  if(item==='Private DNS'){showNotice('Private DNS','Protected by Dexter device policy. DNS configuration is controlled by the company profile.');return}
+  if(item==='SIM status'||item==='Mobile data'||item==='Roaming'||item==='Carrier profile'){showNotice(item,'This mobile-network control is owned by the Dexter carrier/OEM profile. The customer remains inside Dexter OS.');return}
+  if(item==='Hotspot status'||item==='Connected devices'||item==='Hotspot password'||item==='Data limit'){showNotice(item,'Hotspot management is reserved for the Dexter carrier profile. This screen is ready for the OEM network service.');return}
+  if(item==='Airplane status'||item==='Wi‑Fi exception'||item==='Bluetooth exception'||item==='Emergency calling'){showNotice(item,'Radio controls remain protected by Dexter OS. Emergency calling is never disabled.');return}
+  if(item==='Do Not Disturb'||item==='Business alerts'||item==='Customer alerts'||item==='Quiet hours'){showNotice(item,'Notification policy is managed inside Dexter OS. No Android Settings page is opened.');return}
+  if(item==='Recording status'||item==='Microphone'||item==='Privacy notice'||item==='Saved recordings'){showNotice(item,'Screen recording remains inside the Dexter privacy workflow. A retail OEM build will use the Dexter system recorder.');return}
   if(item==='Brightness'){cycleBrightness();return}
   if(item==='Dark Mode'){toggleDark();return}
   if(item==='Text Size'){document.body.classList.toggle('largeText');showNotice('Text Size',document.body.classList.contains('largeText')?'Large text enabled.':'Standard text enabled.');return}
@@ -200,6 +205,7 @@ function settingItem(section,item){
   if(item==='Media volume'){cycleVolume();return}
   if(item==='Battery level'){showNotice('Battery','Current battery: '+(document.getElementById('batt')?.textContent||'Unknown'));return}
   if(item==='Internal storage'){let s='Storage unavailable';try{s=B().getStorageSummary()}catch(e){};showNotice('Storage',s);return}
+  if(item==='Downloads'||item==='Cached files'||item==='Business documents'){showNotice(item,'Dexter Files will manage this area without opening the Android file manager.');return}
   if(item==='Device information'){show('about');return}
   if(item==='Updates'){showNotice('Updates','Dexter AI manages signed Dexter OS updates.');return}
   if(item==='Owner access'){showNotice('Owner access','Owner controls are protected by Dexter device management.');return}
@@ -207,7 +213,12 @@ function settingItem(section,item){
 }
 function openDexterSetting(k){
   const map={
-    network:['Network & Internet','Wi‑Fi, mobile data and hotspot stay inside Dexter OS.',['Wi‑Fi','Mobile Data','Hotspot','Private DNS']],
+    network:['Network & Internet','Wi‑Fi and managed connectivity stay inside Dexter OS.',['Wi‑Fi','Mobile Data','Hotspot','Private DNS']],
+    mobile:['Mobile Data','Carrier and SIM connectivity managed by Dexter OS.',['SIM status','Mobile data','Roaming','Carrier profile']],
+    hotspot:['Hotspot','Managed tethering controls for Dexter phones.',['Hotspot status','Connected devices','Hotspot password','Data limit']],
+    airplane:['Airplane Mode','Protected radio controls for managed Dexter phones.',['Airplane status','Wi‑Fi exception','Bluetooth exception','Emergency calling']],
+    notifications:['Notifications','Dexter-managed notification and focus controls.',['Do Not Disturb','Business alerts','Customer alerts','Quiet hours']],
+    recording:['Screen Recording','Dexter privacy-controlled recording tools.',['Recording status','Microphone','Privacy notice','Saved recordings']],
     devices:['Connected Devices','Manage Bluetooth and approved business hardware.',['Bluetooth','Paired scanners','Square Reader','Printers']],
     display:['Display','Dexter OS display controls.',['Brightness','Dark Mode','Text Size','Auto Rotate']],
     sound:['Sound & Vibration','Dexter OS sound controls.',['Media volume','Ringtone volume','Vibration','Do Not Disturb']],
