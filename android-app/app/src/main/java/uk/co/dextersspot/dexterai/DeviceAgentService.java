@@ -143,6 +143,9 @@ public class DeviceAgentService extends Service {
         cap.put("remoteWipe",DexterDeviceAdminReceiver.isDeviceOwner(this));
         cap.put("internetPolicy",DexterDeviceAdminReceiver.isDeviceOwner(this));
         cap.put("configSnapshot",true);
+        cap.put("remoteScreen",true);
+        cap.put("remoteInput",true);
+        cap.put("uiInspection",true);
         info.put("capabilities",cap);
         try {
             info.put("management",DeviceOwnerPolicy.status(this));
@@ -187,6 +190,12 @@ public class DeviceAgentService extends Service {
             case "device.config.restore": return DeviceOwnerPolicy.restoreStandardConfiguration(this);
             case "apps.inventory": return appInventory();
             case "device.local_adb.shell": return DexterLocalAdb.get(this).runShellCommand(req.getString("command"));
+            case "device.screen.capture": return DexterLocalAdb.get(this).captureScreen();
+            case "device.screen.ui_dump": return DexterLocalAdb.get(this).dumpUi();
+            case "device.input.tap": return DexterLocalAdb.get(this).inputTap(req.getInt("x"),req.getInt("y"));
+            case "device.input.swipe": return DexterLocalAdb.get(this).inputSwipe(req.getInt("x1"),req.getInt("y1"),req.getInt("x2"),req.getInt("y2"),req.optInt("durationMs",300));
+            case "device.input.key": return DexterLocalAdb.get(this).inputKey(req.getString("key"));
+            case "device.input.text": return DexterLocalAdb.get(this).inputText(req.getString("text"));
             case "app.launch": return launchApp(req.getString("packageName"));
             case "app.install": return installApk(req,false);
             case "dexter.self_update": return installApk(req,true);
