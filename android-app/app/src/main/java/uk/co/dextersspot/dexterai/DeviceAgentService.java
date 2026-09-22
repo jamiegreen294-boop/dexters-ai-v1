@@ -79,6 +79,7 @@ public class DeviceAgentService extends Service {
 
     private void loop() {
         while (running) {
+            try { DeviceAccessClient.enforceExpiry(this); } catch(Exception ignored) {}
             try {
                 heartbeat();
             } catch (Exception e) {
