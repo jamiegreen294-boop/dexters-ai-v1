@@ -1,0 +1,17 @@
+{
+  "feature": "Google Play role access",
+  "package": "com.android.vending",
+  "defaultRole": "staff",
+  "access": {
+    "staff": "hidden",
+    "manager": "allowed",
+    "owner": "allowed"
+  },
+  "behaviour": {
+    "staffUsesDexterStoreOnly": true,
+    "managerSessionMayRevealPlayStore": true,
+    "hideAgainOnRoleExit": true,
+    "playStoreMustNotAppearInStaffLauncherOrSearch": true,
+    "unapprovedInstallsStillFollowDexterManagementPolicy": true
+  }
+}
