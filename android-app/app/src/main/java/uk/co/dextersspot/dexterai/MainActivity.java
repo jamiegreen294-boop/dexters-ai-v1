@@ -46,7 +46,9 @@ public class MainActivity extends Activity {
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 String host = request.getUrl().getHost();
                 if ("jamiegreen294-boop.github.io".equalsIgnoreCase(host)) return false;
-                startActivity(new Intent(Intent.ACTION_VIEW, request.getUrl()));
+                Intent i=new Intent(MainActivity.this,DexterWebActivity.class);
+                i.putExtra("url",request.getUrl().toString());
+                startActivity(i);
                 return true;
             }
         });
@@ -164,22 +166,9 @@ public class MainActivity extends Activity {
             } catch (Exception ignored) { return "{\"error\":\"Local ADB failed\"}"; }
         }
 
-        @JavascriptInterface public void openWirelessDebuggingSettings() {
-            try {
-                Intent i = new Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS);
-                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                context.startActivity(i);
-            } catch (Exception ignored) {}
-        }
+        @JavascriptInterface public void openWirelessDebuggingSettings() { openDexterSettings("system"); }
 
-        @JavascriptInterface public void openBatteryOptimizationSettings() {
-            try {
-                Intent i = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
-                    android.net.Uri.parse("package:" + context.getPackageName()));
-                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                context.startActivity(i);
-            } catch (Exception ignored) {}
-        }
+        @JavascriptInterface public void openBatteryOptimizationSettings() { openDexterSettings("battery"); }
 
         @JavascriptInterface public void openBusinessApps() {
             try {
@@ -197,13 +186,15 @@ public class MainActivity extends Activity {
             } catch (Exception ignored) {}
         }
 
-        @JavascriptInterface public void openUnknownSourcesSettings() {
+        @JavascriptInterface public void openUnknownSourcesSettings() { openDexterSettings("security"); }
+
+        private void openDexterSettings(String page) {
             try {
-                Intent i = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
-                    android.net.Uri.parse("package:" + context.getPackageName()));
-                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                Intent i=new Intent(context,DexterHomeActivity.class);
+                i.putExtra("page","settings");
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP);
                 context.startActivity(i);
-            } catch (Exception ignored) {}
+            } catch(Exception ignored) {}
         }
     }
 
