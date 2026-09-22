@@ -127,11 +127,15 @@ pre{white-space:pre-wrap;word-break:break-word;background:#090b10;padding:12px;b
 <section id="p-operator" class="panel">
 <div class="metrics" id="operatorMetrics"></div>
 <div class="grid2">
+  <div class="card"><div class="head"><h2>Autonomous V2</h2><div class="actions"><button class="btn" onclick="runSelfRepair()">Fix TEST issues</button><button class="btn secondary" onclick="queueEval()">Queue eval</button><button class="btn secondary" onclick="runLearningReview()">Learn now</button></div></div><div class="body"><div class="small">Safe autonomous repair, evaluation and learning. Live POS, KDS, Loyalty and Back Office writes remain protected.</div><div class="sectiontitle">Self-repair history</div><div id="operatorRepair" class="list"></div><div class="sectiontitle">AI evaluation</div><div id="operatorEval" class="list"></div></div></div>
+  <div class="card"><div class="head"><h2>Agent & tool telemetry</h2><button class="btn secondary" onclick="refresh()">Refresh</button></div><div class="body"><div class="sectiontitle">Agent runs</div><div id="operatorAgentRuns" class="list"></div><div class="sectiontitle">Tool runs</div><div id="operatorToolRuns" class="list"></div></div></div>
+</div>
+<div class="grid2">
   <div class="card"><div class="head"><h2>System map</h2><span class="pill">TEST / protected live</span></div><div class="body"><div id="operatorSystems" class="list"></div><div class="sectiontitle">Dependencies</div><div id="operatorEdges" class="list"></div></div></div>
   <div class="card"><div class="head"><h2>Regression suite</h2><button class="btn" onclick="runRegression()">Run Dexter Core</button></div><div class="body"><div id="operatorRegression" class="list"><div class="small">No regression run yet.</div></div></div></div>
 </div>
 <div class="grid2">
-  <div class="card"><div class="head"><h2>Last-known-good</h2></div><div class="body"><div id="operatorRollback" class="list"></div></div></div>
+  <div class="card"><div class="head"><h2>Learning signals</h2></div><div class="body"><div id="operatorLearningSignals" class="list"></div><div class="sectiontitle">Last-known-good</div><div id="operatorRollback" class="list"></div></div></div>
   <div class="card"><div class="head"><h2>Create test rollback point</h2></div><div class="body workbox">
     <select id="rollbackSystem"></select>
     <input id="rollbackLabel" class="input" placeholder="Label, e.g. Stable command centre">
@@ -184,13 +188,34 @@ function renderDashboard(d){
  $('homeJobs').innerHTML=jobs.slice(0,15).map(j=>item(j.tool_name||j.job_type,(j.error||'')+(j.completed_at?' · '+fmtDate(j.completed_at):''),j.status)).join('')||'<div class="small">No Home PC jobs.</div>';
  $('audit').innerHTML=audit.map(a=>item(a.action,(a.actor||'system')+' · '+fmtDate(a.created_at),a.environment||'test')).join('')||'<div class="small">No audit activity.</div>';
  const nodes=d.systemNodes||[], edges=d.systemEdges||[], runs=d.regressionRuns||[], points=d.rollbackPoints||[];
- if($('operatorMetrics'))$('operatorMetrics').innerHTML=[['Systems',nodes.length],['Dependencies',edges.length],['Regression runs',runs.length],['Rollback points',points.length]].map(x=>'<div class="metric"><b>'+x[1]+'</b><span>'+x[0]+'</span></div>').join('');
+ const agentRuns=d.agentRunTelemetry||[], toolRuns=d.toolRunTelemetry||[], repairs=d.selfRepairRuns||[], signals=d.learningSignals||[], evals=d.evalRuns||[];
+ const latestEval=evals[0]||null;
+ if($('operatorMetrics'))$('operatorMetrics').innerHTML=[
+   ['Systems',nodes.length],['Eval score',latestEval?.score!=null?latestEval.score+'%':'—'],['Self-repairs',repairs.length],['Agent runs',agentRuns.length],['Tool runs',toolRuns.length],['Learning signals',signals.length]
+ ].map(x=>'<div class="metric"><b>'+x[1]+'</b><span>'+x[0]+'</span></div>').join('');
+ if($('operatorRepair'))$('operatorRepair').innerHTML=repairs.slice(0,8).map(r=>item('Repair · '+fmtDate(r.started_at),(r.actions?.length||0)+' actions · '+(r.verification?.critical_failures??'?')+' critical remaining',r.status)).join('')||'<div class="small">No self-repair run yet.</div>';
+ if($('operatorEval'))$('operatorEval').innerHTML=evals.slice(0,8).map(r=>item('Evaluation · '+fmtDate(r.created_at),(r.passed||0)+' passed · '+(r.failed||0)+' failed'+(r.score!=null?' · '+r.score+'%':''),r.status)).join('')||'<div class="small">No evaluation run yet.</div>';
+ if($('operatorAgentRuns'))$('operatorAgentRuns').innerHTML=agentRuns.slice(0,10).map(r=>item(r.agent_key,(r.model||'')+(r.duration_ms!=null?' · '+r.duration_ms+' ms':''),r.status)).join('')||'<div class="small">No agent telemetry yet.</div>';
+ if($('operatorToolRuns'))$('operatorToolRuns').innerHTML=toolRuns.slice(0,10).map(r=>item(r.tool_name,(r.duration_ms!=null?r.duration_ms+' ms':'')+(r.error?' · '+r.error:''),r.status)).join('')||'<div class="small">No tool telemetry yet.</div>';
+ if($('operatorLearningSignals'))$('operatorLearningSignals').innerHTML=signals.slice(0,10).map(r=>item(r.summary,r.signal_type+' · confidence '+Math.round(Number(r.confidence||0)*100)+'%',r.status)).join('')||'<div class="small">No learning signals yet.</div>';
  if($('operatorSystems'))$('operatorSystems').innerHTML=nodes.map(n=>item(n.name,(n.system_type||'system')+' · '+(n.write_policy||'') ,n.environment||n.status)).join('')||'<div class="small">No mapped systems.</div>';
  if($('operatorEdges'))$('operatorEdges').innerHTML=edges.map(e=>item(e.from_system_key+' → '+e.to_system_key,e.relation,e.impact)).join('')||'<div class="small">No dependencies mapped.</div>';
  if($('operatorRegression'))$('operatorRegression').innerHTML=runs.slice(0,10).map(r=>item('Dexter Core · '+fmtDate(r.started_at),(r.passed||0)+' passed · '+(r.failed||0)+' failed',r.status)).join('')||'<div class="small">No regression run yet.</div>';
  if($('operatorRollback'))$('operatorRollback').innerHTML=points.map(p=>'<div class="item"><div class="row"><b>'+esc(p.label)+'</b><span class="status">'+(p.is_last_known_good?'LAST-KNOWN-GOOD':esc(p.source_type))+'</span></div><p>'+esc(p.system_key+' · '+p.source_ref+' · '+fmtDate(p.created_at))+'</p>'+(p.is_last_known_good?'':'<div class="actions"><button class="btn secondary" onclick="markRollbackGood(\''+esc(p.id)+'\')">Mark good</button></div>')+'</div>').join('')||'<div class="small">No rollback points yet.</div>';
  if($('rollbackSystem'))$('rollbackSystem').innerHTML=nodes.filter(n=>n.environment==='test').map(n=>'<option value="'+esc(n.system_key)+'">'+esc(n.name)+'</option>').join('');
 
+}
+async function runSelfRepair(){
+ try{note('Dexter is checking and repairing safe TEST issues…');const r=await api('self_repair',{triggerSource:'manual'});note('Self-repair '+r.status+' · '+(r.actions?.length||0)+' actions');await refresh()}catch(e){note(e.message)}
+}
+async function queueEval(){
+ try{note('Queuing free local Dexter evaluation…');const r=await api('eval_run',{triggerSource:'manual'});note('Evaluation queued on Home PC');await refresh()}catch(e){note(e.message)}
+}
+async function collectEval(){
+ try{const r=await api('eval_collect');note('Evaluation collector checked '+(r.collected?.length||0)+' run(s)');await refresh()}catch(e){note(e.message)}
+}
+async function runLearningReview(){
+ try{note('Reviewing recent work and failures…');const r=await api('learning_review',{triggerSource:'manual'});note('Learning: '+(r.signals||0)+' signals · '+(r.postmortems||0)+' postmortems');await refresh()}catch(e){note(e.message)}
 }
 async function runRegression(){
  try{
