@@ -1127,6 +1127,32 @@ function parseAdbDevices(stdout){
     return {serial,state,model:meta.model||null,product:meta.product||null,device:meta.device||null,transport_id:meta.transport_id||null};
   });
 }
+function parseAdbMdnsServices(stdout){
+  const out=[];
+  for(const line of String(stdout||"").split(/\r?\n/)){
+    const m=line.match(/_adb-tls-connect\._tcp\.?\s+([^\s:]+|\d{1,3}(?:\.\d{1,3}){3}):(\d{2,5})/i);
+    if(m)out.push(m[1]+":"+m[2]);
+  }
+  return [...new Set(out)];
+}
+async function androidAutoReconnect(){
+  const before=await adbRun(["devices","-l"],30000).catch(()=>({stdout:""}));
+  const already=parseAdbDevices(before.stdout).filter(d=>d.state==="device");
+  const mdns=await adbRun(["mdns","services"],30000).catch(()=>({stdout:""}));
+  const endpoints=parseAdbMdnsServices(mdns.stdout);
+  const attempts=[];
+  for(const address of endpoints){
+    try{
+      const r=await adbRun(["connect",address],12000);
+      attempts.push({address,ok:/connected|already connected/i.test(String(r.stdout||"")+String(r.stderr||"")),output:String(r.stdout||r.stderr||"").trim().slice(0,500)});
+    }catch(e){
+      attempts.push({address,ok:false,error:String(e?.message||e).slice(0,500)});
+    }
+  }
+  const after=await adbRun(["devices","-l"],30000).catch(()=>({stdout:""}));
+  return {already_connected:already,endpoints,attempts,devices:parseAdbDevices(after.stdout)};
+}
+
 async function androidDeviceInfo(serial){
   const target=serial?["-s",String(serial)]:[];
   const [model,brand,version,battery,storage]=await Promise.all([
@@ -1167,6 +1193,9 @@ async function androidTool(tool,request={}){
     if(!/^[A-Za-z0-9_.:-]+:\d{2,5}$/.test(address))throw new Error("Android wireless-debug address must be host:port.");
     const r=await adbRun(["connect",address],30000);
     return {address,output:r.stdout.trim()};
+  }
+  if(tool==="android.autoconnect"){
+    return await androidAutoReconnect();
   }
   if(tool==="android.pair"){
     const address=String(request.address||"").trim(),code=String(request.code||"").trim();
@@ -1450,6 +1479,15 @@ async function health(){
   return {status:"ready",host:"home-pc",browser:"chromium",internet:true,coding_agent:true,hardware_doctor:process.platform==="win32",hardware_tools:["hardware.inspect","hardware.printers.read","hardware.ports.read","hardware.spooler.read","hardware.bridge.read"],image_generation:comfy.ready||cpuImage.ready,live_actions:LIVE_ACTIONS,cloud_agent_paired:Boolean(AGENT_TOKEN),agent_endpoint:AGENT_ENDPOINT,headless:HEADLESS,workspace:WORKSPACE,ollama:{ready:ollamaReady,url:OLLAMA_URL,model:LOCAL_MODEL,code_model:CODE_MODEL,models},image:{preferred:comfy.ready?"comfyui":cpuImage.ready?"stable-diffusion.cpp-cpu":null,comfyui:comfy,cpu:cpuImage},jobs:loadJobs().length};
 }
 function serveFile(res,file,contentType){const data=fs.readFileSync(file);res.writeHead(200,{"Content-Type":contentType,"Cache-Control":"no-store"});res.end(data);}
+
+let androidReconnectTimer=null;
+async function startAndroidReconnectWatchdog(){
+  if(androidReconnectTimer)return;
+  const tick=()=>androidAutoReconnect().catch(()=>null);
+  setTimeout(tick,5000);
+  androidReconnectTimer=setInterval(tick,60000);
+  androidReconnectTimer.unref?.();
+}
 
 const server=http.createServer(async(req,res)=>{
   try{
