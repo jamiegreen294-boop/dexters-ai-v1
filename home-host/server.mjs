@@ -1446,6 +1446,16 @@ async function desktopChromeFillSecret(request={}){
     return {ok:true,url:page.url(),field_type:"password"};
   }finally{}
 }
+async function desktopChromeSelect(request={}){
+  const {browser,page}=await desktopChromeCdp(request);
+  try{
+    const el=await byRef(page,String(request.ref||""));
+    const value=String(request.value||"");
+    if(!value)throw new Error("Select value is required.");
+    const result=await el.selectOption({label:value}).catch(async()=>await el.selectOption(value));
+    return {ok:true,url:page.url(),selected:result};
+  }finally{}
+}
 async function desktopChromeFill(request={}){
   const {browser,page}=await desktopChromeCdp(request);
   try{
@@ -1536,7 +1546,7 @@ async function workspaceTool(tool,request={}){
   if(tool==="desktop.chrome_snapshot")return await desktopChromeSnapshot(request);
   if(tool==="desktop.secret.public_key")return await desktopSecretPublicKey();
   if(tool==="desktop.chrome_fill_secret")return await desktopChromeFillSecret(request);
-  if(tool==="desktop.chrome_fill")return await desktopChromeFill(request);
+  if(tool==="desktop.chrome_select")return await desktopChromeSelect(request);\n  if(tool==="desktop.chrome_fill")return await desktopChromeFill(request);
   if(tool==="desktop.chrome_click")return await desktopChromeClick(request);
   if(tool==="desktop.chrome_focus")return await desktopChromeFocus(request);
   if(tool==="desktop.screenshot")return await desktopScreenshot(request);
