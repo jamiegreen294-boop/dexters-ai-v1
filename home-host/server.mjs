@@ -1396,6 +1396,15 @@ async function desktopChromeOpenUrl(request={}){
   await new Promise(r=>setTimeout(r,1200));
   return {ok:true,url,chrome,profile,pid:child.pid||null};
 }
+async function desktopChromeRestartControlled(request={}){
+  desktopRequireWindows();
+  const profile=desktopProfileDir();
+  const safe=profile.replace(/\x27/g,"\x27\x27");
+  const ps="$p=Get-CimInstance Win32_Process -Filter \"Name = \'chrome.exe\'\" -ErrorAction SilentlyContinue|Where-Object {$_.CommandLine -like \"*"+safe.replace(/\\/g,"\\\\")+"*\"};foreach($x in $p){Stop-Process -Id $x.ProcessId -Force -ErrorAction SilentlyContinue};[pscustomobject]@{Stopped=@($p).Count}|ConvertTo-Json -Compress";
+  await desktopPowershell(ps,15000).catch(()=>null);
+  await new Promise(r=>setTimeout(r,1000));
+  return await desktopChromeOpenUrl({url:request.url||"https://www.esimerge.com/apply"});
+}
 async function desktopChromeCdp(){
   const endpoint="http://127.0.0.1:9222";
   let browser;
@@ -1496,6 +1505,7 @@ async function workspaceTool(tool,request={}){
   if(tool==="desktop.profile.setup")return await desktopProfileSetup(request);
   if(tool==="desktop.chrome_install")return await desktopChromeInstall();
   if(tool==="desktop.chrome_open_url")return await desktopChromeOpenUrl(request);
+  if(tool==="desktop.chrome_restart_controlled")return await desktopChromeRestartControlled(request);
   if(tool==="desktop.chrome_snapshot")return await desktopChromeSnapshot();
   if(tool==="desktop.chrome_fill")return await desktopChromeFill(request);
   if(tool==="desktop.chrome_click")return await desktopChromeClick(request);
