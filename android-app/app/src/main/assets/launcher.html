@@ -97,11 +97,26 @@ button{font:inherit;color:inherit}
 
 <section id="settings" class="page"><div style="display:flex;align-items:center;gap:10px"><button onclick="show('home')" style="border:0;background:#151d22;color:white;width:40px;height:40px;border-radius:20px;font-size:22px">⌂</button><div class="h1" style="margin:12px 0 2px">Settings</div></div><div class="search">⌕ &nbsp;&nbsp; Search settings</div>
 <div class="owner"><div class="roundico" style="background:#111;border:2px solid var(--gold);color:var(--gold);font-weight:900">D</div><div style="flex:1"><b>Dexters Business</b><small>Owner</small></div><div class="arrow">›</div></div>
-<div class="label">Device</div><div class="group"><div class="row" onclick="openDexterSetting('network')"><div class="rIcon"><svg><use href="#i-wifi"/></svg></div><b>Network & Internet</b><div class="arrow">›</div></div><div class="row" onclick="openDexterSetting('devices')"><div class="rIcon"><svg><use href="#i-business"/></svg></div><b>Connected Devices</b><div class="arrow">›</div></div><div class="row" onclick="openDexterSetting('display')"><div class="rIcon"><svg><use href="#i-sun"/></svg></div><b>Display</b><div class="arrow">›</div></div><div class="row" onclick="openDexterSetting('sound')"><div class="rIcon"><svg><use href="#i-msg"/></svg></div><b>Sound & Vibration</b><div class="arrow">›</div></div><div class="row" onclick="openDexterSetting('battery')"><div class="rIcon"><svg><use href="#i-battery"/></svg></div><b>Battery</b><div class="arrow">›</div></div><div class="row" onclick="openDexterSetting('storage')"><div class="rIcon"><svg><use href="#i-storage"/></svg></div><b>Storage</b><div class="arrow">›</div></div><div class="row" onclick="openDexterSetting('security')"><div class="rIcon"><svg><use href="#i-lock"/></svg></div><b>Security & Privacy</b><div class="arrow">›</div></div></div>
+<div class="label">Device</div><div class="group"><div class="row" onclick="openEsim()"><div class="rIcon"><svg><use href="#i-signal"/></svg></div><div><b>Dexter eSIM</b><small id="esimSummary">Checking hardware…</small></div><div class="arrow">›</div></div><div class="row" onclick="openDexterSetting('network')"><div class="rIcon"><svg><use href="#i-wifi"/></svg></div><b>Network & Internet</b><div class="arrow">›</div></div><div class="row" onclick="openDexterSetting('devices')"><div class="rIcon"><svg><use href="#i-business"/></svg></div><b>Connected Devices</b><div class="arrow">›</div></div><div class="row" onclick="openDexterSetting('display')"><div class="rIcon"><svg><use href="#i-sun"/></svg></div><b>Display</b><div class="arrow">›</div></div><div class="row" onclick="openDexterSetting('sound')"><div class="rIcon"><svg><use href="#i-msg"/></svg></div><b>Sound & Vibration</b><div class="arrow">›</div></div><div class="row" onclick="openDexterSetting('battery')"><div class="rIcon"><svg><use href="#i-battery"/></svg></div><b>Battery</b><div class="arrow">›</div></div><div class="row" onclick="openDexterSetting('storage')"><div class="rIcon"><svg><use href="#i-storage"/></svg></div><b>Storage</b><div class="arrow">›</div></div><div class="row" onclick="openDexterSetting('security')"><div class="rIcon"><svg><use href="#i-lock"/></svg></div><b>Security & Privacy</b><div class="arrow">›</div></div></div>
 <div class="label">Dexter</div><div class="group"><div class="row" onclick="url('https://jamiegreen294-boop.github.io/dexters-ai-v1/')"><div class="rIcon"><svg><use href="#i-ai"/></svg></div><b>Dexter AI</b><div class="arrow">›</div></div><div class="row" onclick="show('store')"><div class="rIcon"><svg><use href="#i-office"/></svg></div><b>Dexter Apps</b><div class="arrow">›</div></div><div class="row" onclick="show('control')"><div class="rIcon"><svg><use href="#i-business"/></svg></div><b>Business Tools</b><div class="arrow">›</div></div><div class="row" onclick="show('store')"><div class="rIcon"><svg><use href="#i-store"/></svg></div><b>Dexter Store</b><div class="arrow">›</div></div><div class="row" onclick="show('about')"><div class="rIcon"><svg><use href="#i-user"/></svg></div><b>About Dexter OS</b><div class="arrow">›</div></div></div>
 <div class="label">Access</div><div class="group"><div class="row" onclick="openAccess()"><div class="rIcon"><svg><use href="#i-lock"/></svg></div><div><b>Manager Access</b><small id="accessSummary">Staff mode</small></div><div class="arrow">›</div></div></div>
 <div class="label">Owner</div><div class="group"><div class="row" onclick="openDexterSetting('accounts')"><div class="rIcon"><svg><use href="#i-user"/></svg></div><b>Accounts</b><div class="arrow">›</div></div><div class="row" onclick="openDexterSetting('system')"><div class="rIcon"><svg><use href="#i-gear"/></svg></div><b>System</b><div class="arrow">›</div></div></div></section>
 
+<section id="esim" class="page">
+<div style="display:flex;align-items:center;gap:10px"><button onclick="show('settings')" style="border:0;background:#151d22;color:white;width:40px;height:40px;border-radius:20px;font-size:22px">‹</button><div class="h1" style="margin:12px 0 2px">Dexter eSIM</div></div>
+<div class="owner"><div class="roundico" style="background:#0e2c24;color:#7ef0bd">e</div><div><b id="esimTitle">Checking this phone…</b><small id="esimSub">Dexter Wholesale eSIM</small></div></div>
+<div id="esimHardwareCard" class="group">
+<div class="row"><div class="rIcon">◎</div><div><b>eSIM hardware</b><small id="esimHardware">Checking…</small></div></div>
+<div class="row"><div class="rIcon">▣</div><div><b>Device</b><small id="esimDevice">Dexter Phone</small></div></div>
+</div>
+<div class="label">Assigned profiles</div>
+<div id="esimProfiles" class="group"><div class="row"><div><b>No profiles loaded yet</b><small>Refresh to check Dexter Wholesale.</small></div></div></div>
+<div style="display:flex;gap:10px;margin-top:12px">
+<button onclick="refreshEsim()" style="flex:1;border:0;border-radius:14px;padding:13px;background:#f4cf71;color:#111;font-weight:800">Refresh</button>
+<button onclick="show('settings')" style="flex:1;border:1px solid #3a454c;border-radius:14px;padding:13px;background:#151d22;color:white;font-weight:700">Back</button>
+</div>
+<div id="esimMessage" style="font-size:13px;color:#a9b2b7;padding:12px 4px 18px">The current Meizu can manage wholesale eSIM assignments, but installation requires eUICC hardware.</div>
+</section>
 <section id="access" class="page">
 <div style="display:flex;align-items:center;gap:10px"><button onclick="show('settings')" style="border:0;background:#151d22;color:white;width:40px;height:40px;border-radius:20px;font-size:22px">‹</button><div class="h1" style="margin:12px 0 2px">Manager Access</div></div>
 <div class="owner"><div class="roundico">D</div><div><b id="accessRoleTitle">Staff mode</b><small id="accessRoleSub">Manager and Owner controls are locked.</small></div></div>
@@ -144,6 +159,33 @@ function toggleTorch(){try{const on=!!B().toggleTorch();document.getElementById(
 function toggleDark(){document.documentElement.classList.toggle('dexterLight');showNotice('Dark Mode',document.documentElement.classList.contains('dexterLight')?'Light appearance enabled for this session.':'Dark appearance enabled.')}
 function showNotice(title,body){document.getElementById('noticeTitle').textContent=title;document.getElementById('noticeHeading').textContent=title;document.getElementById('noticeBody').textContent=body;show('notice')}
 let accessSelectedRole='manager',accessExpiresAt=null,accessTimer=null;
+function openEsim(){
+  show('esim');
+  let cap={};
+  try{cap=JSON.parse(B().getEsimLocalCapability()||'{}')}catch(e){}
+  const supported=!!cap.euiccSupported,enabled=!!cap.euiccEnabled;
+  document.getElementById('esimTitle').textContent=supported?(enabled?'eSIM ready':'eSIM hardware detected'):'Wholesale eSIM management';
+  document.getElementById('esimHardware').textContent=supported?(enabled?'Available and enabled':'Detected but unavailable'):'Not fitted in this Meizu';
+  document.getElementById('esimDevice').textContent=(cap.manufacturer||'')+' '+(cap.model||'Dexter Phone');
+  document.getElementById('esimSummary').textContent=supported?'eSIM available':'Wholesale management only';
+  refreshEsim();
+}
+function refreshEsim(){document.getElementById('esimMessage').textContent='Checking Dexter Wholesale…';try{B().refreshEsim()}catch(e){document.getElementById('esimMessage').textContent='Unable to reach Dexter Wholesale.'}}
+window.dexterEsimResult=function(raw){
+  let r={};try{r=typeof raw==='string'?JSON.parse(raw):raw||{}}catch(e){}
+  const msg=document.getElementById('esimMessage'),box=document.getElementById('esimProfiles');
+  if(r.error){msg.textContent=r.error;return}
+  const ps=r.profiles||[];
+  box.innerHTML=ps.length?ps.map(p=>{
+    const plan=p.plan||{},name=plan.name||'Dexter eSIM',net=plan.network_label||'',status=p.status||'issued';
+    const num=p.msisdn?(' · '+p.msisdn):'';
+    return '<div class="row"><div class="rIcon">e</div><div><b>'+name+'</b><small>'+[net,status].filter(Boolean).join(' · ')+num+'</small></div><div class="arrow">›</div></div>';
+  }).join(''):'<div class="row"><div><b>No assigned eSIM profiles</b><small>Profiles assigned in Dexter AI will appear here.</small></div></div>';
+  const st=r.state||{};
+  if(st.euicc_supported===false)msg.textContent='This Meizu has no eUICC. Wholesale profiles can be assigned here but cannot be installed on this handset.';
+  else if(st.euicc_supported===true)msg.textContent='eSIM hardware detected. Assigned profiles are ready for Dexter eSIM installation.';
+  else msg.textContent='Dexter Wholesale is ready. Device capability has not been reported yet.';
+}
 function openAccess(){show('access');try{B().accessStatus()}catch(e){dexterAccessResult(JSON.stringify({error:'Access service unavailable.'}))}}
 function selectAccessRole(role){accessSelectedRole=role;document.getElementById('accessMessage').textContent=(role==='owner'?'Owner':'Manager')+' selected. Enter the PIN to continue.';document.getElementById('accessPin').focus()}
 function submitAccessLogin(){const pin=document.getElementById('accessPin').value.trim();if(!/^\d{6,10}$/.test(pin)){document.getElementById('accessMessage').textContent='Enter a 6–10 digit PIN.';return}document.getElementById('accessMessage').textContent='Checking…';try{B().accessLogin(accessSelectedRole,pin)}catch(e){document.getElementById('accessMessage').textContent='Unable to check PIN.'}}
@@ -246,7 +288,7 @@ document.addEventListener('touchend',e=>{
   if(Math.abs(dx)<70||Math.abs(dx)<=Math.abs(dy))return;
   if(current==='home'&&dx<0)show('control');
   else if(current==='control'&&dx>0)show('home');
-  else if((current==='settings'||current==='store'||current==='about'||current==='settingDetail'||current==='notice'||current==='access')&&dx>0)show('home');
+  else if((current==='settings'||current==='store'||current==='about'||current==='settingDetail'||current==='notice'||current==='access'||current==='esim')&&dx>0)show('home');
 }, {passive:true});
 try{let b=B();let v=b.getBatteryLevel();if(v>=0)document.getElementById('batt').textContent=v+'%';document.getElementById('model').textContent='Business Phone · '+b.getDeviceModel();const w=document.getElementById('wifiState');if(w)w.textContent=b.isWifiEnabled()?'On':'Off';const vb=document.getElementById('volumeBar');if(vb){const vol=b.getMediaVolume();if(vol>=0)vb.style.width=vol+'%'}}catch(e){}
 applyRoleUi();setTimeout(()=>document.getElementById('boot').style.display='none',1500);
