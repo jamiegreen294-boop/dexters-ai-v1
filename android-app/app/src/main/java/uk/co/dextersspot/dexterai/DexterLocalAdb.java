@@ -204,6 +204,81 @@ public final class DexterLocalAdb extends AbsAdbConnectionManager {
         return out;
     }
 
+
+    private synchronized boolean ensureConnected() throws Exception {
+        boolean connected = false;
+        android.content.SharedPreferences p = context.getSharedPreferences("dexter_local_adb", Context.MODE_PRIVATE);
+        String host = p.getString("host", "127.0.0.1");
+        int port = p.getInt("port", 5555);
+        try { connected = connect(host, port); } catch (Exception ignored) {}
+        if (!connected) {
+            try { connected = connectTls(context, 8000L); } catch (Exception ignored) {}
+        }
+        if (!connected) {
+            try { connected = autoConnect(context, 8000L); } catch (Exception ignored) {}
+        }
+        return connected;
+    }
+
+    public synchronized JSONObject captureScreen() {
+        JSONObject out = new JSONObject();
+        try {
+            if (!ensureConnected()) return out.put("connected", false).put("error", "Local ADB connection failed");
+            String b64 = shell("screencap -p | base64 | tr -d '\\n'");
+            return out.put("connected", true).put("mimeType", "image/png").put("base64", b64);
+        } catch (Exception e) {
+            try { return out.put("connected", false).put("error", safe(e)); } catch (Exception ignored) { return out; }
+        }
+    }
+
+    public synchronized JSONObject dumpUi() {
+        JSONObject out = new JSONObject();
+        try {
+            if (!ensureConnected()) return out.put("connected", false).put("error", "Local ADB connection failed");
+            String xml = shell("uiautomator dump /sdcard/dexter-window.xml >/dev/null 2>&1; cat /sdcard/dexter-window.xml");
+            return out.put("connected", true).put("xml", xml);
+        } catch (Exception e) {
+            try { return out.put("connected", false).put("error", safe(e)); } catch (Exception ignored) { return out; }
+        }
+    }
+
+    public synchronized JSONObject inputTap(int x, int y) {
+        return inputCommand("input tap " + x + " " + y, "tap");
+    }
+
+    public synchronized JSONObject inputSwipe(int x1, int y1, int x2, int y2, int durationMs) {
+        int d = Math.max(50, Math.min(durationMs, 5000));
+        return inputCommand("input swipe " + x1 + " " + y1 + " " + x2 + " " + y2 + " " + d, "swipe");
+    }
+
+    public synchronized JSONObject inputKey(String key) {
+        String k = key == null ? "" : key.trim().toUpperCase(java.util.Locale.ROOT);
+        java.util.Set<String> allowed = new java.util.HashSet<>(java.util.Arrays.asList(
+            "BACK","HOME","APP_SWITCH","POWER","WAKEUP","SLEEP","ENTER","DPAD_UP","DPAD_DOWN","DPAD_LEFT","DPAD_RIGHT"
+        ));
+        if (!allowed.contains(k)) {
+            JSONObject out = new JSONObject();
+            try { return out.put("connected", false).put("error", "Unsupported remote key: " + k); } catch (Exception ignored) { return out; }
+        }
+        return inputCommand("input keyevent KEYCODE_" + k, "key");
+    }
+
+    public synchronized JSONObject inputText(String text) {
+        String safeText = text == null ? "" : text.replace("%","%25").replace(" ","%s").replace("&","%26").replace("|","%7C").replace(";","%3B");
+        return inputCommand("input text '" + safeText.replace("'","") + "'", "text");
+    }
+
+    private JSONObject inputCommand(String command, String action) {
+        JSONObject out = new JSONObject();
+        try {
+            if (!ensureConnected()) return out.put("connected", false).put("error", "Local ADB connection failed");
+            String output = shell(command);
+            return out.put("connected", true).put("action", action).put("output", output);
+        } catch (Exception e) {
+            try { return out.put("connected", false).put("error", safe(e)); } catch (Exception ignored) { return out; }
+        }
+    }
+
     private String shell(String command) throws Exception {
         AdbStream stream = openStream("shell:" + command);
         try {
@@ -213,10 +288,10 @@ public final class DexterLocalAdb extends AbsAdbConnectionManager {
             int total = 0;
             int n;
             while ((n = in.read(buf)) > 0) {
-                int allowed = Math.min(n, 32768 - total);
+                int allowed = Math.min(n, 4 * 1024 * 1024 - total);
                 if (allowed > 0) out.write(buf, 0, allowed);
                 total += allowed;
-                if (total >= 32768) break;
+                if (total >= 4 * 1024 * 1024) break;
             }
             return out.toString("UTF-8");
         } finally {
