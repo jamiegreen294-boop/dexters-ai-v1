@@ -32,6 +32,7 @@ import android.webkit.WebViewClient;
 import java.io.ByteArrayOutputStream;
 
 public class DexterHomeActivity extends Activity {
+    private boolean firstResumeDone=false;
     private WebView web;
     private boolean torchOn=false;
     private boolean rotationEnabled=false;
