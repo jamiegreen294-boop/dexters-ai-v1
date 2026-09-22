@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<config>
+    <allow-in-power-save package="uk.co.dextersspot.dexterai"/>
+    <allow-in-power-save package="uk.co.dexter.os.updater"/>
+    <allow-in-data-usage-save package="uk.co.dextersspot.dexterai"/>
+    <allow-in-data-usage-save package="uk.co.dexter.os.updater"/>
+</config>
