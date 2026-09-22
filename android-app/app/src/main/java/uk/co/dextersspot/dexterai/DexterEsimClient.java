@@ -55,7 +55,7 @@ public final class DexterEsimClient {
         JSONArray a=new JSONArray();
         try{
             SubscriptionManager sm=(SubscriptionManager)c.getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE);
-            List<SubscriptionInfo> list=sm==null?null:sm.getAvailableSubscriptionInfoList();
+            List<SubscriptionInfo> list=sm==null?null:sm.getActiveSubscriptionInfoList();
             if(list!=null)for(SubscriptionInfo s:list){
                 if(!s.isEmbedded())continue;
                 a.put(new JSONObject()
