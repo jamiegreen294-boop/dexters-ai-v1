@@ -19,6 +19,7 @@ public class DeviceAgentService extends Service {
     private static final String SEND_CHANNEL = "dexter_send";
     private final Handler handler = new Handler(Looper.getMainLooper());
     private volatile boolean running = false;
+    private volatile Thread workerThread;
 
     public static boolean hasToken(Context c) {
         return readToken(c).length() >= 32;
@@ -60,8 +61,12 @@ public class DeviceAgentService extends Service {
         AgentWatchdogReceiver.schedule(this);
     }
 
-    @Override public int onStartCommand(Intent intent, int flags, int startId) {
-        if (!running) { running = true; new Thread(this::loop, "dexter-phone-agent").start(); }
+    @Override public synchronized int onStartCommand(Intent intent, int flags, int startId) {
+        if (workerThread == null || !workerThread.isAlive()) {
+            running = true;
+            workerThread = new Thread(this::loop, "dexter-phone-agent");
+            workerThread.start();
+        }
         return START_STICKY;
     }
 
@@ -75,10 +80,21 @@ public class DeviceAgentService extends Service {
         super.onTaskRemoved(rootIntent);
     }
 
-    @Override public void onDestroy() { running = false; super.onDestroy(); }
+    @Override public void onDestroy() {
+        running = false;
+        try { if(workerThread!=null) workerThread.interrupt(); } catch(Exception ignored) {}
+        try {
+            Intent restart=new Intent(getApplicationContext(),DeviceAgentService.class);
+            PendingIntent pi=PendingIntent.getService(getApplicationContext(),297,restart,PendingIntent.FLAG_ONE_SHOT|PendingIntent.FLAG_IMMUTABLE);
+            AlarmManager am=(AlarmManager)getSystemService(ALARM_SERVICE);
+            if(am!=null) am.setAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP,SystemClock.elapsedRealtime()+5000,pi);
+        } catch(Exception ignored) {}
+        super.onDestroy();
+    }
     @Override public android.os.IBinder onBind(Intent intent) { return null; }
 
     private void loop() {
+        try {
         while (running) {
             try { DeviceAccessClient.enforceExpiry(this); } catch(Exception ignored) {}
             try {
@@ -96,7 +112,15 @@ public class DeviceAgentService extends Service {
             } catch (Exception e) {
                 recordAgentError("dexterSend: " + String.valueOf(e.getMessage()));
             }
-            try { Thread.sleep(30000); } catch (InterruptedException e) { return; }
+            try { Thread.sleep(15000); } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+        } finally {
+            running = false;
+            workerThread = null;
+            try { AgentWatchdogReceiver.schedule(this); } catch(Exception ignored) {}
         }
     }
 
