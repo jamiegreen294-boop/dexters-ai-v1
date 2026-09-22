@@ -1304,6 +1304,41 @@ async function desktopPowershell(script,timeout=30000){
   desktopRequireWindows();
   return await runProcess("powershell.exe",["-NoProfile","-NonInteractive","-ExecutionPolicy","Bypass","-Command",String(script)],WORKSPACE,timeout);
 }
+async function desktopProfileRequestElevation(){
+  desktopRequireWindows();
+  const dir=path.join(WORKSPACE,"desktop","profile-setup");fs.mkdirSync(dir,{recursive:true});
+  const scriptPath=path.join(dir,"create-dexterai-user.ps1");
+  const resultPath=path.join(dir,"result.json");
+  const q=s=>String(s).replace(/\x27/g,"\x27\x27");
+  const script=[
+    "$ErrorActionPreference=\x27Stop\x27",
+    "$name=\x27DexterAI\x27",
+    "try {",
+    "  $existing=Get-LocalUser -Name $name -ErrorAction SilentlyContinue",
+    "  if(-not $existing){ New-LocalUser -Name $name -NoPassword -AccountNeverExpires -Description \x27Dexter AI standard workstation profile\x27 | Out-Null }",
+    "  try { Remove-LocalGroupMember -Group \x27Administrators\x27 -Member $name -ErrorAction SilentlyContinue } catch {}",
+    "  try { Add-LocalGroupMember -Group \x27Users\x27 -Member $name -ErrorAction SilentlyContinue } catch {}",
+    "  try { Remove-LocalGroupMember -Group \x27Remote Desktop Users\x27 -Member $name -ErrorAction SilentlyContinue } catch {}",
+    "  $u=Get-LocalUser -Name $name",
+    "  $obj=[pscustomobject]@{ok=$true;name=$u.Name;enabled=$u.Enabled;description=$u.Description;is_admin=$false}",
+    "} catch { $obj=[pscustomobject]@{ok=$false;error=$_.Exception.Message} }",
+    "$obj|ConvertTo-Json -Compress|Set-Content -Encoding UTF8 \x27"+q(resultPath)+"\x27"
+  ].join("\r\n");
+  fs.writeFileSync(scriptPath,script,"utf8");
+  try{fs.unlinkSync(resultPath)}catch{}
+  const arg="-NoProfile -ExecutionPolicy Bypass -File \""+scriptPath+"\"";
+  const ps="$p=Start-Process powershell.exe -Verb RunAs -PassThru -ArgumentList \x27"+q(arg)+"\x27;[pscustomobject]@{Pid=$p.Id}|ConvertTo-Json -Compress";
+  const r=await desktopPowershell(ps,15000);
+  if(r.code!==0)throw new Error("Could not request Windows administrator approval: "+String(r.stderr||r.stdout||"unknown error").slice(0,1500));
+  return {ok:true,uac_prompt_requested:true,script:path.relative(WORKSPACE,scriptPath),result:path.relative(WORKSPACE,resultPath)};
+}
+async function desktopProfileElevationStatus(){
+  desktopRequireWindows();
+  const resultPath=path.join(WORKSPACE,"desktop","profile-setup","result.json");
+  if(!fs.existsSync(resultPath))return {completed:false,waiting_for_uac:true};
+  let data={};try{data=JSON.parse(fs.readFileSync(resultPath,"utf8").replace(/^\uFEFF/,""))}catch(e){return {completed:true,ok:false,error:"Could not read setup result."}}
+  return {completed:true,...data};
+}
 async function desktopProfileSetup(request={}){
   desktopRequireWindows();
   const profileDir=desktopProfileDir();
@@ -1419,6 +1454,8 @@ async function desktopPressKey(request={}){
   return {ok:true,key};
 }
 async function workspaceTool(tool,request={}){
+  if(tool==="desktop.profile.request_elevation")return await desktopProfileRequestElevation();
+  if(tool==="desktop.profile.elevation_status")return await desktopProfileElevationStatus();
   if(tool==="desktop.profile.setup")return await desktopProfileSetup(request);
   if(tool==="desktop.chrome_install")return await desktopChromeInstall();
   if(tool==="desktop.chrome_open_url")return await desktopChromeOpenUrl(request);
