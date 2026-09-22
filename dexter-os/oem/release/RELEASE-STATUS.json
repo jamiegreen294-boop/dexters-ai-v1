@@ -1,0 +1,30 @@
+{
+  "product": "Dexter OS",
+  "softwareFoundation": "complete-pending-hardware-bind",
+  "customerSurfaces": {
+    "homeSettingsControlCentre": "implemented",
+    "managerOwnerAccess": "implemented",
+    "playStoreRoleGate": "implemented",
+    "dialerInCall": "oem-module-present",
+    "messaging": "oem-module-present",
+    "files": "oem-module-present",
+    "esim": "oem-module-present",
+    "setup": "oem-module-present",
+    "updater": "oem-module-present",
+    "camera": "customer-surface-present-hardware-pipeline-pending"
+  },
+  "hardwareBindingRequired": [
+    "device tree / BoardConfig",
+    "kernel and vendor image",
+    "modem RIL / IMS",
+    "eUICC / LPA",
+    "camera HAL",
+    "audio HAL",
+    "display / touch / sensors",
+    "AVB and release signing",
+    "device-specific OTA payload",
+    "UK radio / SAR / emergency-call certification"
+  ],
+  "retailReady": false,
+  "retailReadyWhen": "all RELEASE-GATES.md checks pass on the exact production hardware SKU"
+}
