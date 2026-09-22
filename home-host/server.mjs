@@ -1405,14 +1405,15 @@ async function desktopChromeRestartControlled(request={}){
   await new Promise(r=>setTimeout(r,1000));
   return await desktopChromeOpenUrl({url:request.url||"https://www.esimerge.com/apply"});
 }
-async function desktopChromeCdp(){
+async function desktopChromeCdp(request={}){
   const endpoint="http://127.0.0.1:9222";
   let browser;
   try{browser=await chromium.connectOverCDP(endpoint)}catch(e){throw new Error("Dexter visible Chromium is not available for local control.");}
   let page=null;
   for(let i=0;i<20;i++){
     const pages=browser.contexts().flatMap(c=>c.pages());
-    page=pages.find(p=>/esimerge\.com\/apply/.test(p.url()))||[...pages].reverse().find(p=>/^https?:\/\//.test(p.url()))||null;
+    const target=String(request.url_contains||"").toLowerCase();
+    page=(target?[...pages].reverse().find(p=>p.url().toLowerCase().includes(target)):null)||pages.find(p=>/esimerge\.com\/apply/.test(p.url()))||[...pages].reverse().find(p=>/^https?:\/\//.test(p.url()))||null;
     if(page)break;
     await new Promise(r=>setTimeout(r,500));
   }
@@ -1420,12 +1421,12 @@ async function desktopChromeCdp(){
   await page.waitForLoadState("domcontentloaded",{timeout:15000}).catch(()=>{});
   return {browser,page};
 }
-async function desktopChromeSnapshot(){
-  const {browser,page}=await desktopChromeCdp();
+async function desktopChromeSnapshot(request={}){
+  const {browser,page}=await desktopChromeCdp(request);
   try{return await snapshot(page)}finally{}
 }
 async function desktopChromeFill(request={}){
-  const {browser,page}=await desktopChromeCdp();
+  const {browser,page}=await desktopChromeCdp(request);
   try{
     const ref=String(request.ref||"");
     const el=await byRef(page,ref);
@@ -1437,7 +1438,7 @@ async function desktopChromeFill(request={}){
   }finally{}
 }
 async function desktopChromeClick(request={}){
-  const {browser,page}=await desktopChromeCdp();
+  const {browser,page}=await desktopChromeCdp(request);
   try{
     const el=await byRef(page,String(request.ref||""));
     const text=((await el.innerText().catch(()=>""))+" "+String(await el.getAttribute("aria-label")||"")).toLowerCase();
@@ -1511,7 +1512,7 @@ async function workspaceTool(tool,request={}){
   if(tool==="desktop.chrome_install")return await desktopChromeInstall();
   if(tool==="desktop.chrome_open_url")return await desktopChromeOpenUrl(request);
   if(tool==="desktop.chrome_restart_controlled")return await desktopChromeRestartControlled(request);
-  if(tool==="desktop.chrome_snapshot")return await desktopChromeSnapshot();
+  if(tool==="desktop.chrome_snapshot")return await desktopChromeSnapshot(request);
   if(tool==="desktop.chrome_fill")return await desktopChromeFill(request);
   if(tool==="desktop.chrome_click")return await desktopChromeClick(request);
   if(tool==="desktop.chrome_focus")return await desktopChromeFocus(request);
