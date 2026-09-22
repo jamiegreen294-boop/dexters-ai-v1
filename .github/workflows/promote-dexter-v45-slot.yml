@@ -1,0 +1,39 @@
+name: Promote Dexter v45 to propagated slot
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - build/meizu-dexter-os-v45-manager-play-fix
+    paths:
+      - '.github/workflows/promote-dexter-v45-slot.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout gh-pages
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          fetch-depth: 0
+
+      - name: Promote signed v45 with rollback
+        run: |
+          test -f device/Dexter-Business-Phone-v45.apk
+          if [ -f device/Dexter-Business-Phone-v44.apk ] && [ ! -f device/Dexter-Business-Phone-v44-rollback.apk ]; then
+            cp device/Dexter-Business-Phone-v44.apk device/Dexter-Business-Phone-v44-rollback.apk
+          fi
+          cp device/Dexter-Business-Phone-v45.apk device/Dexter-Business-Phone-v44.apk
+          git config user.name "Dexter Build"
+          git config user.email "actions@users.noreply.github.com"
+          git add device/Dexter-Business-Phone-v44.apk device/Dexter-Business-Phone-v44-rollback.apk
+          if git diff --cached --quiet; then
+            echo "Slot already promoted"
+          else
+            git commit -m "Promote Dexter Business Phone v45 to propagated v44 slot"
+            git push origin HEAD:gh-pages
+          fi
