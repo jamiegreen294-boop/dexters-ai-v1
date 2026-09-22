@@ -64,6 +64,7 @@ public class DexterHomeActivity extends Activity {
 
     @Override protected void onResume(){
         super.onResume();
+        DeviceAccessClient.enforceExpiry(this);
         enterImmersive();
         try { if(DeviceAgentService.hasToken(this) || DexterDeviceAdminReceiver.isDeviceOwner(this)) DeviceAgentService.start(this); } catch(Exception ignored) {}
         try {
@@ -223,7 +224,11 @@ public class DexterHomeActivity extends Activity {
                 return human(used)+" used · "+human(free)+" free · "+human(total)+" total";
             } catch(Exception e){ return "Storage unavailable"; }
         }
-        @JavascriptInterface public String getAccessRole(){ return DeviceOwnerPolicy.getAccessRole(DexterHomeActivity.this); }
+        @JavascriptInterface public String getAccessRole(){ DeviceAccessClient.enforceExpiry(DexterHomeActivity.this); return DeviceOwnerPolicy.getAccessRole(DexterHomeActivity.this); }
+        @JavascriptInterface public void accessStatus(){ runAccess("status",null,null); }
+        @JavascriptInterface public void accessLogin(String role,String pin){ runAccess("login",role,pin); }
+        @JavascriptInterface public void accessSetupPin(String role,String pin){ runAccess("setup",role,pin); }
+        @JavascriptInterface public void accessLogout(){ runAccess("logout",null,null); }
         @JavascriptInterface public boolean openPlayStore(){
             try {
                 String role=DeviceOwnerPolicy.getAccessRole(DexterHomeActivity.this);
@@ -234,6 +239,31 @@ public class DexterHomeActivity extends Activity {
                 startActivity(i);
                 return true;
             } catch(Exception e){ return false; }
+        }
+        private void runAccess(String action,String role,String pin){
+            new Thread(()->{
+                try{
+                    org.json.JSONObject r;
+                    if("login".equals(action)) r=DeviceAccessClient.login(DexterHomeActivity.this,role,pin);
+                    else if("setup".equals(action)) r=DeviceAccessClient.setupPin(DexterHomeActivity.this,role,pin);
+                    else if("logout".equals(action)) r=DeviceAccessClient.logout(DexterHomeActivity.this);
+                    else r=DeviceAccessClient.status(DexterHomeActivity.this);
+                    final String payload=r.toString();
+                    runOnUiThread(()->{
+                        if(web!=null)web.evaluateJavascript("window.dexterAccessResult("+org.json.JSONObject.quote(payload)+")",null);
+                    });
+                }catch(DeviceAccessClient.AccessException e){
+                    final String payload=e.payload!=null?e.payload.toString():new org.json.JSONObject().put("error",String.valueOf(e.getMessage())).toString();
+                    runOnUiThread(()->{
+                        if(web!=null)web.evaluateJavascript("window.dexterAccessResult("+org.json.JSONObject.quote(payload)+")",null);
+                    });
+                }catch(Exception e){
+                    final String payload=new org.json.JSONObject().put("error",String.valueOf(e.getMessage())).toString();
+                    runOnUiThread(()->{
+                        if(web!=null)web.evaluateJavascript("window.dexterAccessResult("+org.json.JSONObject.quote(payload)+")",null);
+                    });
+                }
+            },"dexter-access").start();
         }
         @JavascriptInterface public boolean isDeviceOwner(){
             return DexterDeviceAdminReceiver.isDeviceOwner(DexterHomeActivity.this);
