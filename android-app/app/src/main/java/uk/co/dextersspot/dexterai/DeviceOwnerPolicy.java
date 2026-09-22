@@ -52,11 +52,39 @@ public final class DeviceOwnerPolicy {
         try { d.setMaximumTimeToLock(a, 120000L); } catch(Exception ignored) {}
     }
 
+    public static String getAccessRole(Context c) {
+        String role=c.getSharedPreferences("dexter_device",Context.MODE_PRIVATE).getString("access_role","staff");
+        role=role==null?"staff":role.toLowerCase(java.util.Locale.ROOT).trim();
+        return ("owner".equals(role)||"manager".equals(role))?role:"staff";
+    }
+
+    public static JSONObject setAccessRole(Context c,String requestedRole) throws Exception {
+        if(!isOwner(c)) throw new IllegalStateException("Dexter is not Device Owner.");
+        String role=requestedRole==null?"staff":requestedRole.toLowerCase(java.util.Locale.ROOT).trim();
+        if(!"owner".equals(role)&&!"manager".equals(role)&&!"staff".equals(role))
+            throw new IllegalArgumentException("Role must be owner, manager or staff.");
+        c.getSharedPreferences("dexter_device",Context.MODE_PRIVATE).edit().putString("access_role",role).apply();
+        enforcePlayStoreRole(c);
+        return new JSONObject().put("accessRole",role).put("playStoreAllowed",!"staff".equals(role));
+    }
+
+    public static void enforcePlayStoreRole(Context c) {
+        if(!isOwner(c)) return;
+        DevicePolicyManager d=dpm(c); ComponentName a=admin(c);
+        boolean allow=!"staff".equals(getAccessRole(c));
+        try {
+            if(isInstalled(c.getPackageManager(),"com.android.vending"))
+                d.setApplicationHidden(a,"com.android.vending",!allow);
+        } catch(Exception ignored) {}
+    }
+
     public static JSONObject status(Context c) throws Exception {
         JSONObject j=new JSONObject();
         DevicePolicyManager d=dpm(c);
         boolean owner=isOwner(c);
         j.put("deviceOwner", owner);
+        j.put("accessRole", getAccessRole(c));
+        j.put("playStoreAllowed", !"staff".equals(getAccessRole(c)));
         try { j.put("activeAdmin", d!=null && d.isAdminActive(admin(c))); }
         catch(Exception e) { j.put("activeAdmin", owner).put("activeAdminError", safeMessage(e)); }
         try { j.put("organization", owner ? String.valueOf(d.getOrganizationName(admin(c))) : ""); }
@@ -75,6 +103,7 @@ public final class DeviceOwnerPolicy {
         if(!isOwner(c)) throw new IllegalStateException("Dexter is not Device Owner.");
         DevicePolicyManager d=dpm(c); ComponentName a=admin(c);
         applySafeDefaults(c);
+        enforcePlayStoreRole(c);
 
         JSONObject applied=new JSONObject();
         JSONObject skipped=new JSONObject();
@@ -127,6 +156,7 @@ public final class DeviceOwnerPolicy {
             addResolvedPackage(pm,allowed,new Intent(Intent.ACTION_SENDTO,android.net.Uri.parse("smsto:")));
             addResolvedPackage(pm,allowed,new Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE));
 
+            if(!"staff".equals(getAccessRole(c)) && isInstalled(pm,"com.android.vending")) allowed.add("com.android.vending");
             String[] approvedBusinessApps={
                 "com.google.android.gm",
                 "com.whatsapp.w4b",
