@@ -94,7 +94,12 @@ public final class DeviceOwnerPolicy {
             "com.android.dialer",
             "com.android.contacts"
         };
-        try { d.setLockTaskPackages(a,lockPackages); applied.put("lockTaskPackages",new JSONArray(lockPackages)); }
+        try {
+            d.setLockTaskPackages(a,lockPackages);
+            JSONArray locked=new JSONArray();
+            for(String pkg:lockPackages)locked.put(pkg);
+            applied.put("lockTaskPackages",locked);
+        }
         catch(Exception e){ skipped.put("lockTaskPackages",safeMessage(e)); }
         try {
             if(Build.VERSION.SDK_INT>=28)d.setLockTaskFeatures(a,DevicePolicyManager.LOCK_TASK_FEATURE_NONE);
