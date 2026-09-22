@@ -1331,17 +1331,24 @@ async function desktopChromeInstall(){
   desktopRequireWindows();
   const existing=desktopChromeCandidates().find(p=>fs.existsSync(p));
   if(existing)return {ok:true,installed:false,chrome:existing,reason:"already-installed"};
-  let r;
+  let wingetResult=null;
+  try{wingetResult=await runProcess("winget",["install","--id","Google.Chrome","-e","--scope","user","--accept-package-agreements","--accept-source-agreements","--silent"],WORKSPACE,180000);}catch{}
+  await new Promise(x=>setTimeout(x,1500));
+  let chrome=desktopChromeCandidates().find(p=>fs.existsSync(p));
+  if(chrome)return {ok:true,installed:true,chrome,method:"winget-user"};
+  const installerDir=path.join(WORKSPACE,"desktop","installers");fs.mkdirSync(installerDir,{recursive:true});
+  const installer=path.join(installerDir,"chrome_installer.exe");
+  const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),60000);
   try{
-    r=await runProcess("winget",["install","--id","Google.Chrome","-e","--scope","user","--accept-package-agreements","--accept-source-agreements","--silent"],WORKSPACE,180000);
-  }catch(e){
-    throw new Error("Chrome install could not start: "+String(e?.message||e));
-  }
-  if(r.code!==0)throw new Error("Chrome install failed: "+String(r.stderr||r.stdout||"unknown error").slice(0,3000));
-  await new Promise(x=>setTimeout(x,2000));
-  const chrome=desktopChromeCandidates().find(p=>fs.existsSync(p));
-  if(!chrome)throw new Error("Chrome installer completed but chrome.exe was not found.");
-  return {ok:true,installed:true,chrome};
+    const r=await fetch("https://dl.google.com/chrome/install/latest/chrome_installer.exe",{signal:controller.signal,redirect:"follow",cache:"no-store"});
+    if(!r.ok)throw new Error("Chrome download failed HTTP "+r.status);
+    fs.writeFileSync(installer,Buffer.from(await r.arrayBuffer()));
+  }finally{clearTimeout(timer);}
+  const install=await runProcess(installer,["/silent","/install"],installerDir,180000);
+  await new Promise(x=>setTimeout(x,3000));
+  chrome=desktopChromeCandidates().find(p=>fs.existsSync(p));
+  if(!chrome)throw new Error("Chrome install failed. Winget: "+String(wingetResult?.stderr||wingetResult?.stdout||"unavailable").slice(0,1000)+" Installer: "+String(install.stderr||install.stdout||"no chrome.exe").slice(0,1000));
+  return {ok:true,installed:true,chrome,method:"google-official-installer"};
 }
 async function desktopChromeOpenUrl(request={}){
   desktopRequireWindows();
