@@ -16,4 +16,11 @@
         <permission name="android.permission.READ_PRIVILEGED_PHONE_STATE"/>
         <permission name="android.permission.MANAGE_DEVICE_POLICY_MANAGED_SUBSCRIPTIONS"/>
     </privapp-permissions>
+    <privapp-permissions package="uk.co.dexter.os.setup">
+        <permission name="android.permission.WRITE_SECURE_SETTINGS"/>
+    </privapp-permissions>
+    <privapp-permissions package="uk.co.dexter.os.updater">
+        <permission name="android.permission.REBOOT"/>
+        <permission name="android.permission.RECOVERY"/>
+    </privapp-permissions>
 </permissions>
