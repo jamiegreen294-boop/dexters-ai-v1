@@ -1,0 +1,14 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="uk.co.dexter.os.messaging">
+ <uses-permission android:name="android.permission.SEND_SMS"/><uses-permission android:name="android.permission.READ_SMS"/>
+ <uses-permission android:name="android.permission.RECEIVE_SMS"/><uses-permission android:name="android.permission.READ_PHONE_STATE"/>
+ <application android:theme="@android:style/Theme.Material.NoActionBar" android:label="Dexter Messages">
+  <activity android:name=".MainActivity" android:exported="true">
+   <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
+   <intent-filter><action android:name="android.intent.action.SENDTO"/><category android:name="android.intent.category.DEFAULT"/>
+    <data android:scheme="sms"/><data android:scheme="smsto"/></intent-filter>
+  </activity>
+  <receiver android:name=".SmsReceiver" android:permission="android.permission.BROADCAST_SMS" android:exported="true">
+   <intent-filter><action android:name="android.provider.Telephony.SMS_DELIVER"/></intent-filter>
+  </receiver>
+ </application>
+</manifest>
