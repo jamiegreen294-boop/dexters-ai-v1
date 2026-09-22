@@ -9,7 +9,7 @@ import android.os.SystemClock;
 
 public class AgentWatchdogReceiver extends BroadcastReceiver {
     private static final int REQUEST_CODE = 296;
-    private static final long INTERVAL_MS = 5 * 60 * 1000L;
+    private static final long INTERVAL_MS = 60 * 1000L;
 
     @Override public void onReceive(Context context, Intent intent) {
         if (DeviceAgentService.hasToken(context) || DexterDeviceAdminReceiver.isDeviceOwner(context)) {
