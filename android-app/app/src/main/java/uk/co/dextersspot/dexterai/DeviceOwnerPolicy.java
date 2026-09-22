@@ -2,6 +2,7 @@ package uk.co.dextersspot.dexterai;
 
 import android.app.admin.DevicePolicyManager;
 import android.app.admin.SystemUpdatePolicy;
+import android.Manifest;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -72,6 +73,7 @@ public final class DeviceOwnerPolicy {
 
         JSONObject applied=new JSONObject();
         JSONObject skipped=new JSONObject();
+        applyCommercialShellPolicy(c,applied,skipped);
 
         applyRestriction(d,a,UserManager.DISALLOW_ADD_USER,"disallowAddUser",applied,skipped);
         applyRestriction(d,a,UserManager.DISALLOW_REMOVE_USER,"disallowRemoveUser",applied,skipped);
@@ -105,6 +107,36 @@ public final class DeviceOwnerPolicy {
         j.put("partial",skipped.length()>0);
         j.put("status",status(c));
         return j;
+    }
+
+    private static void applyCommercialShellPolicy(Context c, JSONObject applied, JSONObject skipped){
+        DevicePolicyManager d=dpm(c); ComponentName a=admin(c);
+        try {
+            d.setLockTaskPackages(a,new String[]{c.getPackageName()});
+            applied.put("lockTaskPackage",true);
+        } catch(Exception e){ try{skipped.put("lockTaskPackage",safeMessage(e));}catch(Exception ignored){} }
+        if(Build.VERSION.SDK_INT>=28){
+            try {
+                d.setLockTaskFeatures(a,DevicePolicyManager.LOCK_TASK_FEATURE_NONE);
+                applied.put("systemUiLocked",true);
+            } catch(Exception e){ try{skipped.put("systemUiLocked",safeMessage(e));}catch(Exception ignored){} }
+        }
+        if(Build.VERSION.SDK_INT>=23){
+            try { applied.put("statusBarDisabled",d.setStatusBarDisabled(a,true)); }
+            catch(Exception e){ try{skipped.put("statusBarDisabled",safeMessage(e));}catch(Exception ignored){} }
+            try { applied.put("keyguardDisabled",d.setKeyguardDisabled(a,true)); }
+            catch(Exception e){ try{skipped.put("keyguardDisabled",safeMessage(e));}catch(Exception ignored){} }
+        }
+        try {
+            d.setPermissionGrantState(a,c.getPackageName(),Manifest.permission.CAMERA,DevicePolicyManager.PERMISSION_GRANT_STATE_GRANTED);
+            applied.put("cameraPermissionManaged",true);
+        } catch(Exception e){ try{skipped.put("cameraPermissionManaged",safeMessage(e));}catch(Exception ignored){} }
+        if(Build.VERSION.SDK_INT>=33){
+            try {
+                d.setPermissionGrantState(a,c.getPackageName(),Manifest.permission.POST_NOTIFICATIONS,DevicePolicyManager.PERMISSION_GRANT_STATE_GRANTED);
+                applied.put("notificationPermissionManaged",true);
+            } catch(Exception e){ try{skipped.put("notificationPermissionManaged",safeMessage(e));}catch(Exception ignored){} }
+        }
     }
 
     private static void applyRestriction(DevicePolicyManager d,ComponentName a,String restriction,String label,JSONObject applied,JSONObject skipped){
