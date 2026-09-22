@@ -42,6 +42,11 @@ jobs:
             dexter-os/oem/aosp/permissions/default-permissions-dexter.xml
             dexter-os/oem/policies/ota-policy.json
             dexter-os/oem/policies/provisioning.json
+            dexter-os/oem/policies/esim-policy.json
+            dexter-os/oem/ESIM-HARDWARE-REQUIREMENTS.md
+            dexter-os/oem/aosp/apps/DexterEsim/Android.bp
+            dexter-os/oem/aosp/apps/DexterEsim/AndroidManifest.xml
+            dexter-os/oem/aosp/apps/DexterEsim/src/uk/co/dexter/os/esim/EsimActivity.java
             dexter-os/oem/factory/factory-provisioning.json
           )
           for f in "${required[@]}"; do test -s "$f" || { echo "Missing $f"; exit 1; }; done
@@ -59,3 +64,6 @@ jobs:
           grep -q 'privapp-permissions-dexter.xml' dexter-os/oem/aosp/dexter_os_common.mk
           grep -q 'certificate: "platform"' dexter-os/oem/aosp/prebuilts/Android.bp
           grep -q 'uk.co.dextersspot.dexterai' dexter-os/oem/aosp/permissions/privapp-permissions-dexter.xml
+          grep -q 'DexterEsim' dexter-os/oem/aosp/dexter_os_common.mk
+          grep -q 'android.hardware.telephony.euicc' dexter-os/oem/aosp/apps/DexterEsim/AndroidManifest.xml
+          grep -q 'WRITE_EMBEDDED_SUBSCRIPTIONS' dexter-os/oem/aosp/permissions/privapp-permissions-dexter.xml
