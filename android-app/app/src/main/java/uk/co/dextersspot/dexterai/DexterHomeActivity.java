@@ -19,6 +19,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.StatFs;
+import android.provider.Settings;
 import android.util.Base64;
 import android.view.View;
 import android.view.WindowManager;
@@ -265,6 +266,33 @@ public class DexterHomeActivity extends Activity {
                 startActivity(i);
                 return true;
             } catch(Exception e){ return false; }
+        }
+        @JavascriptInterface public boolean openRemoteControlSetup(){
+            try {
+                String role=DeviceOwnerPolicy.getAccessRole(DexterHomeActivity.this);
+                if(!("manager".equals(role)||"owner".equals(role))) return false;
+                try { stopLockTask(); } catch(Exception ignored) {}
+                Intent i=new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS);
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(i);
+                return true;
+            } catch(Exception e){ return false; }
+        }
+        @JavascriptInterface public boolean openWirelessDebugging(){
+            try {
+                String role=DeviceOwnerPolicy.getAccessRole(DexterHomeActivity.this);
+                if(!("manager".equals(role)||"owner".equals(role))) return false;
+                try { stopLockTask(); } catch(Exception ignored) {}
+                Intent i;
+                if(Build.VERSION.SDK_INT>=30) i=new Intent("android.settings.WIRELESS_DEBUGGING_SETTINGS");
+                else i=new Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS);
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(i);
+                return true;
+            } catch(Exception e){ return false; }
+        }
+        @JavascriptInterface public boolean isRemoteControlReady(){
+            return DexterRemoteAccessibilityService.isReady();
         }
         private void runAccess(String action,String role,String pin){
             new Thread(()->{
