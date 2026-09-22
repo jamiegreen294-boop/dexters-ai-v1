@@ -37,6 +37,13 @@
       "manager",
       "staff"
     ],
-    "policy": "Only approved business apps are surfaced to staff"
+    "policy": "Only approved business apps are surfaced to staff",
+    "playStoreAccess": {
+      "staff": false,
+      "manager": true,
+      "owner": true,
+      "mode": "role-gated",
+      "package": "com.android.vending"
+    }
   }
 }
