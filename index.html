@@ -79,6 +79,8 @@ pre{white-space:pre-wrap;word-break:break-word;background:#090b10;padding:12px;b
       <div id="esimDevices" class="list"></div>
       <div class="sectiontitle">Profile inventory</div>
       <div id="esimProfilesAdmin" class="list"></div>
+      <div class="sectiontitle">Subscriptions & usage</div>
+      <div id="esimSubscriptions" class="list"></div>
       <div class="sectiontitle">Orders</div>
       <div id="esimOrders" class="list"></div>
     </div>
@@ -166,17 +168,17 @@ async function refresh(){
  try{const [h,d,c]=await Promise.all([api('health'),api('dashboard'),api('connectors')]);showHealth(h);d.connectors=c.connectors||d.connectors;renderDashboard(d)}catch(e){note(e.message)}
 }
 
-let esimState={providers:[],plans:[],profiles:[],orders:[],devices:[],phones:[]};
+let esimState={providers:[],plans:[],profiles:[],orders:[],devices:[],phones:[],subscriptions:[]};
 function esimOptions(rows,labelFn,empty='Select…'){return '<option value="">'+empty+'</option>'+rows.map(x=>'<option value="'+esc(x.id)+'">'+esc(labelFn(x))+'</option>').join('')}
 async function loadEsim(){
  try{
-  const [pv,pl,pr,or,ds,ph]=await Promise.all([
-    api('esim_provider_list'),api('esim_plan_list'),api('esim_profile_list'),api('esim_order_list'),api('esim_device_state_list'),api('device_list')
+  const [pv,pl,pr,or,ds,ph,su]=await Promise.all([
+    api('esim_provider_list'),api('esim_plan_list'),api('esim_profile_list'),api('esim_order_list'),api('esim_device_state_list'),api('device_list'),api('esim_subscription_list')
   ]);
-  esimState={providers:pv.providers||[],plans:pl.plans||[],profiles:pr.profiles||[],orders:or.orders||[],devices:ds.devices||[],phones:ph.devices||[]};
+  esimState={providers:pv.providers||[],plans:pl.plans||[],profiles:pr.profiles||[],orders:or.orders||[],devices:ds.devices||[],phones:ph.devices||[],subscriptions:su.subscriptions||[]};
   $('esimMetrics').innerHTML=[
     ['Providers',esimState.providers.length],['Plans',esimState.plans.filter(x=>x.active).length],['Profiles',esimState.profiles.length],
-    ['Orders',esimState.orders.length],['eUICC phones',esimState.devices.filter(x=>x.euicc_supported).length],['Assigned',esimState.profiles.filter(x=>x.assigned_device_id).length]
+    ['Orders',esimState.orders.length],['Active',esimState.subscriptions.filter(x=>x.status==='active').length],['eUICC phones',esimState.devices.filter(x=>x.euicc_supported).length]
   ].map(x=>'<div class="metric"><b>'+x[1]+'</b><span>'+x[0]+'</span></div>').join('');
 
   const providerOpts=esimOptions(esimState.providers,x=>x.name+' · '+x.status,'Choose provider');
@@ -197,6 +199,15 @@ async function loadEsim(){
     const buttons=unassigned?'<div class="actions">'+esimState.phones.slice(0,5).map(d=>'<button class="btn secondary" onclick="assignEsim(\''+esc(p.id)+'\',\''+esc(d.id)+'\')">Assign '+esc(d.name||d.model||'phone')+'</button>').join('')+'</div>':'';
     return '<div class="item"><div class="row"><b>'+esc(plan.name||p.provider_profile_ref||'eSIM profile')+'</b><span class="status">'+esc(p.status)+'</span></div><p>'+esc([plan.network_label,p.msisdn,p.iccid].filter(Boolean).join(' · '))+'</p><p>'+(dev.name?'Assigned: '+esc(dev.name):'Unassigned')+'</p>'+buttons+'</div>';
   }).join('')||'<div class="small">No wholesale profiles imported yet.</div>';
+
+  $('esimSubscriptions').innerHTML=esimState.subscriptions.map(s=>{
+    const plan=s.dexter_esim_plans||{},dev=s.dexter_phone_devices||{},u=s.latest_usage||{};
+    const allowance=[];
+    if(u.data_remaining_mb!=null)allowance.push(Math.round(Number(u.data_remaining_mb))+' MB data left');
+    if(u.voice_remaining_minutes!=null)allowance.push(Math.round(Number(u.voice_remaining_minutes))+' mins left');
+    if(u.sms_remaining!=null)allowance.push(String(u.sms_remaining)+' SMS left');
+    return '<div class="item"><div class="row"><b>'+esc(plan.name||'Dexter eSIM subscription')+'</b><span class="status">'+esc(s.status)+'</span></div><p>'+esc((dev.name||dev.model||s.customer_ref||'Unassigned')+(plan.network_label?' · '+plan.network_label:''))+'</p><p>'+esc(allowance.join(' · ')||(s.renews_at?'Renews '+fmtDate(s.renews_at):'No usage snapshot yet'))+'</p></div>';
+  }).join('')||'<div class="small">No active subscriptions yet.</div>';
 
   $('esimOrders').innerHTML=esimState.orders.map(o=>'<div class="item"><div class="row"><b>'+esc(o.order_ref||'eSIM order')+'</b><span class="status">'+esc(o.status)+'</span></div><p>'+esc((o.dexter_esim_plans?.name||'')+(o.dexter_phone_devices?.name?' · '+o.dexter_phone_devices.name:''))+'</p><p>'+esc(fmtDate(o.created_at))+(o.error?' · '+esc(o.error):'')+'</p></div>').join('')||'<div class="small">No eSIM orders yet.</div>';
 
