@@ -1,0 +1,43 @@
+{
+  "feature": "Dexter Manager and Owner access",
+  "defaultRole": "staff",
+  "roles": {
+    "staff": {
+      "elevated": false,
+      "playStore": false
+    },
+    "manager": {
+      "elevated": true,
+      "sessionMinutes": 15,
+      "playStore": true
+    },
+    "owner": {
+      "elevated": true,
+      "sessionMinutes": 30,
+      "playStore": true,
+      "canConfigurePins": true
+    }
+  },
+  "pinPolicy": {
+    "digitsOnly": true,
+    "minimumLength": 6,
+    "maximumLength": 10,
+    "hashOnlyAtRest": true,
+    "failedAttemptsBeforeLockout": 5,
+    "lockoutMinutes": 15,
+    "plaintextStorageForbidden": true
+  },
+  "sessionPolicy": {
+    "serverValidated": true,
+    "autoReturnToStaff": true,
+    "endOnManualLock": true,
+    "endOnCredentialReset": true
+  },
+  "fleetManagement": {
+    "ownerCanViewDevices": true,
+    "ownerCanSetDeviceRole": true,
+    "ownerCanResetElevatedCredentials": true,
+    "ownerCanRemoteLock": true,
+    "auditEveryAccessEvent": true
+  }
+}
