@@ -4,7 +4,7 @@ $base = "https://raw.githubusercontent.com/jamiegreen294-boop/dexters-ai-v1/buil
 $root = Join-Path $env:USERPROFILE "DexterAI\dexters-ai-v1-build-real-dexter-ai\home-host"
 New-Item -ItemType Directory -Force -Path $root | Out-Null
 
-$files = @("server.mjs","START-DEXTER.bat","WATCHDOG.ps1","REGISTER-AUTOSTART.ps1")
+$files = @("server.mjs","START-DEXTER.bat","WATCHDOG.ps1","GUARDIAN.ps1","REGISTER-AUTOSTART.ps1")
 foreach($f in $files){
   $u = $base + $f + "?t=" + [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
   Invoke-WebRequest -UseBasicParsing $u -OutFile (Join-Path $root $f)
@@ -21,7 +21,7 @@ try {
   try {
     $h = Invoke-RestMethod -Uri "http://127.0.0.1:8787/health" -TimeoutSec 5
     if($h.status -ne "ready"){ throw "Health endpoint not ready." }
-    Write-Host "DEXTER_OK"
+    Write-Host "DEXTER_OK - guardian installed"
   } catch {
     Start-ScheduledTask -TaskName "Dexter AI Home Host" -ErrorAction SilentlyContinue
     Start-Sleep -Seconds 8
