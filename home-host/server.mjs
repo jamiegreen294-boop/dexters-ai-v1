@@ -1425,6 +1425,27 @@ async function desktopChromeSnapshot(request={}){
   const {browser,page}=await desktopChromeCdp(request);
   try{return await snapshot(page)}finally{}
 }
+let desktopSecretKeyPair=null;
+async function desktopSecretPublicKey(){
+  if(!desktopSecretKeyPair){
+    desktopSecretKeyPair=crypto.generateKeyPairSync("rsa",{modulusLength:2048,publicKeyEncoding:{type:"spki",format:"pem"},privateKeyEncoding:{type:"pkcs8",format:"pem"}});
+  }
+  return {algorithm:"RSA-OAEP-SHA256",public_key_pem:desktopSecretKeyPair.publicKey};
+}
+async function desktopChromeFillSecret(request={}){
+  if(!desktopSecretKeyPair)throw new Error("Secure secret session not initialised.");
+  const {browser,page}=await desktopChromeCdp(request);
+  try{
+    const el=await byRef(page,String(request.ref||""));
+    const type=String(await el.getAttribute("type")||"").toLowerCase();
+    if(type!=="password")throw new Error("Secure fill is restricted to password fields.");
+    const cipher=Buffer.from(String(request.ciphertext_b64||""),"base64");
+    if(!cipher.length)throw new Error("Encrypted secret is required.");
+    const plain=crypto.privateDecrypt({key:desktopSecretKeyPair.privateKey,oaepHash:"sha256",padding:crypto.constants.RSA_PKCS1_OAEP_PADDING},cipher).toString("utf8");
+    try{await el.fill(plain)}finally{ /* plaintext never returned or logged */ }
+    return {ok:true,url:page.url(),field_type:"password"};
+  }finally{}
+}
 async function desktopChromeFill(request={}){
   const {browser,page}=await desktopChromeCdp(request);
   try{
@@ -1513,6 +1534,8 @@ async function workspaceTool(tool,request={}){
   if(tool==="desktop.chrome_open_url")return await desktopChromeOpenUrl(request);
   if(tool==="desktop.chrome_restart_controlled")return await desktopChromeRestartControlled(request);
   if(tool==="desktop.chrome_snapshot")return await desktopChromeSnapshot(request);
+  if(tool==="desktop.secret.public_key")return await desktopSecretPublicKey();
+  if(tool==="desktop.chrome_fill_secret")return await desktopChromeFillSecret(request);
   if(tool==="desktop.chrome_fill")return await desktopChromeFill(request);
   if(tool==="desktop.chrome_click")return await desktopChromeClick(request);
   if(tool==="desktop.chrome_focus")return await desktopChromeFocus(request);
