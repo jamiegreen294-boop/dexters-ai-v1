@@ -188,6 +188,7 @@ public class DeviceAgentService extends Service {
             case "device.apps.protect": return DeviceOwnerPolicy.protectApps(this,req.optJSONArray("packages"));
             case "device.config.snapshot": return DeviceOwnerPolicy.configurationSnapshot(this);
             case "device.config.restore": return DeviceOwnerPolicy.restoreStandardConfiguration(this);
+            case "device.pos.configure": return configurePos(req);
             case "apps.inventory": return appInventory();
             case "device.local_adb.shell": return DexterLocalAdb.get(this).runShellCommand(req.getString("command"));
             case "device.screen.capture": return DexterLocalAdb.get(this).captureScreen();
@@ -202,6 +203,17 @@ public class DeviceAgentService extends Service {
             case "app.uninstall": return requestUninstall(req.getString("packageName"));
             default: throw new IllegalArgumentException("Unsupported job: "+type);
         }
+    }
+
+    private JSONObject configurePos(JSONObject req) throws Exception {
+        String deviceId=req.optString("deviceId","");
+        String deviceSecret=req.optString("deviceSecret","");
+        if(deviceId.isEmpty() || deviceSecret.length()<32) throw new Exception("POS device credentials are incomplete.");
+        getSharedPreferences("dexter_pos",MODE_PRIVATE).edit()
+            .putString("device_id",deviceId)
+            .putString("device_secret",deviceSecret)
+            .apply();
+        return new JSONObject().put("configured",true).put("deviceId",deviceId);
     }
 
     private JSONObject deviceHealth() throws Exception {
