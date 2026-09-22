@@ -37,6 +37,7 @@ pre{white-space:pre-wrap;word-break:break-word;background:#090b10;padding:12px;b
 <button data-tab="learning">📚 Learning</button>
 <div class="navtitle desktop-only">System</div>
 <button data-tab="phones">📱 Phones</button>
+<button data-tab="esim">📶 eSIM</button>
 <button data-tab="connections">🔌 Connections</button>
 <button data-tab="health">🩺 Health</button>
 <button data-tab="activity">🧾 Activity</button>
@@ -67,6 +68,55 @@ pre{white-space:pre-wrap;word-break:break-word;background:#090b10;padding:12px;b
 </div>
 </section>
 
+<section id="p-esim" class="panel">
+<div class="grid2">
+  <div class="card">
+    <div class="head"><h2>Dexter Wholesale eSIM</h2><button class="btn secondary" onclick="loadEsim()">Refresh</button></div>
+    <div class="body">
+      <div class="small">Wholesale catalogue, profile stock, device assignment and eSIM capability. Provider API credentials stay server-side.</div>
+      <div id="esimMetrics" class="grid3" style="margin-top:12px"></div>
+      <div class="sectiontitle">Phones</div>
+      <div id="esimDevices" class="list"></div>
+      <div class="sectiontitle">Profile inventory</div>
+      <div id="esimProfilesAdmin" class="list"></div>
+      <div class="sectiontitle">Orders</div>
+      <div id="esimOrders" class="list"></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="head"><h2>Wholesale setup</h2><span class="pill">Owner</span></div>
+    <div class="body workbox">
+      <div class="sectiontitle">Add / update plan</div>
+      <select id="esimPlanProvider"></select>
+      <input id="esimPlanName" class="input" placeholder="Plan name">
+      <input id="esimPlanNetwork" class="input" placeholder="Network / carrier label">
+      <input id="esimPlanCountry" class="input" placeholder="Country code, e.g. GB">
+      <input id="esimPlanData" class="input" type="number" min="0" placeholder="Data allowance MB">
+      <input id="esimPlanDays" class="input" type="number" min="1" placeholder="Validity days">
+      <input id="esimPlanWholesale" class="input" type="number" min="0" placeholder="Wholesale cost pence">
+      <input id="esimPlanRetail" class="input" type="number" min="0" placeholder="Retail price pence">
+      <button class="btn" onclick="saveEsimPlan()">Save plan</button>
+
+      <div class="sectiontitle">Import wholesale profile</div>
+      <select id="esimProfileProvider"></select>
+      <select id="esimProfilePlan"></select>
+      <input id="esimProfileRef" class="input" placeholder="Provider profile reference">
+      <input id="esimProfileIccid" class="input" placeholder="ICCID (optional)">
+      <input id="esimProfileMsisdn" class="input" placeholder="Mobile number (optional)">
+      <input id="esimActivationRef" class="input" placeholder="Activation reference / SM-DP+ matching reference">
+      <button class="btn" onclick="importEsimProfile()">Import profile</button>
+
+      <div class="sectiontitle">Create wholesale order</div>
+      <select id="esimOrderPlan"></select>
+      <select id="esimOrderDevice"></select>
+      <input id="esimCustomerRef" class="input" placeholder="Customer / account reference">
+      <button class="btn" onclick="createEsimOrder()">Create order</button>
+      <div id="esimAdminNote" class="small">Provider API connection is pending your wholesale supplier credentials.</div>
+    </div>
+  </div>
+</div>
+</section>
+
 <section id="p-memory" class="panel"><div class="grid2"><div class="card"><div class="head"><h2>Approved memory</h2></div><div class="body"><div id="memoryList" class="list"></div></div></div><div class="card"><div class="head"><h2>Add memory</h2></div><div class="body workbox"><input id="memoryCategory" class="input" value="business" placeholder="Category"><textarea id="memoryContent" placeholder="A durable fact or rule Dexter should remember…"></textarea><button id="addMemory" class="btn">Add approved memory</button><div class="small">Only durable facts belong here. Conversation history is stored separately.</div></div></div></div></section>
 <section id="p-learning" class="panel"><div class="grid2"><div class="card"><div class="head"><h2>Verified learning</h2></div><div class="body"><div id="learningList" class="list"></div></div></div><div class="card"><div class="head"><h2>Research & learn</h2></div><div class="body workbox"><input id="learnCategory" class="input" value="operations" placeholder="Category"><textarea id="learnTopic" placeholder="Topic Dexter should research and learn about…"></textarea><button id="learnBtn" class="btn">Queue research</button><div class="small">Learning is queued through the Home PC research worker and only verified notes are used as trusted context.</div></div></div></div></section>
 
@@ -87,7 +137,7 @@ async function api(action,extra={}){const r=await fetch(EP,{method:'POST',header
 function addMsg(role,text,meta=''){const e=document.createElement('div');e.className='msg '+role;e.textContent=text;if(meta){const m=document.createElement('div');m.className='meta';m.textContent=meta;e.append(m)}$('chat').append(e);$('chat').scrollTop=$('chat').scrollHeight}
 function item(title,meta='',status=''){return '<div class="item"><div class="row"><b>'+esc(title)+'</b>'+(status?'<span class="status">'+esc(status)+'</span>':'')+'</div>'+(meta?'<p>'+esc(meta)+'</p>':'')+'</div>'}
 function fmtDate(v){try{return new Date(v).toLocaleString('en-GB')}catch{return String(v||'')}}
-function setTab(name){document.querySelectorAll('.nav button[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));$('p-'+name)?.classList.add('active');if(name==='phones')loadPhones()}
+function setTab(name){document.querySelectorAll('.nav button[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));$('p-'+name)?.classList.add('active');if(name==='phones')loadPhones();if(name==='esim')loadEsim()}
 document.querySelectorAll('.nav button[data-tab]').forEach(b=>b.onclick=()=>setTab(b.dataset.tab));
 
 function showHealth(h){
@@ -115,6 +165,76 @@ function renderDashboard(d){
 async function refresh(){
  try{const [h,d,c]=await Promise.all([api('health'),api('dashboard'),api('connectors')]);showHealth(h);d.connectors=c.connectors||d.connectors;renderDashboard(d)}catch(e){note(e.message)}
 }
+
+let esimState={providers:[],plans:[],profiles:[],orders:[],devices:[],phones:[]};
+function esimOptions(rows,labelFn,empty='Select…'){return '<option value="">'+empty+'</option>'+rows.map(x=>'<option value="'+esc(x.id)+'">'+esc(labelFn(x))+'</option>').join('')}
+async function loadEsim(){
+ try{
+  const [pv,pl,pr,or,ds,ph]=await Promise.all([
+    api('esim_provider_list'),api('esim_plan_list'),api('esim_profile_list'),api('esim_order_list'),api('esim_device_state_list'),api('device_list')
+  ]);
+  esimState={providers:pv.providers||[],plans:pl.plans||[],profiles:pr.profiles||[],orders:or.orders||[],devices:ds.devices||[],phones:ph.devices||[]};
+  $('esimMetrics').innerHTML=[
+    ['Providers',esimState.providers.length],['Plans',esimState.plans.filter(x=>x.active).length],['Profiles',esimState.profiles.length],
+    ['Orders',esimState.orders.length],['eUICC phones',esimState.devices.filter(x=>x.euicc_supported).length],['Assigned',esimState.profiles.filter(x=>x.assigned_device_id).length]
+  ].map(x=>'<div class="metric"><b>'+x[1]+'</b><span>'+x[0]+'</span></div>').join('');
+
+  const providerOpts=esimOptions(esimState.providers,x=>x.name+' · '+x.status,'Choose provider');
+  $('esimPlanProvider').innerHTML=providerOpts;$('esimProfileProvider').innerHTML=providerOpts;
+  const planOpts=esimOptions(esimState.plans,x=>x.name+(x.network_label?' · '+x.network_label:''),'Choose plan');
+  $('esimProfilePlan').innerHTML=planOpts;$('esimOrderPlan').innerHTML=planOpts;
+  $('esimOrderDevice').innerHTML=esimOptions(esimState.phones,x=>(x.name||x.model||'Dexter Phone')+' · '+(x.app_version||''),'No device / assign later');
+
+  $('esimDevices').innerHTML=esimState.phones.map(p=>{
+    const st=esimState.devices.find(x=>x.device_id===p.id);
+    const cap=st?(st.euicc_supported?(st.euicc_enabled?'eSIM ready':'eUICC detected'):'No eUICC'):'Not reported';
+    return '<div class="item"><div class="row"><b>'+esc(p.name||p.model||'Dexter Phone')+'</b><span class="status">'+esc(cap)+'</span></div><p>'+esc((p.manufacturer||'')+' '+(p.model||'')+' · '+(p.app_version||''))+'</p><p>Last report: '+esc(st?fmtDate(st.last_checked_at):'never')+'</p></div>';
+  }).join('')||'<div class="small">No paired phones.</div>';
+
+  $('esimProfilesAdmin').innerHTML=esimState.profiles.map(p=>{
+    const plan=p.dexter_esim_plans||{},dev=p.dexter_phone_devices||{};
+    const unassigned=!p.assigned_device_id;
+    const buttons=unassigned?'<div class="actions">'+esimState.phones.slice(0,5).map(d=>'<button class="btn secondary" onclick="assignEsim(\''+esc(p.id)+'\',\''+esc(d.id)+'\')">Assign '+esc(d.name||d.model||'phone')+'</button>').join('')+'</div>':'';
+    return '<div class="item"><div class="row"><b>'+esc(plan.name||p.provider_profile_ref||'eSIM profile')+'</b><span class="status">'+esc(p.status)+'</span></div><p>'+esc([plan.network_label,p.msisdn,p.iccid].filter(Boolean).join(' · '))+'</p><p>'+(dev.name?'Assigned: '+esc(dev.name):'Unassigned')+'</p>'+buttons+'</div>';
+  }).join('')||'<div class="small">No wholesale profiles imported yet.</div>';
+
+  $('esimOrders').innerHTML=esimState.orders.map(o=>'<div class="item"><div class="row"><b>'+esc(o.order_ref||'eSIM order')+'</b><span class="status">'+esc(o.status)+'</span></div><p>'+esc((o.dexter_esim_plans?.name||'')+(o.dexter_phone_devices?.name?' · '+o.dexter_phone_devices.name:''))+'</p><p>'+esc(fmtDate(o.created_at))+(o.error?' · '+esc(o.error):'')+'</p></div>').join('')||'<div class="small">No eSIM orders yet.</div>';
+
+  const pending=esimState.providers.find(x=>x.code==='wholesale-pending');
+  $('esimAdminNote').textContent=pending&&pending.status!=='active'?'Wholesale provider adapter is ready for your supplier API credentials. No provider credentials are stored in the phone.':'Wholesale provider active.';
+ }catch(e){note(e.message)}
+}
+async function saveEsimPlan(){
+ try{
+  const d=await api('esim_plan_upsert',{
+    providerId:$('esimPlanProvider').value||null,name:$('esimPlanName').value.trim(),networkLabel:$('esimPlanNetwork').value.trim(),
+    countryCode:$('esimPlanCountry').value.trim(),allowanceMb:$('esimPlanData').value===''?null:Number($('esimPlanData').value),
+    durationDays:$('esimPlanDays').value===''?null:Number($('esimPlanDays').value),wholesaleCostPence:$('esimPlanWholesale').value===''?null:Number($('esimPlanWholesale').value),
+    retailPricePence:$('esimPlanRetail').value===''?null:Number($('esimPlanRetail').value),currency:'GBP'
+  });
+  note('eSIM plan saved: '+d.plan.name);await loadEsim();
+ }catch(e){note(e.message)}
+}
+async function importEsimProfile(){
+ try{
+  const d=await api('esim_profile_import',{
+    providerId:$('esimProfileProvider').value||null,planId:$('esimProfilePlan').value||null,providerProfileRef:$('esimProfileRef').value.trim(),
+    iccid:$('esimProfileIccid').value.trim(),msisdn:$('esimProfileMsisdn').value.trim(),activationRef:$('esimActivationRef').value.trim(),
+    status:'available',activationPayload:{source:'manual-wholesale-import'}
+  });
+  note('Wholesale eSIM profile imported.');await loadEsim();
+ }catch(e){note(e.message)}
+}
+async function assignEsim(profileId,deviceId){
+ try{await api('esim_assign',{profileId,deviceId});note('eSIM assigned to Dexter phone.');await loadEsim()}catch(e){note(e.message)}
+}
+async function createEsimOrder(){
+ try{
+  const d=await api('esim_order_create',{planId:$('esimOrderPlan').value,deviceId:$('esimOrderDevice').value||null,customerRef:$('esimCustomerRef').value.trim()});
+  note(d.providerActionRequired?'Order created; provider fulfilment pending connection.':'eSIM order created.');await loadEsim();
+ }catch(e){note(e.message)}
+}
+
 async function loadPhones(){
  try{
   const d=await api('device_list');
