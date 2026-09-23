@@ -1795,6 +1795,27 @@ async function startAndroidReconnectWatchdog(){
   androidReconnectTimer.unref?.();
 }
 
+async function tvControl(action){
+  const allowed=new Set(["status","launch","stop","backup"]);
+  const safe=String(action||"").toLowerCase();
+  if(!allowed.has(safe))throw new Error("Unsupported TV action.");
+  const script="C:\\DexterAI\\KodiManager\\Dexter-Kodi.ps1";
+  if(!fs.existsSync(script))throw new Error("Kodi manager script not found.");
+  return await new Promise((resolve,reject)=>{
+    const ps=spawn("powershell.exe",["-NoProfile","-ExecutionPolicy","Bypass","-File",script,"-Action",safe],{windowsHide:true,shell:false});
+    let stdout="",stderr="";
+    ps.stdout.on("data",d=>stdout+=String(d));
+    ps.stderr.on("data",d=>stderr+=String(d));
+    const timer=setTimeout(()=>{try{ps.kill()}catch{};reject(new Error("TV command timed out."));},30000);
+    ps.on("error",e=>{clearTimeout(timer);reject(e);});
+    ps.on("close",code=>{
+      clearTimeout(timer);
+      if(code===0)resolve({ok:true,action:safe,stdout:stdout.trim(),stderr:stderr.trim()});
+      else reject(new Error((stderr||stdout||("TV command failed with exit code "+code)).trim()));
+    });
+  });
+}
+
 const server=http.createServer(async(req,res)=>{
   try{
     if(req.method==="GET"&&(req.url==="/"||req.url==="/index.html"))return serveFile(res,path.join(ROOT,"index.html"),"text/html; charset=utf-8");
@@ -1809,6 +1830,7 @@ const server=http.createServer(async(req,res)=>{
     if(req.method==="GET"&&req.url==="/jobs"){if(!authOk(req))return json(res,401,{error:"Unauthorized"});return json(res,200,{jobs:loadJobs()});}
     if(req.method==="POST"&&req.url==="/browser/tool"){if(!authOk(req))return json(res,401,{error:"Unauthorized"});const body=await readBody(req);return json(res,200,{result:await browserTool(String(body.tool||""),body.request||{})});}
     if(req.method==="POST"&&req.url==="/workspace/tool"){if(!authOk(req))return json(res,401,{error:"Unauthorized"});const body=await readBody(req);return json(res,200,{result:await workspaceTool(String(body.tool||""),body.request||{})});}
+    if(req.method==="POST"&&req.url==="/tv/control"){if(!authOk(req))return json(res,401,{error:"Unauthorized"});const body=await readBody(req);const action=String(body.action||"").toLowerCase();if(!["status","launch","stop","backup"].includes(action))return json(res,400,{error:"TV action must be status, launch, stop or backup."});return json(res,200,await tvControl(action));}
     if(req.method==="POST"&&req.url==="/jobs"){if(!authOk(req))return json(res,401,{error:"Unauthorized"});return json(res,202,{job:await createJob(await readBody(req))});}
     if(req.method==="POST"&&req.url==="/ai/chat"){if(!authOk(req))return json(res,401,{error:"Unauthorized"});const body=await readBody(req);const reply=await ollama(Array.isArray(body.messages)?body.messages:[{role:"user",content:String(body.prompt||"")}],body.format);return json(res,200,{reply,model:LOCAL_MODEL,provider:"ollama-local"});}
     return json(res,404,{error:"Not found"});
