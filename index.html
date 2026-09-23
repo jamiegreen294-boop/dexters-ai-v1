@@ -38,6 +38,7 @@ pre{white-space:pre-wrap;word-break:break-word;background:#090b10;padding:12px;b
 <button data-tab="learning">📚 Learning</button>
 <div class="navtitle desktop-only">System</div>
 <button data-tab="phones">📱 Phones</button>
+<button data-tab="tv">📺 Home TV</button>
 <button data-tab="esim">📶 eSIM</button>
 <button data-tab="connections">🔌 Connections</button>
 <button data-tab="operator">🧭 Operator</button>
@@ -74,6 +75,29 @@ pre{white-space:pre-wrap;word-break:break-word;background:#090b10;padding:12px;b
 <div class="small">Owner console for Dexter OS test/company devices. Role changes and locks are sent through the authenticated Dexter phone agent.</div>
 <div id="phoneDevices" class="list" style="margin-top:12px"></div>
 </div>
+</div>
+</section>
+
+<section id="p-tv" class="panel">
+<div class="grid2">
+  <div class="card"><div class="head"><h2>Home TV & Kodi</h2><span class="pill">HOME</span></div>
+    <div class="body">
+      <div class="small">Controls the home Fire Stick/Kodi through the paired Dexter Home PC. This is separate from Dexters business systems.</div>
+      <div class="actions" style="margin-top:14px">
+        <button class="btn" onclick="tvControl('launch')">▶ Open Kodi</button>
+        <button class="btn secondary" onclick="tvControl('stop')">■ Close Kodi</button>
+        <button class="btn secondary" onclick="tvControl('status')">● Check status</button>
+        <button class="btn secondary" onclick="tvControl('backup')">↥ Back up Kodi</button>
+      </div>
+      <div id="tvStatus" class="item" style="margin-top:12px"><b>Ready</b><p>Use the buttons or tell Dexter in Chat: “open Kodi”, “close Kodi”, “check Fire Stick”, or “back up Kodi”.</p></div>
+    </div>
+  </div>
+  <div class="card"><div class="head"><h2>Voice commands</h2></div>
+    <div class="body">
+      <p class="small">The normal Chat microphone can also control Kodi. TV commands are allow-listed and run through the authenticated Home PC connection.</p>
+      <div class="actions"><button class="btn secondary" onclick="setTab('chat');setTimeout(()=>startVoice('msg'),100)">🎙️ Talk to Dexter</button></div>
+    </div>
+  </div>
 </div>
 </section>
 
@@ -369,6 +393,20 @@ async function createEsimOrder(){
   const d=await api('esim_order_create',{planId:$('esimOrderPlan').value,deviceId:$('esimOrderDevice').value||null,customerRef:$('esimCustomerRef').value.trim()});
   note(d.providerActionRequired?'Order created; provider fulfilment pending connection.':'eSIM order created.');await loadEsim();
  }catch(e){note(e.message)}
+}
+
+async function tvControl(action){
+ try{
+  const box=$('tvStatus');if(box)box.innerHTML='<b>Working…</b><p>Sending '+esc(action)+' to the home TV.</p>';
+  const d=await api('tv_control',{tvAction:action});
+  const labels={launch:'Kodi opened',stop:'Kodi closed',status:'Status checked',backup:'Kodi backup completed'};
+  const detail=d?.result?.stdout||d?.result?.message||'Command completed successfully.';
+  if(box)box.innerHTML='<b class="ok">'+esc(labels[action]||'Done')+'</b><p>'+esc(String(detail).slice(0,1200))+'</p>';
+  note(labels[action]||'TV command completed.');
+ }catch(e){
+  const box=$('tvStatus');if(box)box.innerHTML='<b class="bad">TV control failed</b><p>'+esc(e.message)+'</p>';
+  note(e.message);
+ }
 }
 
 async function loadPhones(){
