@@ -90,6 +90,14 @@ pre{white-space:pre-wrap;word-break:break-word;background:#090b10;padding:12px;b
         <button class="btn secondary" onclick="tvControl('backup')">↥ Back up Kodi</button>
       </div>
       <div id="tvStatus" class="item" style="margin-top:12px"><b>Ready</b><p>Use the buttons or tell Dexter in Chat: “open Kodi”, “close Kodi”, “check Fire Stick”, or “back up Kodi”.</p></div>
+      <div class="sectiontitle">Kodi URL</div>
+      <input id="kodiUrl" class="input" placeholder="Paste an HTTPS Kodi source URL">
+      <input id="kodiSourceName" class="input" placeholder="Source name (optional)">
+      <div class="actions">
+        <button class="btn secondary" onclick="kodiUrlAction('inspect')">Check URL</button>
+        <button class="btn" onclick="kodiUrlAction('add_source')">Add approved source</button>
+      </div>
+      <div id="kodiUrlStatus" class="item" style="margin-top:12px"><b>Safe URL intake</b><p>Dexter can inspect HTTPS links. Automatic Kodi source adding is limited to approved sources; unknown links are not installed blindly.</p></div>
     </div>
   </div>
   <div class="card"><div class="head"><h2>Voice commands</h2></div>
@@ -393,6 +401,28 @@ async function createEsimOrder(){
   const d=await api('esim_order_create',{planId:$('esimOrderPlan').value,deviceId:$('esimOrderDevice').value||null,customerRef:$('esimCustomerRef').value.trim()});
   note(d.providerActionRequired?'Order created; provider fulfilment pending connection.':'eSIM order created.');await loadEsim();
  }catch(e){note(e.message)}
+}
+
+async function kodiUrlAction(mode){
+ try{
+  const url=$('kodiUrl')?.value.trim()||'';
+  const name=$('kodiSourceName')?.value.trim()||'';
+  if(!url)throw Error('Paste a Kodi URL first.');
+  const box=$('kodiUrlStatus');
+  if(box)box.innerHTML='<b>Working…</b><p>Checking the URL with Dexter Home PC.</p>';
+  const d=await api('kodi_url',{mode,url,name});
+  const r=d?.result||{};
+  let title='URL checked',detail='Host: '+(r.host||'unknown');
+  if(r.added){title='Kodi source added';detail=(r.name||'Source')+' has been added to Kodi.'}
+  else if(r.already_exists){title='Already saved';detail=(r.name||'This source')+' is already in Kodi.'}
+  else if(r.approved){detail+=' · approved for the safe source flow.'}
+  else{detail+=' · not on the automatic allowlist, so it was not added.'}
+  if(box)box.innerHTML='<b class="ok">'+esc(title)+'</b><p>'+esc(detail)+'</p>';
+  note(title);
+ }catch(e){
+  const box=$('kodiUrlStatus');if(box)box.innerHTML='<b class="bad">Kodi URL not added</b><p>'+esc(e.message)+'</p>';
+  note(e.message);
+ }
 }
 
 async function tvControl(action){
