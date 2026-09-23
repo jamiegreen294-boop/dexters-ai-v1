@@ -1795,6 +1795,58 @@ async function startAndroidReconnectWatchdog(){
   androidReconnectTimer.unref?.();
 }
 
+async function runFixedProcess(exe,args,timeoutMs=20000){
+  return await new Promise((resolve,reject)=>{
+    const p=spawn(exe,args,{windowsHide:true,shell:false});
+    let stdout="",stderr="";
+    p.stdout.on("data",d=>stdout+=String(d));
+    p.stderr.on("data",d=>stderr+=String(d));
+    const timer=setTimeout(()=>{try{p.kill()}catch{};reject(new Error("Command timed out."));},timeoutMs);
+    p.on("error",e=>{clearTimeout(timer);reject(e);});
+    p.on("close",code=>{clearTimeout(timer);if(code===0)resolve({stdout:stdout.trim(),stderr:stderr.trim()});else reject(new Error((stderr||stdout||("Command failed with exit code "+code)).trim()));});
+  });
+}
+function xmlEscape(v){return String(v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&apos;");}
+function validateKodiUrl(raw){
+  let u;try{u=new URL(String(raw||"").trim())}catch{throw new Error("Enter a valid HTTPS URL.");}
+  if(u.protocol!=="https:")throw new Error("Kodi sources must use HTTPS.");
+  if(u.username||u.password)throw new Error("URLs containing embedded credentials are not allowed.");
+  const host=u.hostname.toLowerCase();
+  if(host==="localhost"||host.endsWith(".local")||/^(10\.|127\.|169\.254\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host))throw new Error("Private/local network URLs are not accepted here.");
+  const approved=
+    host==="kodi.tv"||
+    host==="mirrors.kodi.tv"||
+    (host==="github.com"&&u.pathname.toLowerCase().startsWith("/jamiegreen294-boop/"))||
+    (host==="raw.githubusercontent.com"&&u.pathname.toLowerCase().startsWith("/jamiegreen294-boop/"))||
+    host==="jamiegreen294-boop.github.io";
+  return {url:u.toString(),host,approved};
+}
+async function kodiUrlAction(mode,rawUrl,rawName){
+  const checked=validateKodiUrl(rawUrl);
+  if(mode==="inspect")return {ok:true,mode,url:checked.url,host:checked.host,approved:checked.approved,can_add:checked.approved};
+  if(mode!=="add_source")throw new Error("Kodi URL mode must be inspect or add_source.");
+  if(!checked.approved)throw new Error("This URL can be inspected, but it is not on Dexter's approved Kodi-source allowlist. Review it first rather than installing it blindly.");
+  const name=String(rawName||new URL(checked.url).hostname).replace(/[^A-Za-z0-9 _.-]/g,"").trim().slice(0,60)||"Dexter source";
+  const adb="C:\\DexterAI\\tools\\platform-tools\\adb.exe";
+  const target="192.168.0.236:5555";
+  const remote="/sdcard/Android/data/org.xbmc.kodi/files/.kodi/userdata/sources.xml";
+  if(!fs.existsSync(adb))throw new Error("ADB is not installed.");
+  await runFixedProcess(adb,["connect",target],10000).catch(()=>null);
+  const current=await runFixedProcess(adb,["-s",target,"exec-out","cat",remote],12000);
+  let xml=current.stdout;
+  if(!xml.includes("<files>")||!xml.includes("</files>"))throw new Error("Kodi sources.xml is missing or invalid.");
+  if(xml.includes(checked.url))return {ok:true,mode,url:checked.url,name,already_exists:true,backup:null};
+  const backup=path.join(WORKSPACE,"kodi-sources-backup-"+Date.now()+".xml");
+  fs.writeFileSync(backup,xml,"utf8");
+  const entry="\n        <source>\n            <name>"+xmlEscape(name)+"</name>\n            <path pathversion=\"1\">"+xmlEscape(checked.url)+"</path>\n            <allowsharing>true</allowsharing>\n        </source>";
+  xml=xml.replace("</files>",entry+"\n    </files>");
+  const temp=path.join(WORKSPACE,"kodi-sources-"+Date.now()+".xml");
+  fs.writeFileSync(temp,xml,"utf8");
+  try{await runFixedProcess(adb,["-s",target,"push",temp,remote],15000);}
+  finally{try{fs.unlinkSync(temp)}catch{}}
+  return {ok:true,mode,url:checked.url,name,added:true,backup};
+}
+
 async function tvControl(action){
   const allowed=new Set(["status","launch","stop","backup"]);
   const safe=String(action||"").toLowerCase();
@@ -1831,6 +1883,7 @@ const server=http.createServer(async(req,res)=>{
     if(req.method==="POST"&&req.url==="/browser/tool"){if(!authOk(req))return json(res,401,{error:"Unauthorized"});const body=await readBody(req);return json(res,200,{result:await browserTool(String(body.tool||""),body.request||{})});}
     if(req.method==="POST"&&req.url==="/workspace/tool"){if(!authOk(req))return json(res,401,{error:"Unauthorized"});const body=await readBody(req);return json(res,200,{result:await workspaceTool(String(body.tool||""),body.request||{})});}
     if(req.method==="POST"&&req.url==="/tv/control"){if(!authOk(req))return json(res,401,{error:"Unauthorized"});const body=await readBody(req);const action=String(body.action||"").toLowerCase();if(!["status","launch","stop","backup"].includes(action))return json(res,400,{error:"TV action must be status, launch, stop or backup."});return json(res,200,await tvControl(action));}
+    if(req.method==="POST"&&req.url==="/kodi/url"){if(!authOk(req))return json(res,401,{error:"Unauthorized"});const body=await readBody(req);return json(res,200,await kodiUrlAction(String(body.mode||"inspect"),String(body.url||""),String(body.name||"")));}
     if(req.method==="POST"&&req.url==="/jobs"){if(!authOk(req))return json(res,401,{error:"Unauthorized"});return json(res,202,{job:await createJob(await readBody(req))});}
     if(req.method==="POST"&&req.url==="/ai/chat"){if(!authOk(req))return json(res,401,{error:"Unauthorized"});const body=await readBody(req);const reply=await ollama(Array.isArray(body.messages)?body.messages:[{role:"user",content:String(body.prompt||"")}],body.format);return json(res,200,{reply,model:LOCAL_MODEL,provider:"ollama-local"});}
     return json(res,404,{error:"Not found"});
