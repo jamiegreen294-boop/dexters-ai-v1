@@ -47,6 +47,10 @@ if "%DEXTER_BROWSER_WORKER_TOKEN%"=="" (
   goto restart
 )
 
+powershell -NoProfile -Command "if(-not (Get-NetTCPConnection -LocalPort 11434 -State Listen -ErrorAction SilentlyContinue)){ $o=Join-Path $env:LOCALAPPDATA 'Programs\Ollama\ollama.exe'; if(Test-Path $o){ Start-Process -FilePath $o -ArgumentList 'serve' -WindowStyle Hidden } }" >nul 2>&1
+echo Starting Ollama local AI if needed...
+timeout /t 2 /nobreak >nul
+
 echo Starting Dexter AI Home Host...
 node "!DEXTER_SERVER!"
 echo Dexter Home Host stopped with exit code %ERRORLEVEL%. Restarting in 3 seconds...
