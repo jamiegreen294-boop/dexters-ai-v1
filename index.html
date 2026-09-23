@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0b0c10"><title>Dexter AI Test Workspace</title>
+<meta name="theme-color" content="#0b0c10"><link rel="manifest" href="/manifest.webmanifest"><link rel="icon" href="/dexter-icon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Dexter AI"><title>Dexter AI Test Workspace</title>
 <style>
 :root{--bg:#08090d;--card:#151821;--card2:#0f1219;--line:#303645;--txt:#f6f7f8;--mut:#9ea6b8;--a:#ffb36d;--b:#ff702d;--ok:#51d483;--warn:#ffc65c;--bad:#ff7182}
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 15% 0,#29212a 0,#0d0f14 36%,#07080b 74%);color:var(--txt);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}.app{max-width:1450px;margin:auto;padding:14px 14px 80px}
@@ -420,4 +420,4 @@ async function selfTest(){ $('selfTest').disabled=true;$('selfResults').innerHTM
 $('unlock').onclick=unlock;$('send').onclick=send;$('runWork').onclick=runWork;$('addMemory').onclick=addMemory;$('learnBtn').onclick=learn;$('selfTest').onclick=selfTest;$('refreshAll').onclick=refresh;if($('voiceChat'))$('voiceChat').onclick=()=>startVoice('msg');if($('voiceWork'))$('voiceWork').onclick=()=>startVoice('workMsg');
 $('msg').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}});
 window.addEventListener('load',async()=>{if($('voiceReplies')){$('voiceReplies').checked=localStorage.getItem('dexter_voice_replies')==='1';$('voiceReplies').onchange=()=>localStorage.setItem('dexter_voice_replies',$('voiceReplies').checked?'1':'0')}tok=localStorage.getItem('dexter_tok')||sessionStorage.getItem('dexter_tok')||'';sid=localStorage.getItem('dexter_sid')||uid();if(tok){try{const h=await api('health');$('lock').classList.add('hidden');$('workspace').classList.remove('hidden');showHealth(h);await Promise.all([refresh(),loadHistory()])}catch{tok=''}}});
-</script></body></html>
+</script><script>if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("/service-worker.js").catch(()=>{}));}</script></body></html>
