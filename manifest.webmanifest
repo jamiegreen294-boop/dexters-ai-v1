@@ -1,0 +1,18 @@
+{
+  "name": "Dexter AI Test",
+  "short_name": "Dexter AI",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#08090d",
+  "theme_color": "#0b0c10",
+  "description": "Private Dexter AI test workspace and home TV control.",
+  "icons": [
+    {
+      "src": "/dexter-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
