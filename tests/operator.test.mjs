@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { operatorIntent, connectorEvidence, operationalStatus, requiresExecutionEvidence, gmailQuery, cloudReport, toolEvidenceMissing, nextUkMorning } from '../supabase/functions/ai-command-centre/operator.ts';
+import { operatorIntent, connectorEvidence, operationalStatus, requiresExecutionEvidence, gmailQuery, cloudReport, toolEvidenceMissing, nextUkMorning, publicMenuRows } from '../supabase/functions/ai-command-centre/operator.ts';
 
 test('ordinary requests reach the right executor while questions stay conversational', () => {
   for (const message of ['Run the shop check', 'Dexter, can you run a daily business report', 'What needs attention?']) assert.equal(operatorIntent(message), 'operator_report');
@@ -73,4 +73,11 @@ test('cloud shop report remains useful with no home PC and no model provider', a
 });
 test('cloud report fails closed when required data cannot be read', async () => {
   await assert.rejects(cloudReport(fakeDb({},'ai_connectors'),{}),/could not read required test data/);
+});
+
+test('public menu refresh rejects partial invalid data and keeps prices and stock',()=>{
+ const rows=publicMenuRows([{name:'Breakfast',items:[{id:'280c7841-6c81-427e-af3a-d1d4553cbfd0',name:'Full Scottish',price:'£8.00',in_stock:true}]}],'2026-09-30T22:00:00Z');
+ assert.equal(rows.length,1);assert.equal(JSON.parse(rows[0].content).price,'£8.00');
+ assert.throws(()=>publicMenuRows([],''));
+ assert.throws(()=>publicMenuRows([{name:'Breakfast',items:[{}]}],''));
 });

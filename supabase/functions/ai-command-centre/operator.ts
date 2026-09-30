@@ -107,3 +107,21 @@ export async function cloudReport(db: any, modelConfig: any) {
   ].join('\n');
   return { report, reply };
 }
+
+// Public menu only. Recipes, policies and allergens require separate authoritative sources.
+export function publicMenuRows(menu: any, syncedAt: string) {
+  if (!Array.isArray(menu) || !menu.length) throw new Error('Public menu is empty or invalid; previous knowledge retained.');
+  const rows: any[] = [];
+  const seen = new Set<string>();
+  for (const category of menu) {
+    if (!category || typeof category.name !== 'string' || !Array.isArray(category.items)) throw new Error('Invalid public menu category.');
+    for (const item of category.items) {
+      if (!item || typeof item.id !== 'string' || !/^[0-9a-f-]{36}$/i.test(item.id) || typeof item.name !== 'string' || seen.has(item.id)) throw new Error('Invalid or duplicate public menu item.');
+      seen.add(item.id);
+      rows.push({source:'live_supabase',category:'menu',source_key:item.id,title:item.name,
+        content:JSON.stringify({name:item.name,price:item.price,category:category.name,in_stock:item.in_stock,item_sort:item.sort_order,description:item.description,category_sort:category.sort_order}),synced_at:syncedAt});
+    }
+  }
+  if (!rows.length) throw new Error('No public menu items; previous knowledge retained.');
+  return rows;
+}

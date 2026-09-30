@@ -39,3 +39,9 @@ The previous runtime and Gmail implementation are preserved under the respective
 Node tests cover routing, stale health, cloud-only operation, failed-data reads, duplicate task submissions, prompt recovery, Gmail queries, queued tool evidence and UK clock changes. Authenticated deployed checks cover the shop report, task lookup, unsupported printing and unavailable Gmail. Missing authentication and insufficient roles are rejected.
 
 Browser rendering could not be inspected in the execution container because a browser binary is unavailable. Frontend JavaScript and DOM behaviour were checked with a mocked DOM; this is not visual verification.
+
+
+## Follow-up checks and menu refresh
+The daily and on-demand operator report now refreshes the public live menu into the test knowledge store. Invalid/empty responses retain previous knowledge and add an attention item. This refresh does not claim recipes, allergens or modifiers are current.
+Home job transport completion no longer immediately completes its parent task; reconciliation/review owns the final state.
+Verified on 30 September: local Qwen3 1.7B replied DEXTER_LOCAL_OK; Windows detected OFFNOVA N-6240 on USB001. These checks do not prove paper output. Gmail currently lacks cloud OAuth app credentials and account authorization.

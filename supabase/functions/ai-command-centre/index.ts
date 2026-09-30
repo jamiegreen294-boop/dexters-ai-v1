@@ -2,7 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import sodium from "npm:libsodium-wrappers@0.7.15";
 import bcrypt from "npm:bcryptjs@2.4.3";
-import { operatorIntent, connectorEvidence, cloudReport, requiresExecutionEvidence, gmailQuery, toolEvidenceMissing, nextUkMorning } from "./operator.ts";
+import { operatorIntent, connectorEvidence, cloudReport, requiresExecutionEvidence, gmailQuery, toolEvidenceMissing, nextUkMorning, publicMenuRows } from "./operator.ts";
 
 const cors = {
   "Content-Type": "application/json",
@@ -1138,7 +1138,20 @@ Deno.serve(async(req)=>{
       return json(payload,status);
     }
     async function operatorSnapshot(){
-      return cloudReport(db,{cloud:Boolean(Deno.env.get("OPENAI_API_KEY")),directLocal:Boolean(Deno.env.get("DEXTER_HOME_HOST_URL")&&Deno.env.get("DEXTER_HOME_HOST_TOKEN"))});
+      let menuRefresh:any;
+      try{
+        const menu=await liveMenuForQuery("menu");
+        const rows=publicMenuRows(menu,now());
+        const {error}=await db.from("dexter_business_knowledge").upsert(rows,{onConflict:"source,source_key"});
+        if(error)throw error;
+        menuRefresh={status:"refreshed",items:rows.length,checkedAt:now(),source:"public live menu"};
+      }catch(error){menuRefresh={status:"failed",error:String((error as Error).message||error)};}
+      const snapshot:any=await cloudReport(db,{cloud:Boolean(Deno.env.get("OPENAI_API_KEY")),directLocal:Boolean(Deno.env.get("DEXTER_HOME_HOST_URL")&&Deno.env.get("DEXTER_HOME_HOST_TOKEN"))});
+      snapshot.report.menuRefresh=menuRefresh;
+      const line=menuRefresh.status==="refreshed"?"Public menu refreshed: "+menuRefresh.items+" current items.":"Public menu refresh failed: "+menuRefresh.error;
+      snapshot.reply+="\n"+line;
+      if(menuRefresh.status!=="refreshed")snapshot.report.attention.push(line);
+      return snapshot;
     }
     async function saveOperatorReport(snapshot:any,title:string,metadata:any={}){
       const {data:task,error:taskError}=await db.from("ai_tasks").insert({title,description:"Read-only cloud operational snapshot",agent_key:"platform-doctor",status:"running",progress:90,result:snapshot.reply}).select("id,title,status,progress").single();
