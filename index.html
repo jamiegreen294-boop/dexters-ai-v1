@@ -48,7 +48,7 @@ pre{white-space:pre-wrap;word-break:break-word;background:#090b10;padding:12px;b
 
 <main>
 <section id="p-chat" class="panel active"><div class="grid2">
-<div class="card"><div class="head"><h2>Chat with Dexter</h2><div id="agent" class="pill">Dexter</div></div><div id="chat" class="chat"></div><div class="composer"><textarea id="msg" placeholder="Ask Dexter anything…"></textarea><div><div class="actions"><button id="voiceChat" class="btn secondary" title="Voice command">🎙️</button><button id="send" class="btn">Send</button></div><label class="small"><input id="voiceReplies" type="checkbox"> 🔊 Speak Dexter replies</label></div></div></div>
+<div class="card"><div class="head"><h2>Chat with Dexter</h2><div id="agent" class="pill">Dexter</div></div><div class="body actions" style="padding-bottom:10px"><button class="btn secondary" onclick="sendCommand('Run the shop check')">Run shop check</button><button class="btn secondary" onclick="sendCommand('Show my tasks')">Show tasks</button><button class="btn secondary" onclick="sendCommand('Check supplier emails')">Check emails</button></div><div id="chat" class="chat" aria-live="polite" aria-relevant="additions"></div><div class="composer"><textarea id="msg" placeholder="Ask Dexter to run a shop check, prepare a draft or carry out a task…"></textarea><div><div class="actions"><button id="voiceChat" class="btn secondary" title="Voice command">🎙️</button><button id="send" class="btn">Send</button></div><label class="small"><input id="voiceReplies" type="checkbox"> 🔊 Speak Dexter replies</label></div></div></div>
 <div class="card"><div class="head"><h2>At a glance</h2><button id="refreshAll" class="btn secondary">Refresh</button></div><div class="body"><div id="metrics" class="grid3"></div><div class="sectiontitle">System</div><div id="healthMini" class="list"></div><div class="sectiontitle">Recent work</div><div id="recentMini" class="list"></div></div></div>
 </div></section>
 
@@ -198,11 +198,23 @@ pre{white-space:pre-wrap;word-break:break-word;background:#090b10;padding:12px;b
 
 <script>
 const EP='https://eikruaxxzzxmfjvsmwwo.supabase.co/functions/v1/ai-command-centre', $=x=>document.getElementById(x);
-let tok='',sid='',dash={},health={};
+let tok='',sid='',dash={},health={},sending=false,refreshing=false;
 function uid(){return crypto.randomUUID?crypto.randomUUID():'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{let r=Math.random()*16|0,v=c==='x'?r:(r&3|8);return v.toString(16)})}
 function esc(v){return String(v??'').replace(/[&<>"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[s]))}
 function note(t){$('toast').textContent=t;$('toast').classList.remove('hidden');clearTimeout(note.t);note.t=setTimeout(()=>$('toast').classList.add('hidden'),3500)}
-async function api(action,extra={}){const r=await fetch(EP,{method:'POST',headers:{'content-type':'application/json','x-dexter-token':tok},body:JSON.stringify({action,sessionId:sid,...extra})});const d=await r.json().catch(()=>({error:'Bad server response'}));if(!r.ok)throw Error(d.error||'Request failed');return d}
+async function api(action,extra={}){
+ const reads=new Set(['health','dashboard','connectors','history','task_detail','artifact_get']);
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),reads.has(action)?25000:300000);
+ try{
+  const r=await fetch(EP,{method:'POST',headers:{'content-type':'application/json','x-dexter-token':tok},body:JSON.stringify({action,sessionId:sid,...extra}),signal:controller.signal});
+  const d=await r.json().catch(()=>({error:'Dexter returned an unreadable response.'}));
+  if(!r.ok){const e=Error(d.reply||d.error||'Request failed');e.status=r.status;throw e}
+  return d;
+ }catch(e){
+  if(e.name==='AbortError')throw Error(reads.has(action)?'The status check timed out. Its result is unverified.':'The reply timed out. The task may still be running; check Tasks before repeating it.');
+  throw e;
+ }finally{clearTimeout(timer)}
+}
 function speakText(text){try{if(!('speechSynthesis' in window))return;window.speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(String(text||''));u.lang='en-GB';u.rate=1;window.speechSynthesis.speak(u)}catch{}}
 function addMsg(role,text,meta=''){const e=document.createElement('div');e.className='msg '+role;e.textContent=text;if(meta){const m=document.createElement('div');m.className='meta';m.textContent=meta;e.append(m)}$('chat').append(e);$('chat').scrollTop=$('chat').scrollHeight;if(role==='a'&&$('voiceReplies')?.checked)speakText(text)}
 function item(title,meta='',status=''){return '<div class="item"><div class="row"><b>'+esc(title)+'</b>'+(status?'<span class="status">'+esc(status)+'</span>':'')+'</div>'+(meta?'<p>'+esc(meta)+'</p>':'')+'</div>'}
@@ -217,22 +229,22 @@ document.querySelectorAll('.nav button[data-tab]').forEach(b=>b.onclick=()=>setT
 function showHealth(h){
  health=h||{};
  const home=!!h.homeAgentOnline, ai=!!h.ai;
- $('env').textContent='TEST · '+(home?'HOME PC ONLINE':'CLOUD READY');
- const rows=[['AI',ai?(h.aiProvider||'ready'):'offline'],['Home PC',home?'online':'offline'],['Memory',h.memory?'ready':'offline'],['Knowledge',String(h.businessKnowledge??h.knowledge??0)],['Live menu',h.liveMenu?'connected':'on demand'],['Live writes',h.liveWrites?'enabled':'approval-gated']];
+ $('env').textContent='TEST · '+(home?'HOME PC ONLINE':'HOME PC OFFLINE');
+ const rows=[['Checked',h.checkedAt?fmtDate(h.checkedAt):'unverified'],['AI',h.aiProvider||(ai?'configured; untested':'unavailable')],['Home PC',home?'online':'offline'],['Cloud reports',h.cloudReportAvailable?'available':'unverified'],['Memory',h.memory?'ready':'offline'],['Knowledge',String(h.businessKnowledge??h.knowledge??0)],['Live menu',h.liveMenu?'connected':'on demand'],['Live writes',h.liveWrites?'enabled':'approval-gated']];
  const out=rows.map(x=>'<div class="item row"><span class="muted">'+esc(x[0])+'</span><b class="'+(String(x[1]).includes('offline')?'bad':'ok')+'">'+esc(x[1])+'</b></div>').join('');
  $('healthMini').innerHTML=out;$('healthFull').innerHTML=out;
 }
 function renderDashboard(d){
  dash=d||{};
  const tasks=d.tasks||[], arts=d.artifacts||[], apps=d.approvals||[], toolReqs=d.toolRequests||[], mem=d.memory||[], learn=d.learning||[], conns=d.connectors||[], jobs=d.homeJobs||[], audit=d.audit||[]; const toolByTask=new Map(toolReqs.map(t=>[t.task_id,t]));
- $('metrics').innerHTML=[['Tasks',tasks.length],['Artifacts',arts.length],['Memory',mem.length],['Learning',learn.length],['Connections',conns.filter(x=>x.status==='ready').length],['Approvals',apps.filter(x=>x.status==='pending').length]].map(x=>'<div class="metric"><b>'+x[1]+'</b><span>'+x[0]+'</span></div>').join('');
+ $('metrics').innerHTML=[['Tasks',tasks.length],['Artifacts',arts.length],['Memory',mem.length],['Learning',learn.length],['Connections',conns.filter(x=>x.evidence?.status==='verified').length],['Approvals',apps.filter(x=>x.status==='pending').length]].map(x=>'<div class="metric"><b>'+x[1]+'</b><span>'+x[0]+'</span></div>').join('');
  $('recentMini').innerHTML=tasks.slice(0,5).map(t=>item(t.title,(t.agent_key||'Dexter')+' · '+(t.progress??0)+'%',t.status)).join('')||'<div class="small">No recent work.</div>';
  $('tasks').innerHTML=tasks.map(t=>'<div class="item"><div class="row"><b>'+esc(t.title)+'</b><span class="status">'+esc(t.status)+'</span></div><p>'+esc((t.agent_key||'Dexter')+' · '+(t.progress??0)+'% · '+fmtDate(t.created_at))+'</p><div class="actions"><button class="btn secondary" onclick="openTask(\''+esc(t.id)+'\')">Open task</button></div></div>').join('')||'<div class="small">No tasks yet.</div>';
  $('artifacts').innerHTML=arts.map(a=>'<div class="item"><div class="row"><b>'+esc(a.name)+'</b><span class="status">'+esc(a.artifact_type)+'</span></div><p>'+esc(fmtDate(a.created_at))+'</p><div class="actions"><button class="btn secondary" onclick="openArtifact(\''+esc(a.id)+'\')">Open artifact</button></div></div>').join('')||'<div class="small">No artifacts yet. Work mode will create them.</div>';
  $('approvals').innerHTML=apps.map(a=>{const tr=toolByTask.get(a.task_id);const isExternal=tr&&(tr.connector_key==='browser'||tr.connector_key==='home-host');const buttons=a.status==='pending'?'<div class="actions"><button class="btn" onclick="decide(\''+esc(a.id)+'\',\'approved\')">'+(isExternal?'Approve live website action':'Approve')+'</button><button class="btn danger" onclick="decide(\''+esc(a.id)+'\',\'rejected\')">Reject</button></div>':(a.status==='approved'&&tr&&tr.status==='approved'?'<div class="actions"><button class="btn" onclick="executeTool(\''+esc(tr.id)+'\')">Execute approved action</button></div>':'');return '<div class="item"><div class="row"><b>'+esc(a.requested_action||'Approval')+'</b><span class="status">'+esc(a.status)+'</span></div><p>'+esc(fmtDate(a.created_at))+'</p>'+buttons+'</div>'}).join('')||'<div class="small">No approvals pending.</div>';
  $('memoryList').innerHTML=mem.map(m=>item(m.category,m.content,'approved')).join('')||'<div class="small">No approved memory yet.</div>';
  $('learningList').innerHTML=learn.map(l=>item(l.topic,(l.category||'general')+' · '+l.lesson,(l.verified?'verified':'unverified'))).join('')||'<div class="small">No verified learning yet.</div>';
- $('connectors').innerHTML=conns.map(c=>'<div class="item"><div class="row"><b>'+esc(c.name)+'</b><span class="status">'+esc(c.status)+'</span></div><p>'+esc(c.last_error||('Last checked '+fmtDate(c.last_checked_at)))+'</p><p>'+(c.runtime_ready===false?'⚪ Runtime credential not loaded':'✅ Registry configured')+'</p></div>').join('')||'<div class="small">No connectors.</div>';
+ $('connectors').innerHTML=conns.map(c=>'<div class="item"><div class="row"><b>'+esc(c.name)+'</b><span class="status">'+esc(c.evidence?.status||'unverified')+'</span></div><p>'+esc(c.last_error||('Last checked '+(c.last_checked_at?fmtDate(c.last_checked_at):'never')))+'</p><p>'+esc(c.evidence?.verification||'Availability has not been verified.')+'</p><p>'+(c.runtime_ready===false?'Credential connection required':'Configuration present; use the latest check for availability')+'</p>'+(c.connector_key==='gmail'?'<a class="btn secondary" href="https://eikruaxxzzxmfjvsmwwo.supabase.co/functions/v1/dexter-gmail-connect" target="_blank" rel="noopener noreferrer">Connect cloud Gmail</a>':'')+'</div>').join('')||'<div class="small">No connectors.</div>';
  $('homeJobs').innerHTML=jobs.slice(0,15).map(j=>item(j.tool_name||j.job_type,(j.error||'')+(j.completed_at?' · '+fmtDate(j.completed_at):''),j.status)).join('')||'<div class="small">No Home PC jobs.</div>';
  $('audit').innerHTML=audit.map(a=>item(a.action,(a.actor||'system')+' · '+fmtDate(a.created_at),a.environment||'test')).join('')||'<div class="small">No audit activity.</div>';
  const projects=d.projects||[], ops=d.operationsHealth||[], alerts=(d.notifications||[]).filter(x=>x.status!=='dismissed');
@@ -240,8 +252,8 @@ function renderDashboard(d){
  const latestBySystem={};ops.forEach(x=>{if(!latestBySystem[x.system_key])latestBySystem[x.system_key]=x});
  const healthRows=Object.values(latestBySystem);
  const badHealth=healthRows.filter(x=>['offline','failed','critical','error'].includes(String(x.status).toLowerCase()));
- const warnHealth=healthRows.filter(x=>['warning','degraded'].includes(String(x.status).toLowerCase()));
- if($('operatorStatePill')){$('operatorStatePill').textContent=badHealth.length?'RED':warnHealth.length?'AMBER':'GREEN';$('operatorStatePill').className='pill '+(badHealth.length?'bad':warnHealth.length?'warn':'ok')}
+ const warnHealth=healthRows.filter(x=>!['healthy','ready','passed','ok','online'].includes(String(x.status).toLowerCase())||!x.checked_at||Date.now()-Date.parse(x.checked_at)>7200000);
+ if($('operatorStatePill')){$('operatorStatePill').textContent=badHealth.length?'ATTENTION':!healthRows.length?'UNVERIFIED':warnHealth.length?'UNVERIFIED':'CHECKS HEALTHY';$('operatorStatePill').className='pill '+(badHealth.length?'bad':(!healthRows.length||warnHealth.length)?'warn':'ok')}
  if($('operatorHealthState'))$('operatorHealthState').innerHTML=healthRows.slice(0,12).map(x=>item(x.system_name||x.system_key,x.summary||fmtDate(x.checked_at),x.status)).join('')||'<div class="small">No operational health checks yet.</div>';
  if($('operatorAlerts'))$('operatorAlerts').innerHTML=alerts.slice(0,10).map(x=>item(x.title,x.message,x.severity)).join('')||'<div class="small">No active alerts.</div>';
  const nodes=d.systemNodes||[], edges=d.systemEdges||[], runs=d.regressionRuns||[], points=d.rollbackPoints||[];
@@ -326,7 +338,12 @@ async function markRollbackGood(id){
  try{await api('rollback_mark_good',{rollbackPointId:id});note('Last-known-good updated.');await refresh()}catch(e){note(e.message)}
 }
 async function refresh(){
- try{const [h,d,c]=await Promise.all([api('health'),api('dashboard'),api('connectors')]);showHealth(h);d.connectors=c.connectors||d.connectors;renderDashboard(d)}catch(e){note(e.message)}
+ if(refreshing||!tok)return;refreshing=true;
+ try{
+  const [h,d,c]=await Promise.allSettled([api('health'),api('dashboard'),api('connectors')]);
+  if(h.status==='fulfilled')showHealth(h.value);else{$('env').textContent='TEST · STATUS UNVERIFIED';note(h.reason.message)}
+  if(d.status==='fulfilled'){if(c.status==='fulfilled')d.value.connectors=c.value.connectors||d.value.connectors;renderDashboard(d.value)}else note(d.reason.message);
+ }finally{refreshing=false}
 }
 
 let esimState={providers:[],plans:[],profiles:[],orders:[],devices:[],phones:[],subscriptions:[]};
@@ -478,9 +495,22 @@ async function phoneResetAccess(id){
  try{await api('device_access_reset',{deviceId:id,targetRole:'all'});note('Phone access reset.');setTimeout(loadPhones,1200)}catch(e){note(e.message)}
 }
 
-async function loadHistory(){try{const d=await api('history');$('chat').innerHTML='';if(!(d.history||[]).length)addMsg('a','Awright. Dexter AI Test is ready. Ask a question or use Work mode for a proper task.');else(d.history||[]).forEach(m=>addMsg(m.role==='assistant'?'a':'u',m.content,fmtDate(m.created_at)))}catch{addMsg('a','Awright. Dexter AI Test is ready.')}}
+async function loadHistory(){try{const d=await api('history');$('chat').innerHTML='';if(!(d.history||[]).length)addMsg('a','Awright. Ask me to run a shop check, show your tasks or check email. Clear work requests create tracked tasks; I’ll say when execution or verification is unavailable.');else(d.history||[]).forEach(m=>addMsg(m.role==='assistant'?'a':'u',m.content,fmtDate(m.created_at)))}catch{addMsg('a','Conversation history could not be loaded. Use Refresh to check the connection.')}}
 async function unlock(){tok=$('token').value.trim();if(!tok)return note('Enter your Dexter owner code.');sid=localStorage.getItem('dexter_sid')||uid();try{const h=await api('health');($('remember').checked?localStorage:sessionStorage).setItem('dexter_tok',tok);localStorage.setItem('dexter_sid',sid);$('lock').classList.add('hidden');$('workspace').classList.remove('hidden');showHealth(h);await Promise.all([refresh(),loadHistory()])}catch(e){tok='';note(e.message)}}
-async function send(){const m=$('msg').value.trim();if(!m)return;$('msg').value='';addMsg('u',m);$('send').disabled=true;try{const d=await api('chat',{message:m});addMsg('a',d.reply||'No reply returned.',[d.agent,d.model].filter(Boolean).join(' · '));$('agent').textContent=d.agent||'Dexter'}catch(e){addMsg('a','Error: '+e.message)}finally{$('send').disabled=false;$('msg').focus()}}
+async function sendCommand(text){if(sending)return note('Dexter is handling the current request.');$('msg').value=text;await send()}
+async function send(){
+ if(sending)return;
+ const m=$('msg').value.trim();if(!m)return;
+ sending=true;$('msg').value='';addMsg('u',m);$('send').disabled=true;$('send').textContent='Working…';
+ try{
+  const d=await api('chat',{message:m});
+  const meta=[d.agent,d.task?'Task: '+d.task.status:null,d.checkedAt?'Checked '+fmtDate(d.checkedAt):null].filter(Boolean).join(' · ');
+  addMsg('a',d.reply||'No reply returned. Completion has not been confirmed.',meta);
+  if(d.task?.id){const b=document.createElement('button');b.className='btn secondary';b.textContent='Open tracked task';b.onclick=()=>{setTab('tasks');openTask(d.task.id)};$('chat').lastElementChild.append(b)}
+  if(d.warning)note(d.warning);$('agent').textContent=d.agent||'Dexter';await refresh();
+ }catch(e){addMsg('a',e.message,'Request not confirmed');if(!$('msg').value)$('msg').value=m}
+ finally{sending=false;$('send').disabled=false;$('send').textContent='Send';$('msg').focus()}
+}
 async function runWork(){const message=$('workMsg').value.trim();if(!message)return note('Describe the task first.');$('runWork').disabled=true;$('workResult').textContent='Dexter is planning the task…';try{const d=await api('work',{message,title:$('workTitle').value.trim(),agent:$('workAgent').value});$('workResult').textContent=d.reply||('Task created: '+(d.task?.title||''));await refresh();if(d.task?.id){setTab('tasks');await openTask(d.task.id)}}catch(e){$('workResult').textContent='Error: '+e.message}finally{$('runWork').disabled=false}}
 async function openTask(id){try{const d=await api('task_detail',{taskId:id});$('taskDetail').textContent=d.task?.title||'Task detail';const parts=[];if(d.task)parts.push('<div class="item"><b>Status: '+esc(d.task.status)+'</b><p>'+esc((d.task.agent_key||'Dexter')+' · '+(d.task.progress??0)+'%')+'</p>'+(d.task.error?'<p class="bad">'+esc(d.task.error)+'</p>':'')+(d.task.result?'<pre>'+esc(d.task.result)+'</pre>':'')+'</div>');if((d.events||[]).length)parts.push('<div class="sectiontitle">Timeline</div>'+d.events.map(e=>item(e.event_type,e.message,fmtDate(e.created_at))).join(''));if((d.artifacts||[]).length)parts.push('<div class="sectiontitle">Artifacts</div>'+d.artifacts.map(a=>'<div class="item"><b>'+esc(a.name)+'</b><div class="actions"><button class="btn secondary" onclick="openArtifact(\''+esc(a.id)+'\')">Open</button></div></div>').join(''));$('taskDetailBody').innerHTML=parts.join('')||'<div class="small">No detail.</div>'}catch(e){note(e.message)}}
 async function openArtifact(id){try{const d=await api('artifact_get',{artifactId:id});const a=d.artifact;$('artifactBody').innerHTML='<div class="sectiontitle">'+esc(a.name)+'</div><div class="item"><div class="row"><b>'+esc(a.name)+'</b><span class="status">'+esc(a.artifact_type)+'</span></div><pre>'+esc(a.content)+'</pre></div>';setTab('artifacts')}catch(e){note(e.message)}}
@@ -492,4 +522,7 @@ async function selfTest(){ $('selfTest').disabled=true;$('selfResults').innerHTM
 $('unlock').onclick=unlock;$('send').onclick=send;$('runWork').onclick=runWork;$('addMemory').onclick=addMemory;$('learnBtn').onclick=learn;$('selfTest').onclick=selfTest;$('refreshAll').onclick=refresh;if($('voiceChat'))$('voiceChat').onclick=()=>startVoice('msg');if($('voiceWork'))$('voiceWork').onclick=()=>startVoice('workMsg');
 $('msg').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}});
 window.addEventListener('load',async()=>{if($('voiceReplies')){$('voiceReplies').checked=localStorage.getItem('dexter_voice_replies')==='1';$('voiceReplies').onchange=()=>localStorage.setItem('dexter_voice_replies',$('voiceReplies').checked?'1':'0')}tok=localStorage.getItem('dexter_tok')||sessionStorage.getItem('dexter_tok')||'';sid=localStorage.getItem('dexter_sid')||uid();if(tok){try{const h=await api('health');$('lock').classList.add('hidden');$('workspace').classList.remove('hidden');showHealth(h);await Promise.all([refresh(),loadHistory()])}catch{tok=''}}});
+setInterval(()=>{if(tok&&!document.hidden&&!sending)refresh()},60000);
+window.addEventListener('online',()=>{if(tok)refresh()});
+document.addEventListener('visibilitychange',()=>{if(tok&&!document.hidden&&!sending)refresh()});
 </script><script>if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("/service-worker.js").catch(()=>{}));}</script></body></html>

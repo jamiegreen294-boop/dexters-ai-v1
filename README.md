@@ -13,6 +13,8 @@ Dexter AI is the isolated test command centre for Dexters.
 - Knowledge: synced Dexters business knowledge plus live-menu reads
 - Memory: owner-approved durable memory, separate from conversation history
 
+Cloud operator command routing, daily reports and the checked-in runtime are described in [cloud-operator-improvements.md](docs/cloud-operator-improvements.md). Run the focused checks with `npm test` on Node 24 or newer.
+
 ## Safety boundary
 
 This repository is TEST only.
