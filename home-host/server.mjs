@@ -1423,7 +1423,7 @@ async function desktopChromeRestartControlled(request={}){
 async function desktopChromeCdp(request={}){
   const endpoint="http://127.0.0.1:9222";
   let browser;
-  try{browser=await chromium.connectOverCDP(endpoint)}catch(e){throw new Error("Dexter visible Chromium is not available for local control.");}
+  try{browser=await chromium.connectOverCDP(endpoint,{timeout:20000})}catch(e){throw new Error("Dexter visible Chromium is not available for local control.");}
   let page=null;
   for(let i=0;i<20;i++){
     const pages=browser.contexts().flatMap(c=>c.pages());
@@ -1486,7 +1486,10 @@ async function desktopChromeFill(request={}){
 async function desktopChromeClick(request={}){
   const {browser,page}=await desktopChromeCdp(request);
   try{
-    const el=await byRef(page,String(request.ref||""));
+    const label=String(request.text||"").trim();
+    const role=String(request.role||"button");
+    if(label && !["button","link","checkbox","tab"].includes(role))throw new Error("Unsupported desktop element role.");
+    const el=label?page.getByRole(role,{name:label,exact:true}).first():await byRef(page,String(request.ref||""));
     const text=((await el.innerText().catch(()=>""))+" "+String(await el.getAttribute("aria-label")||"")).toLowerCase();
     if(/captcha|cloudflare|turnstile|verify you are human|verification/.test(text))throw new Error("Human verification required.");
     await el.click({timeout:15000});
