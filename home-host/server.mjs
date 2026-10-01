@@ -1317,7 +1317,7 @@ function desktopProfileDir(){
 }
 async function desktopPowershell(script,timeout=30000){
   desktopRequireWindows();
-  return await runProcess("powershell.exe",["-NoProfile","-NonInteractive","-ExecutionPolicy","Bypass","-Command",String(script)],WORKSPACE,timeout);
+  return await runProcess("powershell.exe",["-NoProfile","-NonInteractive","-ExecutionPolicy","Bypass","-EncodedCommand",Buffer.from(String(script),"utf16le").toString("base64")],WORKSPACE,timeout);
 }
 async function desktopProfileRequestElevation(){
   desktopRequireWindows();
@@ -1415,7 +1415,7 @@ async function desktopChromeRestartControlled(request={}){
   desktopRequireWindows();
   const profile=desktopProfileDir();
   const safe=profile.replace(/\x27/g,"\x27\x27");
-  const ps="$p=Get-CimInstance Win32_Process -Filter \"Name = \'chrome.exe\'\" -ErrorAction SilentlyContinue|Where-Object {$_.CommandLine -like \"*"+safe.replace(/\\/g,"\\\\")+"*\"};foreach($x in $p){Stop-Process -Id $x.ProcessId -Force -ErrorAction SilentlyContinue};[pscustomobject]@{Stopped=@($p).Count}|ConvertTo-Json -Compress";
+  const ps="$p=Get-CimInstance Win32_Process -Filter \"Name = \'chrome.exe\'\" -ErrorAction SilentlyContinue|Where-Object {$_.CommandLine -like \"*"+safe+"*\"};foreach($x in $p){Stop-Process -Id $x.ProcessId -Force -ErrorAction SilentlyContinue};[pscustomobject]@{Stopped=@($p).Count}|ConvertTo-Json -Compress";
   await desktopPowershell(ps,15000).catch(()=>null);
   await new Promise(r=>setTimeout(r,1000));
   return await desktopChromeOpenUrl({url:request.url||"https://www.esimerge.com/apply"});
@@ -1423,12 +1423,12 @@ async function desktopChromeRestartControlled(request={}){
 async function desktopChromeCdp(request={}){
   const endpoint="http://127.0.0.1:9222";
   let browser;
-  try{browser=await chromium.connectOverCDP(endpoint,{timeout:20000})}catch(e){throw new Error("Dexter visible Chromium is not available for local control.");}
+  try{browser=await chromium.connectOverCDP(endpoint,{timeout:20000})}catch(e){throw new Error("Dexter Chrome control failed: "+String(e?.message||e).slice(0,1500));}
   let page=null;
   for(let i=0;i<20;i++){
     const pages=browser.contexts().flatMap(c=>c.pages());
     const target=String(request.url_contains||"").toLowerCase();
-    page=(target?[...pages].reverse().find(p=>p.url().toLowerCase().includes(target)):null)||pages.find(p=>/esimerge\.com\/apply/.test(p.url()))||[...pages].reverse().find(p=>/^https?:\/\//.test(p.url()))||null;
+    page=target?([...pages].reverse().find(p=>p.url().toLowerCase().includes(target))||null):([...pages].reverse().find(p=>/^https?:\/\//.test(p.url()))||null);
     if(page)break;
     await new Promise(r=>setTimeout(r,500));
   }
@@ -1500,8 +1500,8 @@ async function desktopChromeClick(request={}){
 async function desktopChromeFocus(){
   desktopRequireWindows();
   const ps="$p=Get-Process chrome -ErrorAction SilentlyContinue|Where-Object {$_.MainWindowHandle -ne 0}|Sort-Object StartTime -Descending|Select-Object -First 1;if(-not $p){throw 'No visible Chrome window found'};Add-Type -AssemblyName Microsoft.VisualBasic;[Microsoft.VisualBasic.Interaction]::AppActivate($p.Id)|Out-Null;[pscustomobject]@{Pid=$p.Id;Title=$p.MainWindowTitle}|ConvertTo-Json -Compress";
-  const r=await desktopPowershell(ps,15000);
-  if(r.code!==0)throw new Error(String(r.stderr||r.stdout||"Could not focus Chrome"));
+  const r=await desktopPowershell(ps,45000);
+  if(r.code!==0)throw new Error(String(r.stderr||r.stdout||(r.killed?"Chrome focus timed out after 45 seconds":"Chrome focus exited with code "+r.code)));
   return {ok:true,window:String(r.stdout||"").trim().slice(0,2000)};
 }
 async function desktopForegroundIsChrome(){
@@ -1518,8 +1518,8 @@ async function desktopScreenshot(){
   fs.mkdirSync(path.dirname(out),{recursive:true});
   const p=out.replace(/\x27/g,"\x27\x27");
   const ps="Add-Type -AssemblyName System.Windows.Forms;Add-Type -AssemblyName System.Drawing;$b=[System.Windows.Forms.SystemInformation]::VirtualScreen;$bmp=New-Object System.Drawing.Bitmap $b.Width,$b.Height;$g=[System.Drawing.Graphics]::FromImage($bmp);$g.CopyFromScreen($b.Left,$b.Top,0,0,$bmp.Size);$bmp.Save('"+p+"',[System.Drawing.Imaging.ImageFormat]::Png);$g.Dispose();$bmp.Dispose()";
-  const r=await desktopPowershell(ps,20000);
-  if(r.code!==0)throw new Error(String(r.stderr||"Screenshot failed"));
+  const r=await desktopPowershell("$ErrorActionPreference='Stop';"+ps,60000);
+  if(r.code!==0)throw new Error(String(r.stderr||r.stdout||(r.killed?"Screen capture timed out after 60 seconds":"Screen capture exited with code "+r.code)));
   return {ok:true,path:path.relative(WORKSPACE,out),image_base64:fs.readFileSync(out).toString("base64")};
 }
 async function desktopClick(request={}){
