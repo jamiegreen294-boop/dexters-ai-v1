@@ -1653,6 +1653,21 @@ Deno.serve(async(req)=>{
             const rr=await runSelfRepair(db,"Dexter scheduler","scheduler");results.push({job:job.name,self_repair:rr});
           }else if(job.action==="learning_review"){
             const lr=await runLearningReview(db,"Dexter scheduler","scheduler");results.push({job:job.name,learning_review:lr});
+          }else if(job.action==="email_agent"){
+            const endpoint=Deno.env.get("SUPABASE_URL")+"/functions/v1/dexter-gmail-connect";
+            const schedulerToken=req.headers.get("x-dexter-scheduler-token")||"";
+            if(!schedulerToken)throw new Error("Dexter scheduler token is unavailable for Email Agent.");
+            const er=await fetch(endpoint,{
+              method:"POST",
+              headers:{"content-type":"application/json","x-dexter-scheduler-token":schedulerToken},
+              body:JSON.stringify({action:"process_inbox",maxResults:8}),
+              signal:AbortSignal.timeout(90000)
+            });
+            const ed=await er.json().catch(()=>({error:"Email Agent returned an unreadable response."}));
+            if(!er.ok)throw new Error("Email Agent: "+String(ed?.error||("HTTP "+er.status)).slice(0,700));
+            results.push({job:job.name,status:ed?.needsReconnect?"needs_reconnect":"email_checked",
+              processed:Number(ed?.processed||0),sent:Number(ed?.sent||0),review:Number(ed?.review||0),
+              ignored:Number(ed?.ignored||0),failed:Number(ed?.failed||0),needs_reconnect:Boolean(ed?.needsReconnect)});
           }else if(job.action==="connector_probe"){
             try{await githubExecute(db,"repo.read",{repo:"jamiegreen294-boop/dexters-ai-v1"},false);await db.from("ai_connectors").update({status:"ready",last_checked_at:now(),last_error:null}).eq("connector_key","github");}catch(e){await db.from("ai_connectors").update({status:"error",last_checked_at:now(),last_error:String((e as Error)?.message||e).slice(0,500)}).eq("connector_key","github");}
             try{await vercelExecute(db,"deployments.read",{projectId:"prj_jHa0ZVvB2Eu8eMqWBQkDgZFehuCA",limit:1},false);await db.from("ai_connectors").update({status:"ready",last_checked_at:now(),last_error:null}).eq("connector_key","vercel");}catch(e){await db.from("ai_connectors").update({status:"error",last_checked_at:now(),last_error:String((e as Error)?.message||e).slice(0,500)}).eq("connector_key","vercel");}
@@ -1710,7 +1725,7 @@ Deno.serve(async(req)=>{
             await db.from("dexter_work_artifacts").insert({task_id:task.id,project_id:projectId||null,name:"Scheduled result",artifact_type:"report",content:ai.reply,metadata:{scheduled_job_id:job.id,model:ai.model}});
             results.push({job:job.name,task_id:task.id,model:ai.model});
           }else throw new Error("Unsupported scheduled action: "+job.action);
-          const minCadence=["eval_collect","telemetry_reconcile"].includes(String(job.action))?5:60;
+          const minCadence=["eval_collect","telemetry_reconcile","email_agent"].includes(String(job.action))?5:60;
           const cadence=Math.max(minCadence,Number(job.payload?.cadence_minutes)||((job.action==="operations_check")?60:1440));
           await db.from("dexter_scheduled_jobs").update({last_run_at:started,last_status:"completed",last_error:null,next_run_at:job.action==="operator_report"?nextUkMorning():new Date(Date.now()+cadence*60000).toISOString(),updated_at:now()}).eq("id",job.id);
           await db.from("dexter_notifications").update({status:"dismissed"}).eq("notification_key","schedule:"+job.id).eq("status","unread");
@@ -1980,7 +1995,8 @@ Deno.serve(async(req)=>{
       if(role!=="owner")return json({error:"Owner access required."},403);
       const name=cleanText(body.name,160),cron=cleanText(body.cronExpression,80),scheduledAction=cleanText(body.scheduledAction,80);
       if(!name||!cron||!scheduledAction)return json({error:"Name, schedule and action are required."},400);
-      const cadence=Math.max(60,Number(body.cadenceMinutes)||1440);
+      const minCadence=scheduledAction==="email_agent"?5:60;
+      const cadence=Math.max(minCadence,Number(body.cadenceMinutes)||1440);
       const payload={...(body.payload||{}),cadence_minutes:cadence};
       const {data,error}=await db.from("dexter_scheduled_jobs").insert({name,project_id:cleanText(body.projectId,80)||null,action:scheduledAction,payload,cron_expression:cron,next_run_at:new Date(Date.now()+cadence*60000).toISOString(),created_by:keyName}).select("*").single();
       if(error)throw error; return json({job:data});
