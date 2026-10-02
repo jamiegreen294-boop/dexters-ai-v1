@@ -10,7 +10,9 @@ const GMAIL = "https://gmail.googleapis.com/gmail/v1/users/me";
 const SCOPES = [
   "openid",
   "email",
-  "https://www.googleapis.com/auth/gmail.readonly"
+  "https://www.googleapis.com/auth/gmail.readonly",
+  "https://www.googleapis.com/auth/gmail.send",
+  "https://www.googleapis.com/auth/gmail.settings.basic"
 ].join(" ");
 
 function db() {
