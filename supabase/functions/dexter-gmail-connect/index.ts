@@ -11,8 +11,7 @@ const SCOPES = [
   "openid",
   "email",
   "https://www.googleapis.com/auth/gmail.readonly",
-  "https://www.googleapis.com/auth/gmail.send",
-  "https://www.googleapis.com/auth/gmail.settings.basic"
+  "https://www.googleapis.com/auth/gmail.send"
 ].join(" ");
 
 function db() {
