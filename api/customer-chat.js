@@ -53,7 +53,7 @@ export default async function handler(req, res) {
   const message = clean(body.message, 5000).trim();
   if (!message) return res.status(400).json({ ok: false, error: "Message required" });
 
-  const model = process.env.DEXTER_AI_MODEL || "gpt-5.6-luna";
+  const model = process.env.DEXTER_AI_MODEL || "gpt-6-luna";
   const maxOutputTokens = Math.max(80, Math.min(700, Number(body.max_output_tokens) || 360));
 
   const controller = new AbortController();
