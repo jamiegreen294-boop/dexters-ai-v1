@@ -26,7 +26,7 @@ const SDCPP_MODEL_URL="https://huggingface.co/darkmaniac7/TokForge-DreamShaper-L
 const SDCPP_MODEL_SHA256="8b080d29432a3185936585971cca09236eea3a018161dd0af11b6f59b5dc4dfb";
 const LOCAL_MODEL=process.env.DEXTER_CHAT_MODEL||"qwen3:1.7b";
 const CODE_MODEL=process.env.DEXTER_CODE_MODEL||process.env.DEXTER_LOCAL_MODEL||"qwen3:4b";
-const MAX_AGENT_STEPS=Math.max(1,Math.min(30,Number(process.env.DEXTER_MAX_AGENT_STEPS||15)));
+const MAX_AGENT_STEPS=Math.max(1,Math.min(20,Number(process.env.DEXTER_MAX_AGENT_STEPS||8)));
 const LIVE_ACTIONS=String(process.env.DEXTER_LIVE_ACTIONS||"false").toLowerCase()==="true";
 const AGENT_ENDPOINT=(process.env.DEXTER_AGENT_ENDPOINT||"https://eikruaxxzzxmfjvsmwwo.supabase.co/functions/v1/dexter-home-agent").replace(/\/$/,"");
 const AGENT_TOKEN=process.env.DEXTER_AGENT_TOKEN||"";
@@ -1958,7 +1958,7 @@ server.listen(PORT,"127.0.0.1",()=>{
   console.log(AGENT_TOKEN?"Dexter cloud agent: paired":"Dexter cloud agent: not paired");
   if(AGENT_TOKEN){
     setTimeout(pollHomeJobs,1000);
-    setInterval(pollHomeJobs,5000);
+    setInterval(pollHomeJobs,1000);
     setInterval(heartbeat,15000);
   }
 });
