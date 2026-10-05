@@ -31,7 +31,9 @@ const LIVE_ACTIONS=String(process.env.DEXTER_LIVE_ACTIONS||"false").toLowerCase(
 const AGENT_ENDPOINT=(process.env.DEXTER_AGENT_ENDPOINT||"https://eikruaxxzzxmfjvsmwwo.supabase.co/functions/v1/dexter-home-agent").replace(/\/$/,"");
 const AGENT_TOKEN=process.env.DEXTER_AGENT_TOKEN||"";
 let agentBusy=false;
+let fastLaneBusy=false;
 let currentCloudJobId=null;
+let currentFastJobId=null;
 
 if(!TOKEN||TOKEN.length<24){
   console.error("Set DEXTER_BROWSER_WORKER_TOKEN to a long random value before starting Dexter.");
@@ -1854,6 +1856,29 @@ async function heartbeat(){
     console.error("Dexter heartbeat:",String(e?.message||e));
   }
 }
+async function pollFastJobs(){
+  if(!AGENT_TOKEN||fastLaneBusy)return;
+  fastLaneBusy=true;
+  try{
+    const d=await agentRequest({action:"poll",lane:"fast"});
+    const job=d?.job;
+    if(!job)return;
+    currentFastJobId=String(job.id||"")||null;
+    try{
+      const result=await executeCloudJob(job);
+      await agentRequest({action:"result",job_id:job.id,status:"completed",result});
+    }catch(e){
+      await agentRequest({action:"result",job_id:job.id,status:"failed",error:String(e?.message||e).slice(0,5000)}).catch(()=>{});
+    }finally{
+      currentFastJobId=null;
+    }
+  }catch(e){
+    console.error("Dexter fast-lane poll:",String(e?.message||e));
+  }finally{
+    fastLaneBusy=false;
+  }
+}
+
 async function pollHomeJobs(){
   if(!AGENT_TOKEN||agentBusy)return;
   agentBusy=true;
@@ -2008,6 +2033,8 @@ server.listen(PORT,"127.0.0.1",()=>{
   if(AGENT_TOKEN){
     setTimeout(pollHomeJobs,1000);
     setInterval(pollHomeJobs,1000);
+    setTimeout(pollFastJobs,500);
+    setInterval(pollFastJobs,500);
     setInterval(heartbeat,15000);
   }
 });
