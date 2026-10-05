@@ -1713,6 +1713,39 @@ async function selfUpdateWorker(){
   }finally{clearTimeout(timer);}
 }
 
+async function emailLocalReason(request,baseUrl='http://127.0.0.1:11434'){
+ const messages=request.messages;
+ if(!Array.isArray(messages)||!messages.length)throw new Error('Email reasoning messages missing');
+ const num_ctx=8192,num_predict=1000;
+ const bytes=Buffer.byteLength(JSON.stringify(messages),'utf8');
+ if(bytes+num_predict+512>num_ctx)throw new Error('Full email conversation exceeds local context; do not truncate');
+ const model=request.model||'qwen3:4b';
+ const r=await fetch(baseUrl+'/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model,messages,format:request.format||'json',stream:false,think:false,keep_alive:'2m',options:{temperature:0,num_ctx,num_predict}}),signal:AbortSignal.timeout(360000)});
+ const data=await r.json();
+ if(!r.ok)throw new Error(data.error||'Email local model failed HTTP '+r.status);
+ if(!data.done||data.done_reason!=='stop')throw new Error('Email local model output incomplete');
+ if(data.prompt_eval_count>num_ctx-num_predict-256)throw new Error('Email prompt reached context limit');
+ const reply=String(data.message?.content||'').trim();JSON.parse(reply);
+ return {reply,model,provider:'ollama-local-email',prompt_tokens:data.prompt_eval_count,output_tokens:data.eval_count};
+}
+
+const EMAIL_RESULT_DIR=path.join(__dirname,"email-results");
+fs.mkdirSync(EMAIL_RESULT_DIR,{recursive:true});
+function journalEmailResult(body){
+  if(!/^[0-9a-f-]{36}$/i.test(body.job_id))throw new Error("Invalid email job identifier");
+  const target=path.join(EMAIL_RESULT_DIR,body.job_id+".json"),temp=target+".tmp";
+  const fd=fs.openSync(temp,"w");
+  try{fs.writeFileSync(fd,JSON.stringify(body));fs.fsyncSync(fd);}finally{fs.closeSync(fd);}
+  fs.renameSync(temp,target);
+}
+async function flushEmailResults(){
+  for(const name of fs.readdirSync(EMAIL_RESULT_DIR).filter(n=>/^[0-9a-f-]{36}\.json$/i.test(n)).slice(0,5)){
+    const file=path.join(EMAIL_RESULT_DIR,name),body=JSON.parse(fs.readFileSync(file,"utf8"));
+    await agentRequest(body);
+    fs.unlinkSync(file);
+  }
+}
+
 async function executeCloudJob(job){
   const request=job?.request||{};
   if(job.job_type==="browser")return await browserTool(String(job.tool_name||"browser.navigate_and_act"),request);
@@ -1727,6 +1760,7 @@ async function executeCloudJob(job){
   if(job.job_type==="self_update")return await selfUpdateWorker();
   if(job.job_type==="self_restart")return scheduleSelfRestart(3000);
   if(job.job_type==="local_ai"){
+    if(request.email_reasoning===true)return await emailLocalReason(request,OLLAMA_URL);
     const messages=Array.isArray(request.messages)?request.messages:[{role:"user",content:String(request.prompt||"")}];
     const fast=request.fast!==false;
     const reply=fast
@@ -1738,7 +1772,7 @@ async function executeCloudJob(job){
 }
 async function agentRequest(body){
   if(!AGENT_TOKEN)return null;
-  const r=await fetch(AGENT_ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json","x-dexter-agent-token":AGENT_TOKEN},body:JSON.stringify(body)});
+  const r=await fetch(AGENT_ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json","x-dexter-agent-token":AGENT_TOKEN},body:JSON.stringify(body),signal:AbortSignal.timeout(30000)});
   const d=await r.json().catch(()=>({}));
   if(!r.ok)throw new Error(d?.error||("Home-agent API failed "+r.status));
   return d;
@@ -1755,17 +1789,22 @@ async function pollHomeJobs(){
   if(!AGENT_TOKEN||agentBusy)return;
   agentBusy=true;
   try{
+    await flushEmailResults();
     const d=await agentRequest({action:"poll"});
     const job=d?.job;
     if(!job)return;
     currentCloudJobId=String(job.id||"")||null;
+    const emailJob=job.request?.email_reasoning===true;
+    let emailJournaled=false;
     try{
       await heartbeat();
       const result=await executeCloudJob(job);
-      await agentRequest({action:"result",job_id:job.id,status:"completed",result});
+      if(emailJob){journalEmailResult({action:"result",job_id:job.id,status:"completed",result});emailJournaled=true;await flushEmailResults();}
+      else await agentRequest({action:"result",job_id:job.id,status:"completed",result});
     }catch(e){
       try{
-        await agentRequest({action:"result",job_id:job.id,status:"failed",error:String(e?.message||e).slice(0,5000)});
+        if(emailJob){if(!emailJournaled)journalEmailResult({action:"result",job_id:job.id,status:"failed",error:String(e?.message||e).slice(0,5000)});await flushEmailResults();}
+        else await agentRequest({action:"result",job_id:job.id,status:"failed",error:String(e?.message||e).slice(0,5000)});
       }catch(reportError){
         console.error("Dexter home-agent result report:",String(reportError?.message||reportError));
       }
@@ -1782,8 +1821,8 @@ async function pollHomeJobs(){
 
 async function health(){
   let ollamaReady=false,models=[];
-  try{const r=await fetch(OLLAMA_URL+"/api/tags");const d=await r.json();ollamaReady=r.ok;models=(d.models||[]).map(x=>x.name).slice(0,20);}catch{}
-  const comfy=await comfyStatus();
+  try{const r=await fetch(OLLAMA_URL+"/api/tags",{signal:AbortSignal.timeout(1500)});const d=await r.json();ollamaReady=r.ok;models=(d.models||[]).map(x=>x.name).slice(0,20);}catch{}
+  const comfy=await Promise.race([comfyStatus(),new Promise(resolve=>setTimeout(()=>resolve({ready:false,error:"Health check deadline"}),1500))]);
   const cpuImage=await sdCppStatus();
   return {status:"ready",host:"home-pc",browser:"chromium",internet:true,coding_agent:true,hardware_doctor:process.platform==="win32",hardware_tools:["hardware.inspect","hardware.printers.read","hardware.ports.read","hardware.spooler.read","hardware.bridge.read"],image_generation:comfy.ready||cpuImage.ready,live_actions:LIVE_ACTIONS,cloud_agent_paired:Boolean(AGENT_TOKEN),agent_endpoint:AGENT_ENDPOINT,headless:HEADLESS,workspace:WORKSPACE,ollama:{ready:ollamaReady,url:OLLAMA_URL,model:LOCAL_MODEL,code_model:CODE_MODEL,models},image:{preferred:comfy.ready?"comfyui":cpuImage.ready?"stable-diffusion.cpp-cpu":null,comfyui:comfy,cpu:cpuImage},jobs:loadJobs().length};
 }
