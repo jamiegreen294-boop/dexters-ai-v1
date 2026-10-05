@@ -1766,8 +1766,57 @@ async function flushEmailResults(){
   }
 }
 
+async function deterministicFastPath(job){
+  const request=job?.request||{};
+  const explicit=String(request.deterministic_tool||request.direct_tool||"").trim();
+  const readOnly=new Set([
+    "android.devices","android.info","android.package_info","android.packages",
+    "system.info","hardware.inspect","hardware.printers.read","system.printers",
+    "hardware.ports.read","hardware.spooler.read","hardware.bridge.read"
+  ]);
+  const approvedActions=new Set([
+    "android.connect","android.autoconnect","android.launch","android.apply_business_profile"
+  ]);
+  if(explicit){
+    if(!readOnly.has(explicit)&&!approvedActions.has(explicit))return null;
+    if(approvedActions.has(explicit)&&request.approval_granted!==true)throw new Error("Deterministic live action requires owner approval.");
+    const directRequest=(request.deterministic_request&&typeof request.deterministic_request==="object")
+      ?{...request.deterministic_request,approval_granted:request.approval_granted===true}
+      :request;
+    return {status:"completed",deterministic:true,tool:explicit,result:await workspaceTool(explicit,directRequest)};
+  }
+  if(job?.job_type!=="coding")return null;
+  const goal=String(request.goal||request.instruction||"").trim();
+  if(!goal)return null;
+  const serial=String(request.serial||"").trim() ||
+    (goal.match(/\b(?:\d{10,}|(?:\d{1,3}\.){3}\d{1,3}:\d{2,5})\b/)||[])[0] || "";
+  const pkg=(goal.match(/\b(?:com|co|uk|net|org)\.[A-Za-z0-9_.]+\b/)||[])[0]||"";
+  let tool=null,directRequest={};
+  if(/\b(?:list|show|check|find)\b[\s\S]{0,30}\bandroid\b[\s\S]{0,20}\bdevices?\b|\badb devices\b/i.test(goal)){
+    tool="android.devices";
+  }else if(/\b(?:device|android)\b[\s\S]{0,25}\binfo(?:rmation)?\b|\bmodel\b[\s\S]{0,20}\bandroid\b/i.test(goal)){
+    tool="android.info";directRequest={serial};
+  }else if(pkg&&/\b(?:package|app)\b[\s\S]{0,25}\b(?:info|version|details)\b|\bversion\b[\s\S]{0,25}\b(?:package|app)\b/i.test(goal)){
+    tool="android.package_info";directRequest={serial,package:pkg};
+  }else if(/\b(?:list|show|check)\b[\s\S]{0,25}\b(?:installed )?(?:apps|packages)\b/i.test(goal)){
+    tool="android.packages";directRequest={serial};
+  }else if(/\b(?:printer|printers)\b[\s\S]{0,20}\b(?:status|check|list|inspect)\b|\b(?:check|list|inspect)\b[\s\S]{0,20}\bprinters?\b/i.test(goal)){
+    tool="hardware.printers.read";
+  }else if(/\b(?:ports?|usb|serial)\b[\s\S]{0,20}\b(?:status|check|list|inspect)\b|\b(?:check|list|inspect)\b[\s\S]{0,20}\b(?:ports?|usb|serial)\b/i.test(goal)){
+    tool="hardware.ports.read";
+  }else if(/\b(?:system|pc|computer)\b[\s\S]{0,20}\binfo(?:rmation)?\b/i.test(goal)){
+    tool="system.info";
+  }else if(/\bhardware\b[\s\S]{0,20}\b(?:check|inspect|status)\b|\b(?:check|inspect)\b[\s\S]{0,20}\bhardware\b/i.test(goal)){
+    tool="hardware.inspect";
+  }
+  if(!tool)return null;
+  return {status:"completed",deterministic:true,tool,result:await workspaceTool(tool,directRequest)};
+}
+
 async function executeCloudJob(job){
   const request=job?.request||{};
+  const deterministic=await deterministicFastPath(job);
+  if(deterministic)return deterministic;
   if(job.job_type==="browser")return await browserTool(String(job.tool_name||"browser.navigate_and_act"),request);
   if(job.job_type==="workspace")return await workspaceTool(String(job.tool_name||""),request);
   if(job.job_type==="research")return await internetResearch(request);
