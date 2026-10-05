@@ -1718,7 +1718,24 @@ async function emailLocalReason(request,baseUrl='http://127.0.0.1:11434'){
  if(!Array.isArray(messages)||!messages.length)throw new Error('Email reasoning messages missing');
  const num_ctx=8192,num_predict=1000;
  const bytes=Buffer.byteLength(JSON.stringify(messages),'utf8');
- if(bytes+num_predict+512>num_ctx)throw new Error('Full email conversation exceeds local context; do not truncate');
+ if(bytes>30000)throw new Error('Full email conversation exceeds safe request size; do not truncate');
+ let inputUpperBound=bytes+512;
+ if(inputUpperBound+num_predict>num_ctx){
+   if(!modelIsQwen(request.model))throw new Error('Full conversation needs the verified Qwen tokenizer');
+   const model=request.model||'qwen3:4b';
+   const loaded=await fetch(baseUrl+'/api/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model,stream:false,keep_alive:'2m',options:{num_ctx}}),signal:AbortSignal.timeout(180000)});
+   if(!loaded.ok)throw new Error('Email model preload failed');await loaded.json();
+   const localAppData=process.env.LOCALAPPDATA||path.join(process.env.USERPROFILE||'C:/Users/Dexter','AppData','Local');
+   const log=fs.readFileSync(path.join(localAppData,'Ollama','server.log'),'utf8');
+   const ports=[...log.matchAll(/listening on http:\/\/127\.0\.0\.1:(\d{1,5})/g)];
+   const port=ports.at(-1)?.[1];if(!port)throw new Error('Local model tokenizer unavailable');
+   const response=await fetch('http://127.0.0.1:'+port+'/tokenize',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({content:JSON.stringify(messages),add_special:true,parse_special:false}),signal:AbortSignal.timeout(5000)});
+   if(!response.ok)throw new Error('Local model token count unavailable');
+   const tokenized=await response.json();if(!Array.isArray(tokenized.tokens))throw new Error('Invalid local token count');
+   // JSON escaping overcounts the message text; reserve 512 more tokens for chat framing.
+   inputUpperBound=tokenized.tokens.length+512;
+ }
+ if(inputUpperBound+num_predict>num_ctx)throw new Error('Full email conversation exceeds local token context; do not truncate');
  const model=request.model||'qwen3:4b';
  const r=await fetch(baseUrl+'/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model,messages,format:request.format||'json',stream:false,think:false,keep_alive:'2m',options:{temperature:0,num_ctx,num_predict}}),signal:AbortSignal.timeout(360000)});
  const data=await r.json();
@@ -1726,8 +1743,11 @@ async function emailLocalReason(request,baseUrl='http://127.0.0.1:11434'){
  if(!data.done||data.done_reason!=='stop')throw new Error('Email local model output incomplete');
  if(data.prompt_eval_count>num_ctx-num_predict-256)throw new Error('Email prompt reached context limit');
  const reply=String(data.message?.content||'').trim();JSON.parse(reply);
- return {reply,model,provider:'ollama-local-email',prompt_tokens:data.prompt_eval_count,output_tokens:data.eval_count};
+ if(data.prompt_eval_count>inputUpperBound)throw new Error('Email tokenizer bound did not cover the full prompt');
+ return {reply,model,provider:'ollama-local-email',prompt_tokens:data.prompt_eval_count,output_tokens:data.eval_count,input_token_bound:inputUpperBound};
 }
+
+function modelIsQwen(model){return !model||/^qwen3:/.test(model);}
 
 const EMAIL_RESULT_DIR=path.join(__dirname,"email-results");
 fs.mkdirSync(EMAIL_RESULT_DIR,{recursive:true});
