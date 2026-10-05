@@ -1889,11 +1889,11 @@ async function pollHomeJobs(){
 }
 
 async function health(){
-  let ollamaReady=false,models=[];
-  try{const r=await fetch(OLLAMA_URL+"/api/tags",{signal:AbortSignal.timeout(1500)});const d=await r.json();ollamaReady=r.ok;models=(d.models||[]).map(x=>x.name).slice(0,20);}catch{}
-  const comfy=await Promise.race([comfyStatus(),new Promise(resolve=>setTimeout(()=>resolve({ready:false,error:"Health check deadline"}),1500))]);
-  const cpuImage=await sdCppStatus();
-  return {status:"ready",host:"home-pc",browser:"chromium",internet:true,coding_agent:true,hardware_doctor:process.platform==="win32",hardware_tools:["hardware.inspect","hardware.printers.read","hardware.ports.read","hardware.spooler.read","hardware.bridge.read"],image_generation:comfy.ready||cpuImage.ready,live_actions:LIVE_ACTIONS,cloud_agent_paired:Boolean(AGENT_TOKEN),agent_endpoint:AGENT_ENDPOINT,headless:HEADLESS,workspace:WORKSPACE,ollama:{ready:ollamaReady,url:OLLAMA_URL,model:LOCAL_MODEL,code_model:CODE_MODEL,models},image:{preferred:comfy.ready?"comfyui":cpuImage.ready?"stable-diffusion.cpp-cpu":null,comfyui:comfy,cpu:cpuImage},jobs:loadJobs().length};
+  let ollamaReady=false;
+  try{const r=await fetch(OLLAMA_URL+"/api/tags",{signal:AbortSignal.timeout(500)});ollamaReady=r.ok;}catch{}
+  let jobs=0;
+  try{jobs=fs.readdirSync(JOB_DIR).filter(x=>x.endsWith(".json")).length;}catch{}
+  return {status:"ready",host:"home-pc",browser:"chromium",coding_agent:true,hardware_doctor:process.platform==="win32",live_actions:LIVE_ACTIONS,cloud_agent_paired:Boolean(AGENT_TOKEN),headless:HEADLESS,workspace:WORKSPACE,ollama:{ready:ollamaReady,url:OLLAMA_URL,model:LOCAL_MODEL,code_model:CODE_MODEL},jobs};
 }
 function serveFile(res,file,contentType){const data=fs.readFileSync(file);res.writeHead(200,{"Content-Type":contentType,"Cache-Control":"no-store"});res.end(data);}
 
