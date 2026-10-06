@@ -1224,6 +1224,18 @@ async function androidTool(tool,request={}){
     return {address,paired:/success/i.test(r.stdout+r.stderr),output:(r.stdout+r.stderr).trim().slice(0,2000)};
   }
   if(tool==="android.info")return await androidDeviceInfo(String(request.serial||"").trim());
+  if(tool==="android.foodhub_checkout_provision"){
+    if(request?.approval_granted!==true)throw new Error("Foodhub checkout provisioning requires owner approval.");
+    const serial=String(request.serial||"192.168.0.199:5555").trim();
+    const deviceId=String(request.device_id||"bde3a386-fd2d-4fec-8aff-704be635aa86").trim();
+    const secret=crypto.randomBytes(32).toString("hex");
+    const secretHash=crypto.createHash("sha256").update(secret).digest("hex");
+    const target=serial?["-s",serial]:[];
+    await adbRun([...target,"shell","am","start","-n","co.dexters.checkout/.CheckoutActivity","--es","device_id",deviceId,"--es","device_secret",secret],30000);
+    await new Promise(r=>setTimeout(r,1500));
+    const check=await adbRun([...target,"shell","run-as","co.dexters.checkout","sh","-c","test -f shared_prefs/checkout-secure.xml && echo provisioned || echo missing"],30000).catch(()=>({stdout:"unknown"}));
+    return {ok:true,serial,device_id:deviceId,secret_hash:secretHash,device_store:String(check.stdout||"").trim(),raw_secret_returned:false};
+  }
   if(tool==="android.dexter_os_activate"){
     if(request?.approval_granted!==true)throw new Error("Dexter OS launcher activation requires owner approval.");
     const serial=String(request.serial||"").trim();
@@ -1777,7 +1789,7 @@ async function deterministicFastPath(job){
     "hardware.ports.read","hardware.spooler.read","hardware.bridge.read"
   ]);
   const approvedActions=new Set([
-    "android.connect","android.autoconnect","android.launch","android.apply_business_profile"
+    "android.connect","android.autoconnect","android.launch","android.apply_business_profile","android.foodhub_checkout_provision"
   ]);
   if(explicit){
     if(!readOnly.has(explicit)&&!approvedActions.has(explicit))return null;
