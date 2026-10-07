@@ -66,9 +66,9 @@ jobs:
           mkdir -p "$RUNNER_TEMP/gh-pages/device"
           cp android-app/app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/gh-pages/device/Dexter-OS-V3-v1.apk"
           cd "$RUNNER_TEMP/gh-pages"
-          git add device/Dexter-OS-Preview-v33.apk
+          git add device/Dexter-OS-V3-v1.apk
           if git diff --cached --quiet; then
-            echo "Dexter OS preview APK already current"
+            echo "Dexter OS V3 APK already current"
           else
             git commit -m "Publish Dexter OS V3 v1"
             for attempt in 1 2 3; do
