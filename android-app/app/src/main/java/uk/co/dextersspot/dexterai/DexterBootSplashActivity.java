@@ -34,7 +34,7 @@ public class DexterBootSplashActivity extends Activity {
         hero.setBackgroundColor(Color.BLACK);
         hero.setScaleType(ImageView.ScaleType.FIT_CENTER);
 
-        File exactArtwork=new File(getFilesDir(),"dexters_gold_dog.png");
+        File exactArtwork=new File("/sdcard/Pictures/dexters_gold_dog.png");
         Bitmap bitmap=BitmapFactory.decodeFile(exactArtwork.getAbsolutePath());
         if(bitmap!=null){
             hero.setImageBitmap(bitmap);
