@@ -10,6 +10,15 @@
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"/>
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
+    <uses-permission android:name="com.sunmi.perm.CONTACTLESS_CARD"/>
+    <uses-permission android:name="com.sunmi.perm.ICC"/>
+    <uses-permission android:name="com.sunmi.perm.MSR"/>
+    <uses-permission android:name="com.sunmi.perm.PINPAD"/>
+
+    <queries>
+        <package android:name="com.sunmi.scanner"/>
+        <package android:name="com.sunmi.pay.hardware_v3"/>
+    </queries>
 
     <application
         android:allowBackup="false"
