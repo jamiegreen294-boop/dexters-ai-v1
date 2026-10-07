@@ -5,11 +5,11 @@ android {
     compileSdk 35
 
     defaultConfig {
-        applicationId 'uk.co.dextersspot.dexteros.preview'
+        applicationId 'uk.co.dextersspot.dexteros.v3'
         minSdk 26
         targetSdk 35
-        versionCode 33
-        versionName '0.33.0-approved-mockup'
+        versionCode 101
+        versionName '1.0.1-v3'
     }
 
     def ksPath = System.getenv('DEXTER_ANDROID_KEYSTORE_PATH')
